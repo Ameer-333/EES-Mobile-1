@@ -37,12 +37,11 @@ function getDashboardTitle(pathname: string, role: UserRole | null): string {
     if (pathname.endsWith('/dashboard')) return `${role} Dashboard`;
     if (pathname.includes('/profile')) return `${role} Profile`;
     if (pathname.includes('/records')) return `My Academic Records`;
-    // if (pathname.includes('/doubts')) return `AI Doubt Assistance`; // Removed
     if (pathname.includes('/students')) return `Manage Students`;
     if (pathname.includes('/data-entry')) return `Student Data Entry`;
     if (pathname.includes('/give-remark')) return `Provide Student Remark`;
     if (pathname.includes('/messaging')) return `Send Messages`;
-    if (pathname.includes('/feedback')) return `AI Feedback Generator`;
+    // if (pathname.includes('/feedback')) return `AI Feedback Generator`; // Removed
     if (pathname.includes('/user-management')) return `User Management`;
     if (pathname.includes('/teacher-management')) return `Teacher Management`;
     if (pathname.includes('/hall-of-fame-management')) return `Manage Hall of Fame`;

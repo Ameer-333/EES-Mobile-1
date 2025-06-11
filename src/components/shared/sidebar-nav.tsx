@@ -20,7 +20,6 @@ const navItems: NavItem[] = [
   { href: '/student/dashboard', label: 'Dashboard', icon: Home, roles: ['Student'] },
   { href: '/student/profile', label: 'Profile & Activities', icon: User, roles: ['Student'] },
   { href: '/student/records', label: 'Academic Records', icon: BookOpen, roles: ['Student'] },
-  // { href: '/student/doubts', label: 'AI Doubts Helper', icon: MessageCircle, roles: ['Student']}, // Removed
   { href: '/hall-of-fame', label: 'Hall of Fame', icon: Award, roles: ['Student'] },
   
   // Teacher
@@ -29,7 +28,7 @@ const navItems: NavItem[] = [
   { href: '/teacher/data-entry', label: 'Student Data Entry', icon: Edit, roles: ['Teacher'] },
   { href: '/teacher/give-remark', label: 'Give Student Remarks', icon: MessageSquarePlus, roles: ['Teacher'] },
   { href: '/teacher/messaging', label: 'Send Messages', icon: Mail, roles: ['Teacher'] },
-  { href: '/teacher/feedback', label: 'AI Feedback Gen', icon: MessageCircle, roles: ['Teacher']}, 
+  // { href: '/teacher/feedback', label: 'AI Feedback Gen', icon: MessageCircle, roles: ['Teacher']}, // Removed
   { href: '/teacher/profile', label: 'My Profile & Salary', icon: User, roles: ['Teacher'] },
   { href: '/hall-of-fame', label: 'Hall of Fame', icon: Award, roles: ['Teacher'] },
 
@@ -125,3 +124,4 @@ export function SidebarNav_Corrected() {
     </nav>
   );
 }
+
