@@ -2,7 +2,7 @@
 'use client';
 
 import type { Student } from '@/types';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { AddStudentDialog } from '@/components/teacher/add-student-dialog';
 import { EditStudentDialog } from '@/components/teacher/edit-student-dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const mockStudentsData: Student[] = [
   { id: 'S001', name: 'Aarav Sharma', satsNumber: 'SAT001', class: '10th', section: 'A', caste: 'General', religion: 'Hindu', address: '1st Street, Bangalore' },
@@ -38,6 +39,11 @@ export function TeacherStudentManagement() {
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
   const [currentStudentToEdit, setCurrentStudentToEdit] = useState<Student | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const filteredStudents = useMemo(() => {
     if (!searchTerm) return students;
@@ -68,6 +74,43 @@ export function TeacherStudentManagement() {
     setStudents(prevStudents => prevStudents.map(s => s.id === editedStudent.id ? editedStudent : s));
     // Toast is handled within EditStudentDialog
   };
+
+  if (!hasMounted) {
+    return (
+      <Card className="w-full shadow-lg rounded-lg">
+        <CardHeader>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-72" />
+            </div>
+            <Skeleton className="h-10 w-40" />
+          </div>
+          <div className="mt-4 relative">
+            <Skeleton className="h-10 w-full md:w-1/2" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {Array(6).fill(0).map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array(3).fill(0).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array(6).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
 
   return (
