@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm, Controller } from 'react-hook-form';
@@ -16,6 +17,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const mockStudents: Pick<Student, 'id' | 'name'>[] = [
   { id: 'S001', name: 'Aarav Sharma' },
@@ -40,6 +43,11 @@ const attendanceSchema = z.object({
 
 export function TeacherDataEntry() {
   const { toast } = useToast();
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const marksForm = useForm<z.infer<typeof marksSchema>>({
     resolver: zodResolver(marksSchema),
@@ -61,6 +69,32 @@ export function TeacherDataEntry() {
     console.log('Attendance submitted:', values);
     toast({ title: 'Attendance Submitted', description: `Attendance for ${values.subjectName} on ${format(values.date, "PPP")} recorded for student ID ${values.studentId}.` });
     attendanceForm.reset();
+  }
+
+  if (!hasMounted) {
+    return (
+      <Card className="w-full shadow-lg rounded-lg">
+        <CardHeader>
+          <Skeleton className="h-8 w-1/2 mb-1" />
+          <Skeleton className="h-4 w-3/4" />
+        </CardHeader>
+        <CardContent>
+          <div className="grid w-full grid-cols-2 mb-6 gap-1">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="space-y-6">
+            <Skeleton className="h-4 w-1/4 mb-1" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-4 w-1/4 mb-1" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-4 w-1/4 mb-1" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-1/3 mt-2" />
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -251,3 +285,4 @@ export function TeacherDataEntry() {
     </Card>
   );
 }
+
