@@ -14,7 +14,7 @@ export default function AdminDashboardPage() {
         </CardHeader>
         <CardContent>
           <CardDescription>
-            This is the central hub for managing the EES Mobile application. 
+            This is the central hub for managing the EES Education application. 
             You have administrative privileges to oversee users, content, and system settings.
           </CardDescription>
           <p className="mt-4 text-muted-foreground">

@@ -10,7 +10,7 @@ export default function AdminSettingsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            Configure application settings here. (Placeholder for EES Mobile settings)
+            Configure application settings here. (Placeholder for EES Education settings)
           </p>
         </CardContent>
       </Card>

@@ -11,19 +11,19 @@ export default function LandingPage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-accent/30 p-4">
       <div className="mb-12 text-center">
         <LogoIcon className="h-24 w-24 text-primary mx-auto mb-3" />
-        <h1 className="text-5xl font-headline font-bold text-primary">EES Mobile</h1>
-        <p className="text-xl text-muted-foreground mt-1">Educational Ecosystem Suite</p>
+        <h1 className="text-5xl font-headline font-bold text-primary">EES Education</h1>
+        <p className="text-xl text-muted-foreground mt-1">Excellent English School</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl w-full">
         <LoginOptionCard
           role="Student"
-          description="Access your academic records, attendance, and AI doubt assistance."
+          description="Access your academic records, attendance, and other resources."
           href="/login/student"
         />
         <LoginOptionCard
           role="Teacher"
-          description="Manage student data, enter marks, attendance, and generate feedback."
+          description="Manage student data, enter marks, attendance, and access teaching tools."
           href="/login/teacher"
         />
         <LoginOptionCard
@@ -34,7 +34,7 @@ export default function LandingPage() {
       </div>
 
       <footer className="mt-12 text-center text-sm text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} EES Mobile. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} EES Education. All rights reserved.</p>
       </footer>
     </div>
   );

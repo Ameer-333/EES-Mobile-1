@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'EES Mobile',
-  description: 'Educational Ecosystem Suite',
+  title: 'EES Education',
+  description: 'Excellent English School',
 };
 
 export default function RootLayout({

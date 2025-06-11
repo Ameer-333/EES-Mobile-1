@@ -47,7 +47,7 @@ export default function ProtectedLayout({
           <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <Link href="/" className="flex items-center gap-2 font-semibold text-primary">
               <LogoIcon className="h-6 w-6" />
-              <span className="font-headline">EES Mobile</span>
+              <span className="font-headline">EES Education</span>
             </Link>
           </div>
           <div className="flex-1">
@@ -77,7 +77,7 @@ export default function ProtectedLayout({
                   className="flex items-center gap-2 text-lg font-semibold mb-4 text-primary"
                 >
                   <LogoIcon className="h-6 w-6" />
-                  <span className="sr-only">EES Mobile</span>
+                  <span className="sr-only">EES Education</span>
                 </Link>
                 <SidebarNav />
               </nav>
