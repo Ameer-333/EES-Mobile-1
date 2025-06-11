@@ -1,6 +1,7 @@
 import type { Student } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { User, MapPin, BookUser, Users, Landmark, Church } from 'lucide-react'; // Added more icons
+import { cn } from '@/lib/utils';
 
 interface StudentProfileCardProps {
   student: Student;
