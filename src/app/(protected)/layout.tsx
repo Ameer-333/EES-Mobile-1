@@ -1,12 +1,13 @@
+
 'use client';
 
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, LogOut, UserCircle } from 'lucide-react';
+import { Menu, LogOut, UserCircle, Award } from 'lucide-react';
 import { LogoIcon } from '@/components/icons/logo-icon';
-import { SidebarNav } from '@/components/shared/sidebar-nav';
+import { SidebarNav_Corrected as SidebarNav } from '@/components/shared/sidebar-nav'; // Use corrected one
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +15,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { UserRole } from '@/types';
@@ -22,7 +24,35 @@ function getCurrentRole(pathname: string): UserRole | null {
   if (pathname.startsWith('/student')) return 'Student';
   if (pathname.startsWith('/teacher')) return 'Teacher';
   if (pathname.startsWith('/admin')) return 'Admin';
+  if (pathname.startsWith('/hall-of-fame')) {
+    // Infer role from a previous segment if possible, or need auth context
+    // This is a simplification for prototype.
+    const segments = pathname.split('/');
+    if (segments.length > 2 && ['student', 'teacher', 'admin'].includes(segments[1])) {
+        return segments[1].charAt(0).toUpperCase() + segments[1].slice(1) as UserRole;
+    }
+  }
   return null;
+}
+
+function getDashboardTitle(pathname: string, role: UserRole | null): string {
+    if (pathname.endsWith('/dashboard')) return `${role} Dashboard`;
+    if (pathname.includes('/profile')) return `${role} Profile`;
+    if (pathname.includes('/records')) return `My Academic Records`;
+    if (pathname.includes('/doubts')) return `AI Doubt Assistance`;
+    if (pathname.includes('/students')) return `Manage Students`;
+    if (pathname.includes('/data-entry')) return `Student Data Entry`;
+    if (pathname.includes('/give-remark')) return `Provide Student Remark`;
+    if (pathname.includes('/messaging')) return `Send Messages`;
+    if (pathname.includes('/feedback')) return `AI Feedback Generator`;
+    if (pathname.includes('/user-management')) return `User Management`;
+    if (pathname.includes('/teacher-management')) return `Teacher Management`;
+    if (pathname.includes('/hall-of-fame-management')) return `Manage Hall of Fame`;
+    if (pathname.includes('/analytics')) return `System Analytics`;
+    if (pathname.includes('/settings')) return `Admin Settings`;
+    if (pathname.includes('/hall-of-fame')) return `Excellent Hall of Fame`;
+
+    return role ? `${role} View` : 'EES Education';
 }
 
 
@@ -33,19 +63,28 @@ export default function ProtectedLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const role = getCurrentRole(pathname);
+  const role = getCurrentRole(pathname); // This might be null for /hall-of-fame directly
+  
+  // A more reliable way to get the role for the layout itself
+  const layoutRole = pathname.split('/')[1] as UserRole | undefined;
+  const currentActualRole = layoutRole && ['student', 'teacher', 'admin'].includes(layoutRole) 
+                            ? layoutRole.charAt(0).toUpperCase() + layoutRole.slice(1) as UserRole 
+                            : null;
+
 
   const handleLogout = () => {
     // Mock logout
-    router.push('/login/student');
+    router.push('/login/student'); // Default to student login, or could be '/'
   };
+  
+  const pageTitle = getDashboardTitle(pathname, currentActualRole);
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-muted/40 md:block">
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-            <Link href="/" className="flex items-center gap-2 font-semibold text-primary">
+            <Link href={currentActualRole ? `/${currentActualRole.toLowerCase()}/dashboard` : "/"} className="flex items-center gap-2 font-semibold text-primary">
               <LogoIcon className="h-6 w-6" />
               <span className="font-headline">EES Education</span>
             </Link>
@@ -73,7 +112,7 @@ export default function ProtectedLayout({
             <SheetContent side="left" className="flex flex-col">
               <nav className="grid gap-2 text-lg font-medium">
                 <Link
-                  href="#"
+                  href={currentActualRole ? `/${currentActualRole.toLowerCase()}/dashboard` : "/"}
                   className="flex items-center gap-2 text-lg font-semibold mb-4 text-primary"
                 >
                   <LogoIcon className="h-6 w-6" />
@@ -84,24 +123,30 @@ export default function ProtectedLayout({
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-            {/* Can add breadcrumbs or search here */}
-            <h1 className="font-semibold text-lg capitalize">{role} Dashboard</h1>
+             <h1 className="font-semibold text-lg">{pageTitle}</h1>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
-                  <AvatarImage src="https://placehold.co/40x40.png" alt="@shadcn" data-ai-hint="user avatar" />
-                  <AvatarFallback>{role?.charAt(0)}</AvatarFallback>
+                  <AvatarImage src={`https://placehold.co/40x40.png?text=${currentActualRole?.charAt(0)}`} alt="User Avatar" data-ai-hint="user avatar generic"/>
+                  <AvatarFallback>{currentActualRole?.charAt(0) || 'U'}</AvatarFallback>
                 </Avatar>
                 <span className="sr-only">Toggle user menu</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account ({role})</DropdownMenuLabel>
+              <DropdownMenuLabel>My Account ({currentActualRole || 'User'})</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push(`/${role?.toLowerCase()}/profile`)}>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
+              {currentActualRole && ['Student', 'Teacher'].includes(currentActualRole) && (
+                <DropdownMenuItem onClick={() => router.push(`/${currentActualRole.toLowerCase()}/profile`)}>Profile</DropdownMenuItem>
+              )}
+               {currentActualRole === 'Admin' && (
+                <DropdownMenuItem onClick={() => router.push(`/admin/settings`)}>Settings</DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => router.push(`/hall-of-fame`)}>
+                <Award className="mr-2 h-4 w-4" /> Hall of Fame
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
