@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,6 +20,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, LogIn, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { auth } from '@/lib/firebase'; // Import Firebase auth
+import { signInWithEmailAndPassword, FirebaseError } from 'firebase/auth';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -33,6 +36,7 @@ export function LoginForm({ role }: LoginFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
@@ -47,16 +51,27 @@ export function LoginForm({ role }: LoginFormProps) {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    // Mock authentication
-    console.log(`Logging in as ${role} with values:`, values);
-    toast({
-      title: 'Login Successful',
-      description: `Welcome, ${role}! Redirecting to dashboard...`,
-    });
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsSubmitting(true);
+    try {
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      
+      // TODO: In a real app, after successful Firebase login, you would typically:
+      // 1. Get the user's UID from the auth.currentUser object.
+      // 2. Query Firestore (or another database) to fetch the user's custom role (Admin, Teacher, Student).
+      // 3. Verify if the fetched role matches the `role` prop of this LoginForm.
+      //    - If it matches, proceed with redirection.
+      //    - If it doesn't match (e.g., a "Student" tries to log in via "/admin/login"), show an error and sign them out.
+      // For this iteration, we are directly redirecting based on the login form's `role` prop.
 
-    // Simulate API call
-    setTimeout(() => {
+      toast({
+        title: 'Login Successful',
+        description: `Welcome, ${role}! Redirecting to dashboard...`,
+      });
+
+      // Simulate API call delay for toast visibility if needed, otherwise can be immediate
+      // await new Promise(resolve => setTimeout(resolve, 500));
+
       if (role === 'Admin') {
         router.push('/admin/dashboard');
       } else if (role === 'Teacher') {
@@ -64,7 +79,35 @@ export function LoginForm({ role }: LoginFormProps) {
       } else {
         router.push('/student/dashboard');
       }
-    }, 1000);
+    } catch (error) {
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case 'auth/user-not-found':
+          case 'auth/wrong-password':
+          case 'auth/invalid-credential':
+            errorMessage = 'Invalid email or password.';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Invalid email address format.';
+            break;
+          case 'auth/too-many-requests':
+            errorMessage = 'Too many login attempts. Please try again later.';
+            break;
+          default:
+            errorMessage = 'Login failed. Please check your credentials or try again later.';
+            break;
+        }
+      }
+      console.error('Firebase Login Error:', error);
+      toast({
+        title: 'Login Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (!hasMounted) {
@@ -111,7 +154,7 @@ export function LoginForm({ role }: LoginFormProps) {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="you@example.com" {...field} />
+                    <Input placeholder="you@example.com" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -129,6 +172,7 @@ export function LoginForm({ role }: LoginFormProps) {
                         type={showPassword ? "text" : "password"} 
                         placeholder="••••••••" 
                         {...field} 
+                        disabled={isSubmitting}
                       />
                       <Button 
                         type="button" 
@@ -137,6 +181,7 @@ export function LoginForm({ role }: LoginFormProps) {
                         className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
                         onClick={() => setShowPassword(!showPassword)}
                         aria-label={showPassword ? "Hide password" : "Show password"}
+                        disabled={isSubmitting}
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
@@ -146,8 +191,13 @@ export function LoginForm({ role }: LoginFormProps) {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full">
-              <LogIn className="mr-2 h-4 w-4" /> Login
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <LogIn className="mr-2 h-4 w-4" />
+              )}
+              {isSubmitting ? 'Logging in...' : 'Login'}
             </Button>
           </form>
         </Form>

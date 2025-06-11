@@ -19,6 +19,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { UserRole } from '@/types';
+import { auth } from '@/lib/firebase'; // Import Firebase auth
+import { signOut } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
 
 function getCurrentRole(pathname: string): UserRole | null {
   if (pathname.startsWith('/student')) return 'Student';
@@ -41,7 +44,6 @@ function getDashboardTitle(pathname: string, role: UserRole | null): string {
     if (pathname.includes('/data-entry')) return `Student Data Entry`;
     if (pathname.includes('/give-remark')) return `Provide Student Remark`;
     if (pathname.includes('/messaging')) return `Send Messages`;
-    // if (pathname.includes('/feedback')) return `AI Feedback Generator`; // Removed
     if (pathname.includes('/user-management')) return `User Management`;
     if (pathname.includes('/teacher-management')) return `Teacher Management`;
     if (pathname.includes('/hall-of-fame-management')) return `Manage Hall of Fame`;
@@ -60,7 +62,7 @@ export default function ProtectedLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const role = getCurrentRole(pathname); 
+  const { toast } = useToast();
   
   const layoutRole = pathname.split('/')[1] as UserRole | undefined;
   const currentActualRole = layoutRole && ['student', 'teacher', 'admin'].includes(layoutRole) 
@@ -68,11 +70,31 @@ export default function ProtectedLayout({
                             : null;
 
 
-  const handleLogout = () => {
-    router.push('/login/student'); 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast({
+        title: 'Logged Out',
+        description: 'You have been successfully logged out.',
+      });
+      // Redirect to the main landing page or a generic login page after logout
+      // For now, let's go to the student login page as a default.
+      router.push('/login/student'); 
+    } catch (error) {
+      console.error('Logout Error:', error);
+      toast({
+        title: 'Logout Failed',
+        description: 'Could not log you out. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
   
   const pageTitle = getDashboardTitle(pathname, currentActualRole);
+
+  // In a real app, you'd also check if the user is authenticated here.
+  // If not authenticated, redirect to login page.
+  // For this iteration, we assume if they reach this layout, they are "authenticated" by URL.
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -124,6 +146,7 @@ export default function ProtectedLayout({
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
+                  {/* TODO: Update Avatar based on actual logged-in user */}
                   <AvatarImage src={`https://placehold.co/40x40.png?text=${currentActualRole?.charAt(0)}`} alt="User Avatar" data-ai-hint="user avatar generic"/>
                   <AvatarFallback>{currentActualRole?.charAt(0) || 'U'}</AvatarFallback>
                 </Avatar>
