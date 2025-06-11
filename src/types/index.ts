@@ -1,3 +1,4 @@
+
 export interface Student {
   id: string;
   name: string;
@@ -30,3 +31,13 @@ export interface StudentSubjectAttendance {
 }
 
 export type UserRole = 'Admin' | 'Teacher' | 'Student';
+
+// Added for User Management Table in Admin section
+export interface ManagedUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  status: 'Active' | 'Inactive' | 'Pending';
+  lastLogin: string; // Should be a date string, or N/A
+}
