@@ -16,8 +16,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, LogIn } from 'lucide-react';
-import { useState } from 'react';
+import { Eye, EyeOff, LogIn, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -32,6 +33,11 @@ export function LoginForm({ role }: LoginFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -59,6 +65,32 @@ export function LoginForm({ role }: LoginFormProps) {
         router.push('/student/dashboard');
       }
     }, 1000);
+  }
+
+  if (!hasMounted) {
+    return (
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader>
+          <CardTitle className="text-3xl font-headline text-center text-primary">{role} Login</CardTitle>
+          <CardDescription className="text-center">
+            Access your {role.toLowerCase()} dashboard
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-1/4" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-1/4" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
