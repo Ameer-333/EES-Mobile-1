@@ -1,10 +1,11 @@
+
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, User, BookOpen, Edit, Settings, Shield } from 'lucide-react';
+import { Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart } from 'lucide-react';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -24,6 +25,7 @@ const navItems: NavItem[] = [
   { href: '/teacher/data-entry', label: 'Data Entry', icon: Edit, roles: ['Teacher'] },
 
   { href: '/admin/dashboard', label: 'Dashboard', icon: Shield, roles: ['Admin'] },
+  { href: '/admin/user-management', label: 'User Management', icon: UsersIcon, roles: ['Admin'] },
   { href: '/admin/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
 ];
 
