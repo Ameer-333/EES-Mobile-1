@@ -25,8 +25,6 @@ function getCurrentRole(pathname: string): UserRole | null {
   if (pathname.startsWith('/teacher')) return 'Teacher';
   if (pathname.startsWith('/admin')) return 'Admin';
   if (pathname.startsWith('/hall-of-fame')) {
-    // Infer role from a previous segment if possible, or need auth context
-    // This is a simplification for prototype.
     const segments = pathname.split('/');
     if (segments.length > 2 && ['student', 'teacher', 'admin'].includes(segments[1])) {
         return segments[1].charAt(0).toUpperCase() + segments[1].slice(1) as UserRole;
@@ -39,7 +37,7 @@ function getDashboardTitle(pathname: string, role: UserRole | null): string {
     if (pathname.endsWith('/dashboard')) return `${role} Dashboard`;
     if (pathname.includes('/profile')) return `${role} Profile`;
     if (pathname.includes('/records')) return `My Academic Records`;
-    if (pathname.includes('/doubts')) return `AI Doubt Assistance`;
+    // if (pathname.includes('/doubts')) return `AI Doubt Assistance`; // Removed
     if (pathname.includes('/students')) return `Manage Students`;
     if (pathname.includes('/data-entry')) return `Student Data Entry`;
     if (pathname.includes('/give-remark')) return `Provide Student Remark`;
@@ -63,9 +61,8 @@ export default function ProtectedLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const role = getCurrentRole(pathname); // This might be null for /hall-of-fame directly
+  const role = getCurrentRole(pathname); 
   
-  // A more reliable way to get the role for the layout itself
   const layoutRole = pathname.split('/')[1] as UserRole | undefined;
   const currentActualRole = layoutRole && ['student', 'teacher', 'admin'].includes(layoutRole) 
                             ? layoutRole.charAt(0).toUpperCase() + layoutRole.slice(1) as UserRole 
@@ -73,8 +70,7 @@ export default function ProtectedLayout({
 
 
   const handleLogout = () => {
-    // Mock logout
-    router.push('/login/student'); // Default to student login, or could be '/'
+    router.push('/login/student'); 
   };
   
   const pageTitle = getDashboardTitle(pathname, currentActualRole);

@@ -1,12 +1,6 @@
-import { AiDoubtAssistance } from '@/components/student/ai-doubt-assistance';
+// This file has been removed as per user request to remove the AI Doubt Helper feature.
+// If you need to add a page here in the future, you can create a new file.
 
-export default function StudentDoubtsPage() {
-  return (
-    <div className="container mx-auto p-0 md:p-4 h-[calc(100vh-10rem)] md:h-[calc(100vh-12rem)] flex flex-col">
-      <h1 className="text-3xl font-headline font-bold mb-6">AI Doubt Assistance</h1>
-      <div className="flex-grow">
-        <AiDoubtAssistance />
-      </div>
-    </div>
-  );
+export default function StudentDoubtsPage_Removed() {
+  return null;
 }
