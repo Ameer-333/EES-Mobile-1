@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, User, BookOpen, Edit, Bot, BarChart, Settings, Shield } from 'lucide-react';
+import { Home, User, BookOpen, Edit, Settings, Shield } from 'lucide-react';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -18,12 +18,10 @@ const navItems: NavItem[] = [
   { href: '/student/dashboard', label: 'Dashboard', icon: Home, roles: ['Student'] },
   { href: '/student/profile', label: 'Profile', icon: User, roles: ['Student'] },
   { href: '/student/records', label: 'Records', icon: BookOpen, roles: ['Student'] },
-  { href: '/student/doubts', label: 'AI Doubts', icon: Bot, roles: ['Student'] },
   
   { href: '/teacher/dashboard', label: 'Dashboard', icon: Home, roles: ['Teacher'] },
   { href: '/teacher/students', label: 'Manage Students', icon: User, roles: ['Teacher'] },
   { href: '/teacher/data-entry', label: 'Data Entry', icon: Edit, roles: ['Teacher'] },
-  { href: '/teacher/feedback', label: 'AI Feedback', icon: Bot, roles: ['Teacher'] },
 
   { href: '/admin/dashboard', label: 'Dashboard', icon: Shield, roles: ['Admin'] },
   { href: '/admin/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
