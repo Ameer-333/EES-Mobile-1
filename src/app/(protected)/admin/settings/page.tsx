@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Save, Bell, Palette, Lock } from "lucide-react";
+import { Save, Bell, Palette, Lock, Settings } from "lucide-react"; // Added Settings here
 import { useToast } from "@/hooks/use-toast";
 
 export default function AdminSettingsPage() {
