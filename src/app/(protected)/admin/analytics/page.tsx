@@ -1,19 +1,20 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { BarChart, LineChartIcon, Users, Activity, PieChartIcon } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, CartesianGrid, XAxis, YAxis, Line, Pie, PieChart as RechartsPieChart, LineChart as RechartsLineChart, BarChart as RechartsBarChart, Cell } from "recharts";
 import { LabelList } from "recharts";
 
-const userRegistrationData = [
-  { month: "Jan", users: Math.floor(Math.random() * 100) + 50 },
-  { month: "Feb", users: Math.floor(Math.random() * 100) + 60 },
-  { month: "Mar", users: Math.floor(Math.random() * 100) + 70 },
-  { month: "Apr", users: Math.floor(Math.random() * 100) + 80 },
-  { month: "May", users: Math.floor(Math.random() * 100) + 90 },
-  { month: "Jun", users: Math.floor(Math.random() * 100) + 100 },
+const initialUserRegistrationData: { month: string; users: number }[] = [
+  { month: "Jan", users: 0 },
+  { month: "Feb", users: 0 },
+  { month: "Mar", users: 0 },
+  { month: "Apr", users: 0 },
+  { month: "May", users: 0 },
+  { month: "Jun", users: 0 },
 ];
 
 const roleDistributionData = [
@@ -34,6 +35,21 @@ const chartConfigRoleDist = {
 
 
 export default function AdminAnalyticsPage() {
+  const [userRegistrationData, setUserRegistrationData] = useState(initialUserRegistrationData);
+
+  useEffect(() => {
+    // Generate random data only on the client side
+    const generatedData = [
+      { month: "Jan", users: Math.floor(Math.random() * 100) + 50 },
+      { month: "Feb", users: Math.floor(Math.random() * 100) + 60 },
+      { month: "Mar", users: Math.floor(Math.random() * 100) + 70 },
+      { month: "Apr", users: Math.floor(Math.random() * 100) + 80 },
+      { month: "May", users: Math.floor(Math.random() * 100) + 90 },
+      { month: "Jun", users: Math.floor(Math.random() * 100) + 100 },
+    ];
+    setUserRegistrationData(generatedData);
+  }, []); // Empty dependency array ensures this runs once on mount
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -142,4 +158,3 @@ function StatCard({ title, value, icon, description }: StatCardProps) {
     </Card>
   );
 }
-
