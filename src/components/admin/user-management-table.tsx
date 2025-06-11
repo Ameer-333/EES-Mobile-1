@@ -2,13 +2,13 @@
 'use client';
 
 import type { UserRole, ManagedUser } from '@/types';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Search, UserPlus, Trash2, ShieldCheck, School, User, Loader2 } from 'lucide-react';
+import { Edit, Search, UserPlus, Trash2, ShieldCheck, School, User } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +18,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -29,6 +28,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AddUserDialog } from '@/components/admin/add-user-dialog';
+import { EditUserDialog } from '@/components/admin/edit-user-dialog'; // Import EditUserDialog
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 const mockUsers: ManagedUser[] = [
@@ -51,7 +52,14 @@ export function UserManagementTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'All'>('All');
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false); // State for edit dialog
+  const [currentUserToEdit, setCurrentUserToEdit] = useState<ManagedUser | null>(null); // State for user being edited
   const { toast } = useToast();
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const filteredUsers = useMemo(() => {
     return users.filter(
@@ -63,8 +71,9 @@ export function UserManagementTable() {
     );
   }, [users, searchTerm, roleFilter]);
 
-  const handleEditUser = (userId: string) => {
-    toast({ title: "Edit User", description: `Editing user with ID: ${userId}. (Feature in development)` });
+  const handleOpenEditDialog = (user: ManagedUser) => {
+    setCurrentUserToEdit(user);
+    setIsEditUserDialogOpen(true);
   };
   
   const handleDeleteUser = (userId: string) => {
@@ -73,12 +82,55 @@ export function UserManagementTable() {
   };
 
   const handleUserAdded = (newUser: ManagedUser) => {
-    setUsers(prevUsers => [newUser, ...prevUsers]);
+    setUsers(prevUsers => [newUser, ...prevUsers]); // Add to the beginning of the list
     toast({
       title: "User Added Successfully",
       description: `${newUser.name} (${newUser.role}) has been added to the system.`,
     });
   };
+
+  const handleUserEdited = (editedUser: ManagedUser) => {
+    setUsers(prevUsers => prevUsers.map(user => user.id === editedUser.id ? editedUser : user));
+    // Toast is handled within EditUserDialog
+  };
+
+  if (!hasMounted) {
+    return (
+      <Card className="w-full shadow-xl rounded-lg border-primary/10">
+        <CardHeader>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-72" />
+            </div>
+            <Skeleton className="h-10 w-36" />
+          </div>
+          <div className="mt-6 flex flex-col md:flex-row gap-4">
+            <Skeleton className="h-10 flex-grow" />
+            <Skeleton className="h-10 w-full md:w-[180px]" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {Array(7).fill(0).map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array(5).fill(0).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array(7).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -147,19 +199,22 @@ export function UserManagementTable() {
                     <TableCell>
                       <Badge
                         variant={user.status === 'Active' ? 'outline' : user.status === 'Pending' ? 'default': 'destructive'}
-                        className={user.status === 'Active' ? 'border-green-500 text-green-600' : user.status === 'Pending' ? 'bg-yellow-500 text-white' : ''}
+                        className={
+                            user.status === 'Active' ? 'border-green-500 text-green-600 bg-green-500/10' : 
+                            user.status === 'Pending' ? 'border-yellow-500 text-yellow-600 bg-yellow-500/10' : 
+                            'border-red-500 text-red-600 bg-red-500/10'}
                       >
                         {user.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{user.lastLogin}</TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditUser(user.id)} className="hover:border-primary hover:text-primary">
+                      <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(user)} className="hover:border-primary hover:text-primary">
                         <Edit className="h-3.5 w-3.5 mr-1" /> Edit
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm" disabled={user.role === 'Admin' && user.id === 'U001'}>
+                          <Button variant="destructive" size="sm" disabled={user.role === 'Admin' && users.filter(u => u.role === 'Admin').length <= 1}>
                             <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                           </Button>
                         </AlertDialogTrigger>
@@ -201,6 +256,12 @@ export function UserManagementTable() {
         isOpen={isAddUserDialogOpen} 
         onOpenChange={setIsAddUserDialogOpen}
         onUserAdded={handleUserAdded}
+      />
+      <EditUserDialog
+        isOpen={isEditUserDialogOpen}
+        onOpenChange={setIsEditUserDialogOpen}
+        onUserEdited={handleUserEdited}
+        userToEdit={currentUserToEdit}
       />
     </>
   );

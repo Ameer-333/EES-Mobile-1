@@ -21,11 +21,12 @@ const navItems: NavItem[] = [
   { href: '/student/records', label: 'Records', icon: BookOpen, roles: ['Student'] },
   
   { href: '/teacher/dashboard', label: 'Dashboard', icon: Home, roles: ['Teacher'] },
-  { href: '/teacher/students', label: 'Manage Students', icon: User, roles: ['Teacher'] },
+  { href: '/teacher/students', label: 'Manage Students', icon: UsersIcon, roles: ['Teacher'] }, // Changed Icon
   { href: '/teacher/data-entry', label: 'Data Entry', icon: Edit, roles: ['Teacher'] },
 
   { href: '/admin/dashboard', label: 'Dashboard', icon: Shield, roles: ['Admin'] },
   { href: '/admin/user-management', label: 'User Management', icon: UsersIcon, roles: ['Admin'] },
+  { href: '/admin/analytics', label: 'Analytics', icon: LineChart, roles: ['Admin'] },
   { href: '/admin/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
 ];
 
@@ -40,7 +41,7 @@ export function SidebarNav() {
   const pathname = usePathname();
   const currentRole = getCurrentRole(pathname);
 
-  const filteredNavItems = navItems.filter(item => item.roles.includes(currentRole!));
+  const filteredNavItems = navItems.filter(item => currentRole && item.roles.includes(currentRole));
 
   return (
     <nav className="flex flex-col space-y-2">
@@ -48,10 +49,10 @@ export function SidebarNav() {
         <Button
           key={item.href}
           asChild
-          variant={pathname === item.href ? 'secondary' : 'ghost'}
+          variant={pathname.startsWith(item.href) ? 'secondary' : 'ghost'} // Use startsWith for active state on sub-paths
           className={cn(
             'w-full justify-start',
-            pathname === item.href && 'bg-accent text-accent-foreground hover:bg-accent/90'
+            pathname.startsWith(item.href) && 'bg-accent text-accent-foreground hover:bg-accent/90'
           )}
         >
           <Link href={item.href}>

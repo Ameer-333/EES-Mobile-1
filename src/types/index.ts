@@ -32,7 +32,6 @@ export interface StudentSubjectAttendance {
 
 export type UserRole = 'Admin' | 'Teacher' | 'Student';
 
-// Added for User Management Table in Admin section
 export interface ManagedUser {
   id: string;
   name: string;
@@ -40,4 +39,15 @@ export interface ManagedUser {
   role: UserRole;
   status: 'Active' | 'Inactive' | 'Pending';
   lastLogin: string; // Should be a date string, or N/A
+}
+
+// Fields for Add/Edit Student forms by Teacher
+export interface StudentFormData {
+  name: string;
+  satsNumber: string;
+  class: string;
+  section: string;
+  caste: string;
+  religion: string;
+  address: string;
 }

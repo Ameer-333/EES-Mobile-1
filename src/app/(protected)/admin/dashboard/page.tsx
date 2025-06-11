@@ -45,9 +45,8 @@ export default function AdminDashboardPage() {
           title="Analytics & Reports"
           description="View system usage statistics, generate reports on student performance, and monitor application health."
           icon={<LineChart className="h-8 w-8 text-primary" />}
-          link="/admin/dashboard" // Placeholder, ideally a dedicated analytics page
-          linkText="View Analytics (Coming Soon)"
-          disabled
+          link="/admin/analytics" 
+          linkText="View Analytics"
         />
       </div>
 
@@ -56,7 +55,7 @@ export default function AdminDashboardPage() {
           <CardTitle className="text-xl font-medium">System Overview</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatCard title="Total Users" value="150+" icon={<Users className="h-6 w-6 text-primary" />} />
+          <StatCard title="Total Users" value="180+" icon={<Users className="h-6 w-6 text-primary" />} />
           <StatCard title="Active Teachers" value="25" icon={<Users className="h-6 w-6 text-primary" />} />
           <StatCard title="System Health" value="Optimal" icon={<ShieldCheck className="h-6 w-6 text-green-500" />} />
         </CardContent>
