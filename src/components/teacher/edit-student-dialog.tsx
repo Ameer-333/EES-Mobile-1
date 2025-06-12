@@ -37,6 +37,7 @@ const editStudentSchema = z.object({
   caste: z.string().min(1, { message: 'Caste is required.' }),
   religion: z.string().min(1, { message: 'Religion is required.' }),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
+  profilePictureUrl: z.string().url({ message: "Invalid URL format. Please enter a full URL (e.g., https://example.com/image.png)" }).optional().or(z.literal('')),
 });
 
 type EditStudentFormValues = z.infer<typeof editStudentSchema>;
@@ -62,6 +63,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
       caste: '',
       religion: '',
       address: '',
+      profilePictureUrl: '',
     },
   });
 
@@ -75,6 +77,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
         caste: studentToEdit.caste,
         religion: studentToEdit.religion,
         address: studentToEdit.address,
+        profilePictureUrl: studentToEdit.profilePictureUrl || '',
       });
     }
   }, [studentToEdit, isOpen, form]);
@@ -89,6 +92,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
     const editedStudent: Student = {
       id: studentToEdit.id, // Keep existing ID
       ...values,
+      profilePictureUrl: values.profilePictureUrl || undefined,
     };
     onStudentEdited(editedStudent);
     setIsSubmitting(false);
@@ -203,6 +207,19 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
                   <FormLabel>Address</FormLabel>
                   <FormControl>
                     <Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="profilePictureUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Profile Picture URL (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://example.com/student.png" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

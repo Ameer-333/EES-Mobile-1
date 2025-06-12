@@ -34,6 +34,7 @@ export interface Student {
   caste: string;
   religion: string;
   address: string;
+  profilePictureUrl?: string; // Added for student image
   remarks?: StudentRemark[];
   scholarships?: Scholarship[];
   backgroundInfo?: string; // For the "background of the student" section
@@ -81,6 +82,7 @@ export interface StudentFormData {
   caste: string;
   religion: string;
   address: string;
+  profilePictureUrl?: string; // Added for student image form
 }
 
 export interface TeacherSalaryRecord {

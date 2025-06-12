@@ -37,6 +37,7 @@ const addStudentSchema = z.object({
   caste: z.string().min(1, { message: 'Caste is required.' }),
   religion: z.string().min(1, { message: 'Religion is required.' }),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
+  profilePictureUrl: z.string().url({ message: "Invalid URL format. Please enter a full URL (e.g., https://example.com/image.png)" }).optional().or(z.literal('')),
 });
 
 type AddStudentFormValues = z.infer<typeof addStudentSchema>;
@@ -61,6 +62,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       caste: '',
       religion: '',
       address: '',
+      profilePictureUrl: '',
     },
   });
 
@@ -72,6 +74,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     const newStudent: Student = {
       id: `S${Math.floor(Math.random() * 9000) + 1000}`, // Mock ID
       ...values,
+      profilePictureUrl: values.profilePictureUrl || undefined, // Ensure empty string becomes undefined
     };
     onStudentAdded(newStudent);
     setIsSubmitting(false);
@@ -182,6 +185,19 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                   <FormLabel>Address</FormLabel>
                   <FormControl>
                     <Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="profilePictureUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Profile Picture URL (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://example.com/student.png" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

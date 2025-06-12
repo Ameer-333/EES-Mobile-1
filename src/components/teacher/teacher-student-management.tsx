@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Edit, Search, UserPlus, Trash2 } from 'lucide-react';
+import Image from 'next/image';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,10 +26,10 @@ import { EditStudentDialog } from '@/components/teacher/edit-student-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const mockStudentsData: Student[] = [
-  { id: 'S001', name: 'Aarav Sharma', satsNumber: 'SAT001', class: '10th', section: 'A', caste: 'General', religion: 'Hindu', address: '1st Street, Bangalore' },
-  { id: 'S002', name: 'Bhavna Singh', satsNumber: 'SAT002', class: '10th', section: 'B', caste: 'OBC', religion: 'Hindu', address: '2nd Street, Mysore' },
+  { id: 'S001', name: 'Aarav Sharma', satsNumber: 'SAT001', class: '10th', section: 'A', caste: 'General', religion: 'Hindu', address: '1st Street, Bangalore', profilePictureUrl: 'https://placehold.co/40x40/FFE0B2/BF360C.png?text=AS' , dataAiHint: "student avatar"},
+  { id: 'S002', name: 'Bhavna Singh', satsNumber: 'SAT002', class: '10th', section: 'B', caste: 'OBC', religion: 'Hindu', address: '2nd Street, Mysore', profilePictureUrl: 'https://placehold.co/40x40/C8E6C9/2E7D32.png?text=BS' , dataAiHint: "student avatar"},
   { id: 'S003', name: 'Chetan Reddy', satsNumber: 'SAT003', class: '9th', section: 'A', caste: 'General', religion: 'Hindu', address: '3rd Street, Hubli' },
-  { id: 'S004', name: 'Diya Patel', satsNumber: 'SAT004', class: '9th', section: 'B', caste: 'OBC', religion: 'Hindu', address: '4th Street, Mangalore' },
+  { id: 'S004', name: 'Diya Patel', satsNumber: 'SAT004', class: '9th', section: 'B', caste: 'OBC', religion: 'Hindu', address: '4th Street, Mangalore', profilePictureUrl: 'https://placehold.co/40x40/B3E5FC/01579B.png?text=DP', dataAiHint: "student avatar" },
   { id: 'S005', name: 'Ethan Dsouza', satsNumber: 'SAT005', class: '10th', section: 'A', caste: 'General', religion: 'Christian', address: '5th Street, Belgaum' },
 ];
 
@@ -95,13 +96,13 @@ export function TeacherStudentManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  {Array(6).fill(0).map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
+                  {Array(7).fill(0).map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {Array(3).fill(0).map((_, i) => (
                   <TableRow key={i}>
-                    {Array(6).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
+                    {Array(7).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
                   </TableRow>
                 ))}
               </TableBody>
@@ -141,6 +142,7 @@ export function TeacherStudentManagement() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[60px]">Avatar</TableHead>
                 <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>SATS No.</TableHead>
@@ -152,6 +154,16 @@ export function TeacherStudentManagement() {
             <TableBody>
               {filteredStudents.length > 0 ? filteredStudents.map((student) => (
                 <TableRow key={student.id}>
+                  <TableCell>
+                    <Image
+                      src={student.profilePictureUrl || `https://placehold.co/40x40.png?text=${student.name.charAt(0)}`}
+                      alt={student.name}
+                      width={40}
+                      height={40}
+                      className="rounded-full"
+                      data-ai-hint="student avatar"
+                    />
+                  </TableCell>
                   <TableCell>{student.id}</TableCell>
                   <TableCell className="font-medium">{student.name}</TableCell>
                   <TableCell>{student.satsNumber}</TableCell>
@@ -187,7 +199,7 @@ export function TeacherStudentManagement() {
                 </TableRow>
               )) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
                     No students found matching your criteria.
                   </TableCell>
                 </TableRow>
@@ -216,4 +228,3 @@ export function TeacherStudentManagement() {
     </>
   );
 }
-
