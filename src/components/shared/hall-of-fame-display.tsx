@@ -8,8 +8,8 @@ import { Award, UserTie, Building, Edit, Crown } from 'lucide-react';
 import { Button } from '../ui/button';
 import Link from 'next/link';
 
-// Mock data for demonstration
-const mockHallOfFameItems: HallOfFameItem[] = [
+// Mock data for demonstration - typically passed as prop
+const defaultMockItems: HallOfFameItem[] = [
   { id: 'hof1', category: 'founder', name: 'Dr. Aramane Manjunath', title: 'Founder & Chairman', description: 'Visionary leader who established EES Education with a dream to provide quality education for all.', imageUrl: 'https://placehold.co/300x300.png', dataAiHint: 'founder portrait elderly man' },
   { id: 'hof2', category: 'co-founder', name: 'Mrs. Sumitra Devi', title: 'Co-Founder & Director', description: 'Instrumental in shaping the curriculum and fostering a nurturing learning environment.', imageUrl: 'https://placehold.co/300x300.png', dataAiHint: 'co-founder portrait woman' },
   { id: 'hof3', category: 'principal', name: 'Mr. Ramesh Gowda', title: 'Principal', description: 'Leading the school with dedication and commitment to academic excellence since 2010.', imageUrl: 'https://placehold.co/300x300.png', dataAiHint: 'principal portrait man' },
@@ -23,27 +23,32 @@ interface HallOfFameDisplayProps {
   currentRole?: UserRole | null;
 }
 
-const categoryIcons = {
-  founder: UserTie,
+const categoryIcons: Record<HallOfFameItem['category'] | 'Founders & Visionaries', React.ElementType> = {
+  'founder': UserTie,
   'co-founder': UserTie,
-  principal: UserTie,
+  'principal': UserTie,
   'school-award': Award,
   'founder-award': Award,
   'student-achievement': Crown,
+  'Founders & Visionaries': UserTie, // For the combined group
 };
 
-const categoryTitles = {
-    founder: 'Founders & Visionaries',
-    'co-founder': 'Founders & Visionaries',
+const categoryTitles: Record<HallOfFameItem['category'], string> = {
+    founder: 'Founders & Visionaries', // Will be used if mainFounder logic changes
+    'co-founder': 'Founders & Visionaries', // Will be used if mainFounder logic changes
     principal: 'Leadership',
     'school-award': 'School Accolades',
     'founder-award': 'Founder Accolades',
     'student-achievement': 'Student Achievements',
 }
 
-export function HallOfFameDisplay({ items = mockHallOfFameItems, currentRole }: HallOfFameDisplayProps) {
+export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: HallOfFameDisplayProps) {
   
-  const groupedItems = items.reduce((acc, item) => {
+  const mainFounder = items.find(item => item.category === 'founder');
+  // otherItems will be used to populate the subsequent categories
+  const otherItems = mainFounder ? items.filter(item => item.id !== mainFounder.id) : items;
+
+  const groupedOtherItems = otherItems.reduce((acc, item) => {
     const key = item.category;
     if (!acc[key]) {
       acc[key] = [];
@@ -54,10 +59,9 @@ export function HallOfFameDisplay({ items = mockHallOfFameItems, currentRole }: 
 
   const orderedCategories: HallOfFameItem['category'][] = ['founder', 'co-founder', 'principal', 'school-award', 'founder-award', 'student-achievement'];
 
-
   return (
     <div className="space-y-12">
-      <div className="text-center mb-12">
+      <div className="text-center mb-12 pt-4">
         <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary flex items-center justify-center">
           <Building className="mr-3 h-10 w-10 md:h-12 md:w-12" /> EES Excellent Hall of Fame
         </h1>
@@ -69,55 +73,106 @@ export function HallOfFameDisplay({ items = mockHallOfFameItems, currentRole }: 
         )}
       </div>
 
+      {mainFounder && (
+        <section className="mb-16 p-6 md:p-10 bg-gradient-to-br from-primary/5 via-background to-accent/10 rounded-xl shadow-2xl border border-primary/20">
+          <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+            <div className="flex-shrink-0 w-full max-w-xs lg:max-w-sm lg:w-2/5 mx-auto">
+              <div className="relative aspect-square rounded-lg overflow-hidden shadow-xl border-4 border-primary/30">
+                <Image
+                  src={mainFounder.imageUrl}
+                  alt={mainFounder.name}
+                  layout="fill"
+                  objectFit="cover"
+                  className="transform transition-transform duration-500 hover:scale-105"
+                  data-ai-hint={mainFounder.dataAiHint || "founder portrait"}
+                />
+              </div>
+            </div>
+            <div className="lg:w-3/5 text-center lg:text-left">
+              <h2 className="text-4xl md:text-5xl font-headline font-extrabold text-primary mb-3 tracking-tight">
+                {mainFounder.name}
+              </h2>
+              <p className="text-xl font-semibold text-muted-foreground mb-6">
+                {mainFounder.title || 'Founder & Visionary Leader'}
+              </p>
+              <blockquote className="text-lg text-foreground/80 leading-relaxed border-l-4 border-accent pl-6 italic">
+                {/* Using mainFounder.description if it's meant to be the impressive lines, or a generic one */}
+                {mainFounder.description && mainFounder.description.length > 50 ? mainFounder.description : 
+                "With unwavering dedication and a pioneering spirit, " + mainFounder.name + " laid the foundation for EES Education, transforming a bold vision into a beacon of knowledge and excellence. Their tireless efforts continue to inspire generations, shaping futures and fostering a community where every student can achieve their highest potential."}
+              </blockquote>
+            </div>
+          </div>
+        </section>
+      )}
+
       {orderedCategories.map(categoryKey => {
-        const categoryItems = groupedItems[categoryKey];
-        if (!categoryItems || categoryItems.length === 0) return null;
-        
-        const CategoryIcon = categoryIcons[categoryKey] || Award;
-        const displayTitle = categoryTitles[categoryKey] || categoryKey.replace('-', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        let itemsToDisplayThisCategory: HallOfFameItem[] = [];
+        let currentDisplayTitle = "";
+        let IconToUse: React.ElementType = Award; // Default icon
+        let sectionKey = categoryKey; // For unique React key
 
-        // Special handling to show Founders and Co-founders under one heading
-        if (categoryKey === 'co-founder' && groupedItems['founder']?.length > 0) return null;
-        let actualItems = categoryItems;
-        let finalTitle = displayTitle;
-
-        if (categoryKey === 'founder' && groupedItems['co-founder']?.length > 0) {
-            actualItems = [...(groupedItems['founder'] || []), ...(groupedItems['co-founder'] || [])];
-            finalTitle = "Founders & Visionaries";
+        if (categoryKey === 'founder') {
+          // This section is for "Other Founders & Co-Founders"
+          const otherFoundersList = groupedOtherItems['founder'] || [];
+          const coFoundersList = groupedOtherItems['co-founder'] || [];
+          itemsToDisplayThisCategory = [...otherFoundersList, ...coFoundersList];
+          currentDisplayTitle = "Founders & Visionaries";
+          IconToUse = categoryIcons['Founders & Visionaries'];
+          sectionKey = 'founders-visionaries'; // More stable key
+          if (itemsToDisplayThisCategory.length === 0) return null;
+        } else if (categoryKey === 'co-founder') {
+          // This case handles if there were *no other founders* (mainFounder was the only one or no founders in otherItems)
+          // And we just want to display co-founders.
+          if (groupedOtherItems['founder'] && groupedOtherItems['founder'].length > 0) {
+            return null; // Co-founders already merged with 'other founders'
+          }
+          itemsToDisplayThisCategory = groupedOtherItems['co-founder'] || [];
+          currentDisplayTitle = "Founders & Visionaries"; // Still under the same umbrella
+          IconToUse = categoryIcons['Founders & Visionaries'];
+          sectionKey = 'co-founders-standalone';
+          if (itemsToDisplayThisCategory.length === 0) return null;
+        } else {
+          // For 'principal', 'school-award', etc.
+          itemsToDisplayThisCategory = groupedOtherItems[categoryKey] || [];
+          currentDisplayTitle = categoryTitles[categoryKey] || categoryKey;
+          IconToUse = categoryIcons[categoryKey] || Award;
+          if (itemsToDisplayThisCategory.length === 0) return null;
         }
-
-
+        
         return (
-            <section key={categoryKey} className="mb-12">
-                <h2 className="text-3xl font-semibold text-primary mb-6 flex items-center">
-                    <CategoryIcon className="mr-3 h-7 w-7"/> {finalTitle}
+            <section key={sectionKey} className="mb-12">
+                <h2 className="text-3xl font-semibold text-primary mb-8 flex items-center border-b-2 border-primary/20 pb-3">
+                    <IconToUse className="mr-3 h-7 w-7"/> {currentDisplayTitle}
                 </h2>
-                <div className={`grid grid-cols-1 md:grid-cols-2 ${['school-award', 'founder-award', 'student-achievement'].includes(categoryKey) ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-6`}>
-                    {actualItems.map(item => (
-                        <Card key={item.id} className="overflow-hidden shadow-xl hover:shadow-2xl transition-shadow duration-300 flex flex-col">
-                            <div className="relative w-full h-60 md:h-72">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
+                    {itemsToDisplayThisCategory.map(item => (
+                        <Card key={item.id} className="overflow-hidden shadow-xl hover:shadow-2xl transition-shadow duration-300 ease-in-out flex flex-col group bg-card rounded-lg border border-border/50 hover:border-primary/30">
+                            <div className="relative w-full h-60 md:h-64"> {/* Adjusted height slightly */}
                                 <Image 
                                     src={item.imageUrl} 
                                     alt={item.name} 
                                     layout="fill" 
                                     objectFit="cover"
+                                    className="transform transition-transform duration-300 group-hover:scale-105"
                                     data-ai-hint={item.dataAiHint || 'hall of fame image'}
                                 />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                             </div>
-                            <CardHeader>
-                                <CardTitle className="text-xl text-primary">{item.name}</CardTitle>
-                                {item.title && <CardDescription className="text-base">{item.title}</CardDescription>}
-                                {item.year && <CardDescription className="text-sm">Year: {item.year}</CardDescription>}
+                            <CardHeader className="flex-grow pb-2 pt-4 px-4">
+                                <CardTitle className="text-xl text-primary group-hover:text-primary/90 transition-colors">{item.name}</CardTitle>
+                                {item.title && <CardDescription className="text-md text-muted-foreground">{item.title}</CardDescription>}
+                                {item.year && <CardDescription className="text-sm text-muted-foreground">Year: {item.year}</CardDescription>}
                             </CardHeader>
-                            <CardContent className="flex-grow">
-                                <p className="text-sm text-muted-foreground">{item.description}</p>
+                            <CardContent className="px-4 pb-4">
+                                <p className="text-sm text-foreground/80 line-clamp-3 group-hover:line-clamp-none transition-all">{item.description}</p>
                             </CardContent>
                         </Card>
                     ))}
                 </div>
             </section>
-        )
+        );
       })}
     </div>
   );
 }
+
