@@ -4,7 +4,7 @@
 import type { HallOfFameItem, UserRole } from '@/types';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Award, UserTie, Building, Edit, Crown } from 'lucide-react';
+import { Award, Briefcase, Building, Edit, Crown } from 'lucide-react'; // Changed UserTie to Briefcase
 import { Button } from '../ui/button';
 import Link from 'next/link';
 
@@ -24,18 +24,18 @@ interface HallOfFameDisplayProps {
 }
 
 const categoryIcons: Record<HallOfFameItem['category'] | 'Founders & Visionaries', React.ElementType> = {
-  'founder': UserTie,
-  'co-founder': UserTie,
-  'principal': UserTie,
+  'founder': Briefcase, // Changed from UserTie
+  'co-founder': Briefcase, // Changed from UserTie
+  'principal': Briefcase, // Changed from UserTie
   'school-award': Award,
   'founder-award': Award,
   'student-achievement': Crown,
-  'Founders & Visionaries': UserTie, // For the combined group
+  'Founders & Visionaries': Briefcase, // Changed from UserTie
 };
 
 const categoryTitles: Record<HallOfFameItem['category'], string> = {
-    founder: 'Founders & Visionaries', // Will be used if mainFounder logic changes
-    'co-founder': 'Founders & Visionaries', // Will be used if mainFounder logic changes
+    founder: 'Founders & Visionaries', 
+    'co-founder': 'Founders & Visionaries', 
     principal: 'Leadership',
     'school-award': 'School Accolades',
     'founder-award': 'Founder Accolades',
@@ -45,7 +45,6 @@ const categoryTitles: Record<HallOfFameItem['category'], string> = {
 export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: HallOfFameDisplayProps) {
   
   const mainFounder = items.find(item => item.category === 'founder');
-  // otherItems will be used to populate the subsequent categories
   const otherItems = mainFounder ? items.filter(item => item.id !== mainFounder.id) : items;
 
   const groupedOtherItems = otherItems.reduce((acc, item) => {
@@ -96,7 +95,6 @@ export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: Hal
                 {mainFounder.title || 'Founder & Visionary Leader'}
               </p>
               <blockquote className="text-lg text-foreground/80 leading-relaxed border-l-4 border-accent pl-6 italic">
-                {/* Using mainFounder.description if it's meant to be the impressive lines, or a generic one */}
                 {mainFounder.description && mainFounder.description.length > 50 ? mainFounder.description : 
                 "With unwavering dedication and a pioneering spirit, " + mainFounder.name + " laid the foundation for EES Education, transforming a bold vision into a beacon of knowledge and excellence. Their tireless efforts continue to inspire generations, shaping futures and fostering a community where every student can achieve their highest potential."}
               </blockquote>
@@ -108,31 +106,27 @@ export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: Hal
       {orderedCategories.map(categoryKey => {
         let itemsToDisplayThisCategory: HallOfFameItem[] = [];
         let currentDisplayTitle = "";
-        let IconToUse: React.ElementType = Award; // Default icon
-        let sectionKey = categoryKey; // For unique React key
+        let IconToUse: React.ElementType = Award; 
+        let sectionKey = categoryKey; 
 
         if (categoryKey === 'founder') {
-          // This section is for "Other Founders & Co-Founders"
           const otherFoundersList = groupedOtherItems['founder'] || [];
           const coFoundersList = groupedOtherItems['co-founder'] || [];
           itemsToDisplayThisCategory = [...otherFoundersList, ...coFoundersList];
           currentDisplayTitle = "Founders & Visionaries";
           IconToUse = categoryIcons['Founders & Visionaries'];
-          sectionKey = 'founders-visionaries'; // More stable key
+          sectionKey = 'founders-visionaries'; 
           if (itemsToDisplayThisCategory.length === 0) return null;
         } else if (categoryKey === 'co-founder') {
-          // This case handles if there were *no other founders* (mainFounder was the only one or no founders in otherItems)
-          // And we just want to display co-founders.
           if (groupedOtherItems['founder'] && groupedOtherItems['founder'].length > 0) {
-            return null; // Co-founders already merged with 'other founders'
+            return null; 
           }
           itemsToDisplayThisCategory = groupedOtherItems['co-founder'] || [];
-          currentDisplayTitle = "Founders & Visionaries"; // Still under the same umbrella
+          currentDisplayTitle = "Founders & Visionaries"; 
           IconToUse = categoryIcons['Founders & Visionaries'];
           sectionKey = 'co-founders-standalone';
           if (itemsToDisplayThisCategory.length === 0) return null;
         } else {
-          // For 'principal', 'school-award', etc.
           itemsToDisplayThisCategory = groupedOtherItems[categoryKey] || [];
           currentDisplayTitle = categoryTitles[categoryKey] || categoryKey;
           IconToUse = categoryIcons[categoryKey] || Award;
@@ -142,12 +136,12 @@ export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: Hal
         return (
             <section key={sectionKey} className="mb-12">
                 <h2 className="text-3xl font-semibold text-primary mb-8 flex items-center border-b-2 border-primary/20 pb-3">
-                    <IconToUse className="mr-3 h-7 w-7"/> {currentDisplayTitle}
+                    {IconToUse && <IconToUse className="mr-3 h-7 w-7"/>} {currentDisplayTitle}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
                     {itemsToDisplayThisCategory.map(item => (
                         <Card key={item.id} className="overflow-hidden shadow-xl hover:shadow-2xl transition-shadow duration-300 ease-in-out flex flex-col group bg-card rounded-lg border border-border/50 hover:border-primary/30">
-                            <div className="relative w-full h-60 md:h-64"> {/* Adjusted height slightly */}
+                            <div className="relative w-full h-60 md:h-64"> 
                                 <Image 
                                     src={item.imageUrl} 
                                     alt={item.name} 
@@ -175,4 +169,3 @@ export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: Hal
     </div>
   );
 }
-
