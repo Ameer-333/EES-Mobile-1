@@ -61,9 +61,18 @@ export default function AdminSettingsPage() {
   }, [toast]);
 
   const handleSaveGeneralSettings = async () => {
+    if (logoUrl && !logoUrl.startsWith('http://') && !logoUrl.startsWith('https://')) {
+      toast({
+        title: "Invalid Logo URL",
+        description: "Logo URL must start with http:// or https://. Please provide a valid web URL for the logo or leave it blank.",
+        variant: "destructive",
+      });
+      return; 
+    }
+
     try {
       const settingsDocRef = doc(firestore, APP_SETTINGS_COLLECTION, GENERAL_SETTINGS_DOC_ID);
-      await setDoc(settingsDocRef, { appName, logoUrl }, { merge: true });
+      await setDoc(settingsDocRef, { appName, logoUrl: logoUrl || "" }, { merge: true }); // Save empty string if logoUrl is falsy
       toast({
         title: "Settings Saved",
         description: `General settings (App Name, Logo URL) have been updated in Firestore.`,
@@ -121,12 +130,12 @@ export default function AdminSettingsPage() {
                   <Input id="appName" value={appName} onChange={(e) => setAppName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="logoUrl">School Logo URL</Label>
+                  <Label htmlFor="logoUrl">School Logo URL (must start with http:// or https://)</Label>
                   <div className="flex items-center space-x-2">
                     <ImageIcon className="h-5 w-5 text-muted-foreground" />
                     <Input id="logoUrl" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://example.com/logo.png" />
                   </div>
-                  {logoUrl && (
+                  {logoUrl && (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) && (
                     <div className="mt-2 p-2 border rounded-md flex justify-center items-center bg-muted/50 max-h-32">
                       <img src={logoUrl} alt="Logo Preview" className="max-h-28 object-contain rounded"
                         onError={(e) => (e.currentTarget.style.display = 'none')}
