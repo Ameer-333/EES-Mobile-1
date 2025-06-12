@@ -48,9 +48,9 @@ export function TeacherSalaryView({ salaryHistory = mockSalaryHistory, onUpdateR
     // In a real app, call onUpdateReason here
     console.log(`Saving reason for ${editingRecordId}: ${reasonText}`);
     // Simulate API call & update mock data locally
-    const recordIndex = mockSalaryHistory.findIndex(r => r.id === editingRecordId);
+    const recordIndex = salaryHistory.findIndex(r => r.id === editingRecordId); // Use salaryHistory prop
     if (recordIndex !== -1) {
-      mockSalaryHistory[recordIndex].reasonForAbsence = reasonText;
+      salaryHistory[recordIndex].reasonForAbsence = reasonText;
     }
     
     toast({ title: 'Reason Updated', description: 'Your reason for absence has been submitted.' });
@@ -86,8 +86,8 @@ export function TeacherSalaryView({ salaryHistory = mockSalaryHistory, onUpdateR
             <TableHeader>
               <TableRow>
                 <TableHead>Month/Year</TableHead>
-                <TableHead className="text-right">Issued</TableHead>
-                <TableHead className="text-right">Deducted</TableHead>
+                <TableHead className="text-right">Issued (₹)</TableHead>
+                <TableHead className="text-right">Deducted (₹)</TableHead>
                 <TableHead className="text-center">Days Absent</TableHead>
                 <TableHead>Reason for Absence</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -105,7 +105,7 @@ export function TeacherSalaryView({ salaryHistory = mockSalaryHistory, onUpdateR
                   </TableCell>
                   <TableCell className="text-right">
                     {record.daysAbsent > 0 && (
-                       <Dialog>
+                       <Dialog open={editingRecordId === record.id} onOpenChange={(isOpen) => !isOpen && setEditingRecordId(null) }>
                         <DialogTrigger asChild>
                           <Button variant="outline" size="sm" onClick={() => handleEditReason(record)}>
                             <Edit className="mr-1 h-3 w-3" /> {record.reasonForAbsence ? 'Edit Reason' : 'Add Reason'}
@@ -125,7 +125,7 @@ export function TeacherSalaryView({ salaryHistory = mockSalaryHistory, onUpdateR
                             rows={3}
                           />
                           <DialogFooter>
-                            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                            <DialogClose asChild><Button variant="outline" onClick={() => setEditingRecordId(null)}>Cancel</Button></DialogClose>
                             <Button onClick={handleSaveReason}>Save Reason</Button>
                           </DialogFooter>
                         </DialogContent>

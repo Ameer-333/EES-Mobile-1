@@ -40,6 +40,8 @@ export interface Student {
 }
 
 export type SubjectName = 'English' | 'Kannada' | 'Hindi' | 'Science' | 'Maths' | 'Social Science';
+export const subjectNamesArray: SubjectName[] = ['English', 'Kannada', 'Hindi', 'Science', 'Maths', 'Social Science'];
+
 
 export interface SubjectMarks {
   subjectName: SubjectName;
@@ -98,14 +100,26 @@ export interface Teacher {
   phoneNumber: string;
   address: string;
   yearOfJoining: number;
-  totalYearsWorked: number; // Admin can update this
-  subjectsTaught?: SubjectName[];
+  totalYearsWorked?: number; // Admin can update this or it can be calculated
+  subjectsTaught: SubjectName[];
   profilePictureUrl?: string;
   salaryHistory?: TeacherSalaryRecord[];
   // For Admin view of teacher attendance/salary
-  daysPresentThisMonth?: number; 
+  daysPresentThisMonth?: number;
   daysAbsentThisMonth?: number;
 }
+
+// For the teacher profile form
+export interface TeacherFormData {
+  name: string;
+  email: string;
+  phoneNumber: string;
+  address: string;
+  yearOfJoining: number;
+  subjectsTaught: SubjectName[];
+  profilePictureUrl?: string;
+}
+
 
 export interface AppMessage {
   id: string;
@@ -117,7 +131,7 @@ export interface AppMessage {
   timestamp: string; // ISO Date string
   read: boolean;
   // For prototype, type will be 'app'. SMS/email are external.
-  messageType: 'app'; 
+  messageType: 'app';
 }
 
 export interface HallOfFameItem {
