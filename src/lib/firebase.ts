@@ -1,8 +1,7 @@
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
-// import { getFirestore, type Firestore } from 'firebase/firestore'; // For later use
-// import { getStorage, type FirebaseStorage } from 'firebase/storage'; // For later use
+import { getFirestore, type Firestore } from 'firebase/firestore'; // Added Firestore
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,8 +15,7 @@ const firebaseConfig = {
 
 let app: FirebaseApp;
 let auth: Auth;
-// let firestore: Firestore; // For later use
-// let storage: FirebaseStorage; // For later use
+let firestore: Firestore; // Added Firestore
 
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
@@ -26,7 +24,6 @@ if (!getApps().length) {
 }
 
 auth = getAuth(app);
-// firestore = getFirestore(app); // For later use
-// storage = getStorage(app); // For later use
+firestore = getFirestore(app); // Initialize Firestore
 
-export { app, auth /*, firestore, storage */ };
+export { app, auth, firestore /*, storage */ };
