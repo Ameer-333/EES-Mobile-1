@@ -5,13 +5,56 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LogoIcon } from '@/components/icons/logo-icon';
 import { ArrowRight } from 'lucide-react';
+import Image from 'next/image';
+import { useState, useEffect } from 'react';
+
+const LOCAL_STORAGE_APP_NAME_KEY = 'eesEducationAppName';
+const LOCAL_STORAGE_LOGO_URL_KEY = 'eesEducationLogoUrl';
 
 export default function LandingPage() {
+  const [appName, setAppName] = useState('EES Education');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const storedAppName = localStorage.getItem(LOCAL_STORAGE_APP_NAME_KEY);
+    if (storedAppName) {
+      setAppName(storedAppName);
+    }
+    const storedLogoUrl = localStorage.getItem(LOCAL_STORAGE_LOGO_URL_KEY);
+    if (storedLogoUrl) {
+      setLogoUrl(storedLogoUrl);
+    }
+
+    const handleSettingsChange = () => {
+      const newAppName = localStorage.getItem(LOCAL_STORAGE_APP_NAME_KEY);
+      if (newAppName) setAppName(newAppName);
+      const newLogoUrl = localStorage.getItem(LOCAL_STORAGE_LOGO_URL_KEY);
+      if (newLogoUrl) setLogoUrl(newLogoUrl);
+    };
+
+    window.addEventListener('appSettingsChanged', handleSettingsChange);
+    return () => {
+      window.removeEventListener('appSettingsChanged', handleSettingsChange);
+    };
+  }, []);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-accent/30 p-4">
       <div className="mb-12 text-center">
-        <LogoIcon className="h-24 w-24 text-primary mx-auto mb-3" />
-        <h1 className="text-5xl font-headline font-bold text-primary">EES Education</h1>
+        {logoUrl ? (
+          <Image 
+            src={logoUrl} 
+            alt={`${appName} Logo`}
+            width={96} 
+            height={96} 
+            className="mx-auto mb-3 rounded-md object-contain"
+            data-ai-hint="school logo custom"
+            onError={() => setLogoUrl(null)} // Fallback if image fails to load
+          />
+        ) : (
+          <LogoIcon className="h-24 w-24 text-primary mx-auto mb-3" />
+        )}
+        <h1 className="text-5xl font-headline font-bold text-primary">{appName}</h1>
         <p className="text-xl text-muted-foreground mt-1">Excellent English School</p>
       </div>
 
@@ -34,7 +77,7 @@ export default function LandingPage() {
       </div>
 
       <footer className="mt-12 text-center text-sm text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} EES Education. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} {appName}. All rights reserved.</p>
       </footer>
     </div>
   );
