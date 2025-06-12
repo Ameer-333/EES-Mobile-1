@@ -24,21 +24,16 @@ import { signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
+// Simplified and more direct role extraction from pathname
 function getExpectedRoleFromPathname(pathname: string): UserRole | null {
-  if (pathname.startsWith('/student')) return 'Student';
-  if (pathname.startsWith('/teacher')) return 'Teacher';
-  if (pathname.startsWith('/admin')) return 'Admin';
-  // For /hall-of-fame, access is granted if authenticated, specific role check might be done on page
-  // or allow any authenticated user. For now, if it's under a role path, it uses that.
-  // Otherwise, this layout implies some role is expected.
-  // Let's refine this: if it's just /hall-of-fame, it's special.
-  // All other /protected routes imply a specific role path.
-  const segments = pathname.split('/');
-    if (segments.length > 1 && ['student', 'teacher', 'admin'].includes(segments[1])) {
-        return segments[1].charAt(0).toUpperCase() + segments[1].slice(1) as UserRole;
-    }
+  if (pathname.startsWith('/student/')) return 'Student';
+  if (pathname.startsWith('/teacher/')) return 'Teacher';
+  if (pathname.startsWith('/admin/')) return 'Admin';
+  // For shared pages like /hall-of-fame directly under /protected, no specific role is "expected" by path alone.
+  // The /hall-of-fame path itself does not imply a role like /admin/hall-of-fame does.
   return null;
 }
+
 
 function getDashboardTitle(pathname: string, actualRole: UserRole | null): string {
     const rolePrefix = actualRole ? actualRole.toLowerCase() : '';
@@ -78,61 +73,79 @@ export default function ProtectedLayout({
   
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setIsLoading(true); // Start loading whenever auth state might change
       if (user) {
         setAuthUser(user);
-        // Fetch role from Firestore
         const userDocRef = doc(firestore, 'users', user.uid);
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
-          const fetchedRole = userData.role as UserRole;
-          setUserRole(fetchedRole);
+          const roleFromDb = userData.role;
 
-          const expectedRole = getExpectedRoleFromPathname(pathname);
-          // Allow access to /hall-of-fame for any authenticated user if no specific sub-path role like /admin/hall-of-fame
-          if (pathname.startsWith('/hall-of-fame') && !expectedRole) {
-             setIsLoading(false);
-             return;
-          }
+          if (roleFromDb && ['Admin', 'Teacher', 'Student'].includes(roleFromDb)) {
+            const fetchedRole = roleFromDb as UserRole;
+            setUserRole(fetchedRole);
+            const expectedRole = getExpectedRoleFromPathname(pathname);
 
-          if (expectedRole && fetchedRole !== expectedRole) {
-            toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive" });
-            router.push('/'); // Redirect to landing if role mismatch
-          } else if (!expectedRole && fetchedRole) { 
-            // If on a generic /protected path but has a role, redirect to their dashboard (this case might not occur with current routing)
-            router.push(`/${fetchedRole.toLowerCase()}/dashboard`);
+            // Allow access to /hall-of-fame for any authenticated user with a valid role,
+            // if no more specific sub-path role (like /admin/hall-of-fame) is expected.
+            if (pathname.startsWith('/hall-of-fame') && !expectedRole) {
+               setIsLoading(false);
+               return; // User has a valid role and is on /hall-of-fame, allow access.
+            }
+
+            if (expectedRole && fetchedRole !== expectedRole) {
+              toast({ title: "Access Denied", description: `Your role (${fetchedRole}) does not permit access to this ${expectedRole} page.`, variant: "destructive" });
+              router.push('/'); 
+            } else {
+              // Role matches, or no specific role expected by path and user has a valid role (e.g. navigating to /hall-of-fame which is fine)
+              setIsLoading(false);
+            }
           } else {
-            setIsLoading(false);
+            // Role is missing from Firestore or is not a valid UserRole string
+            toast({ title: "Access Denied", description: `Your user role ('${roleFromDb || 'Not Set'}') is not configured correctly in the database. Please contact admin.`, variant: "destructive" });
+            await signOut(auth); 
+            setAuthUser(null);
+            setUserRole(null);
+            router.push('/'); 
           }
         } else {
-          // User document doesn't exist in Firestore or no role
-          toast({ title: "Access Denied", description: "User role not found. Please contact admin.", variant: "destructive" });
-          await signOut(auth); // Sign out the user as their setup is incomplete
+          // User document doesn't exist in Firestore (meaning no role assigned)
+          toast({ title: "Access Denied", description: "User role not found in database. Please contact admin.", variant: "destructive" });
+          await signOut(auth);
           setAuthUser(null);
           setUserRole(null);
           router.push('/'); 
         }
       } else {
+        // No user logged in
         setAuthUser(null);
         setUserRole(null);
-        // Only redirect if not on a public part of /hall-of-fame (if we decide to make it partially public)
-        // For now, all /protected routes require auth. /hall-of-fame is under /protected implicitly.
-        if (!pathname.startsWith('/login')) { // Avoid redirect loop from login pages
+        // Only redirect if not on a public page or login page
+        // (Currently all pages under /protected require auth)
+        if (!pathname.startsWith('/login') && pathname !== '/') { 
             router.push('/'); 
+        } else {
+          setIsLoading(false); // On landing or login page, stop loading
         }
       }
-      // Defer setting isLoading to false until after potential immediate redirects
-      // to prevent brief flash of content.
-      // A small delay might be needed if router.push is too fast.
-      // For now, this should mostly work.
-      if (isLoading) { // only set if it was true
-          setTimeout(() => setIsLoading(false), 50); // Small delay to allow router to push
+      // Defer setting isLoading to false for non-redirect cases
+      // setTimeout is a bit of a hack, ideally manage loading state more precisely
+      // For now, if a redirect happens, it'll unmount or re-evaluate anyway.
+      // If no redirect and still loading, set it to false.
+      if (isLoading && !(user && userDocSnap.exists() && getExpectedRoleFromPathname(pathname) && userDocSnap.data().role !== getExpectedRoleFromPathname(pathname)) && !(user && !userDocSnap.exists()) ) {
+          // This condition is complex, simplified to: if still loading and no immediate redirect condition met, stop loading.
+          // A better approach would be to set isLoading(false) at the end of each logical path within the if/else blocks.
+          // The setIsLoading(false) calls within the blocks should largely handle this.
       }
+       // Fallback to stop loading if no other path explicitly did.
+       // This timeout helps prevent content flashing if redirects are quick.
+       setTimeout(() => setIsLoading(false), 100);
     });
 
     return () => unsubscribe();
-  }, [pathname, router, toast, isLoading]); // Added isLoading to dependencies
+  }, [pathname, router, toast]); // Removed isLoading from dependency array as it caused loops
 
   const handleLogout = async () => {
     try {
@@ -155,28 +168,34 @@ export default function ProtectedLayout({
   };
   
   const pageTitle = getDashboardTitle(pathname, userRole);
-  const sidebarRoleForNav = getExpectedRoleFromPathname(pathname) || userRole;
 
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Loading EES Education...</p>
+        <p className="ml-4 text-lg">Verifying access...</p>
       </div>
     );
   }
 
-  if (!authUser && !pathname.startsWith('/login')) { // Double check to prevent rendering if redirect is slow
-      // Already handled by useEffect, but as a safeguard.
-      // router.push('/'); // This might cause an infinite loop if not careful with public pages
-      return ( // Minimal render before redirect fully kicks in
+  // If after loading, there's no authenticated user with a role, and we're not on a public page (like /login or /)
+  // This case should ideally be caught by the onAuthStateChanged logic redirecting,
+  // but as a final check before rendering children.
+  if (!authUser && !pathname.startsWith('/login') && pathname !=='/') {
+      // Redirect already handled in useEffect, this is a safeguard display before redirect effect takes place
+      return (
         <div className="flex items-center justify-center min-h-screen">
              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-             <p className="ml-4 text-lg">Redirecting...</p>
+             <p className="ml-4 text-lg">Redirecting to login...</p>
         </div>
       );
   }
+  
+  // Render children only if user is authenticated and has a role (or if on a page that doesn't need role check like /hall-of-fame for any authenticated user)
+  const canRenderChildren = authUser && userRole && 
+                           ( (getExpectedRoleFromPathname(pathname) === null && pathname.startsWith('/hall-of-fame')) || 
+                             (getExpectedRoleFromPathname(pathname) === userRole) );
 
 
   return (
@@ -191,7 +210,6 @@ export default function ProtectedLayout({
           </div>
           <div className="flex-1">
             <nav className="grid items-start px-2 text-sm font-medium lg:px-4 py-4">
-              {/* Pass the determined role for sidebar navigation */}
               {authUser && userRole && <SidebarNav />}
             </nav>
           </div>
@@ -259,11 +277,13 @@ export default function ProtectedLayout({
           )}
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-background overflow-auto">
-          {/* Only render children if user is authenticated and role check has passed (or is not needed for this path) */}
-          {authUser && userRole && children} 
-          {/* Consider a specific message if role check failed but we are not redirecting, though current logic redirects */}
+          {/* Render children if authorized and not loading */}
+          {!isLoading && canRenderChildren && children}
+          {/* Consider a specific message if role check failed, though current logic redirects */}
         </main>
       </div>
     </div>
   );
 }
+
+    
