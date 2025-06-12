@@ -1,5 +1,9 @@
+
 import { LoginForm } from '@/components/auth/login-form';
 import { LogoIcon } from '@/components/icons/logo-icon';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Home } from 'lucide-react';
 
 export default function StudentLoginPage() {
   return (
@@ -10,6 +14,12 @@ export default function StudentLoginPage() {
         <p className="text-muted-foreground">Excellent English School</p>
       </div>
       <LoginForm role="Student" />
+      <Button asChild variant="outline" className="mt-8">
+        <Link href="/">
+          <Home className="mr-2 h-4 w-4" />
+          Back to Home
+        </Link>
+      </Button>
     </div>
   );
 }
