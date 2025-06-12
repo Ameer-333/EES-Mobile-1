@@ -1,6 +1,9 @@
+
 import { StudentProfileCard } from '@/components/student/student-profile-card';
 import { StudentRecords } from '@/components/student/student-records';
-import { AiDoubtAssistance } from '@/components/student/ai-doubt-assistance';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { Home, LogIn } from 'lucide-react';
 
 export default function StudentDashboardPage() {
   // In a real app, student data would be fetched here
@@ -13,11 +16,20 @@ export default function StudentDashboardPage() {
           <StudentProfileCard />
           <StudentRecords />
         </div>
-        {/* 
-          The doubt assistance could be a modal or a separate page if this layout is too crowded.
-          For now, placing it here. Or it can be navigated to via sidebar.
-          Let's assume it's on a separate page /student/doubts and remove it from dashboard.
-        */}
+      </div>
+      <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+        <Button asChild variant="outline">
+          <Link href="/">
+            <Home className="mr-2 h-4 w-4" />
+            Back to Home
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/login/student">
+            <LogIn className="mr-2 h-4 w-4" />
+            Back to Login Page
+          </Link>
+        </Button>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
-import { ShieldCheck, Users, Settings, LineChart, ArrowRight } from "lucide-react";
+import { ShieldCheck, Users, Settings, LineChart, ArrowRight, Home, LogIn } from "lucide-react";
 
 export default function AdminDashboardPage() {
   return (
@@ -60,6 +60,21 @@ export default function AdminDashboardPage() {
           <StatCard title="System Health" value="Optimal" icon={<ShieldCheck className="h-6 w-6 text-green-500" />} />
         </CardContent>
       </Card>
+
+      <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+        <Button asChild variant="outline">
+          <Link href="/">
+            <Home className="mr-2 h-4 w-4" />
+            Back to Home
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/login/admin">
+            <LogIn className="mr-2 h-4 w-4" />
+            Back to Login Page
+          </Link>
+        </Button>
+      </div>
     </div>
   );
 }
