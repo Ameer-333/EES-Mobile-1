@@ -98,7 +98,14 @@ export default function ProtectedLayout({
             if (expectedRole && fetchedRole !== expectedRole) {
               toast({ title: "Access Denied", description: `Your role (${fetchedRole}) does not permit access to this ${expectedRole} page.`, variant: "destructive" });
               router.push('/'); 
-            } else {
+            } else if (!expectedRole && !pathname.startsWith('/hall-of-fame') && !pathname.startsWith('/login') && pathname !== '/') {
+               // This case handles if a user is logged in, has a role, but tries to access a path that doesn't have an "expectedRole"
+               // and isn't a known shared path like /hall-of-fame. E.g. /protected/unknown-page
+               // This situation should ideally not happen with current nav, but acts as a safeguard.
+               toast({ title: "Page Not Found", description: `The page (${pathname}) you are trying to access is not valid for your role.`, variant: "destructive" });
+               router.push('/');
+            }
+             else {
               // Role matches, or no specific role expected by path and user has a valid role (e.g. navigating to /hall-of-fame which is fine)
               setIsLoading(false);
             }
@@ -130,22 +137,13 @@ export default function ProtectedLayout({
           setIsLoading(false); // On landing or login page, stop loading
         }
       }
-      // Defer setting isLoading to false for non-redirect cases
-      // setTimeout is a bit of a hack, ideally manage loading state more precisely
-      // For now, if a redirect happens, it'll unmount or re-evaluate anyway.
-      // If no redirect and still loading, set it to false.
-      if (isLoading && !(user && userDocSnap.exists() && getExpectedRoleFromPathname(pathname) && userDocSnap.data().role !== getExpectedRoleFromPathname(pathname)) && !(user && !userDocSnap.exists()) ) {
-          // This condition is complex, simplified to: if still loading and no immediate redirect condition met, stop loading.
-          // A better approach would be to set isLoading(false) at the end of each logical path within the if/else blocks.
-          // The setIsLoading(false) calls within the blocks should largely handle this.
-      }
        // Fallback to stop loading if no other path explicitly did.
        // This timeout helps prevent content flashing if redirects are quick.
        setTimeout(() => setIsLoading(false), 100);
     });
 
     return () => unsubscribe();
-  }, [pathname, router, toast]); // Removed isLoading from dependency array as it caused loops
+  }, [pathname, router, toast]); 
 
   const handleLogout = async () => {
     try {
