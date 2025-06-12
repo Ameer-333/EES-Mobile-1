@@ -30,7 +30,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { ScrollArea } from '../ui/scroll-area';
+// Removed ScrollArea import as it's no longer used directly here.
 
 const currentYear = new Date().getFullYear();
 
@@ -128,7 +128,7 @@ export function TeacherProfileFormDialog({
       if (!open) form.reset();
       onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Teacher Profile" : "Add New Teacher"}</DialogTitle>
           <DialogDescription>
@@ -136,70 +136,70 @@ export function TeacherProfileFormDialog({
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
-            <ScrollArea className="max-h-[65vh] p-1 pr-3">
-              <div className="space-y-4">
-                <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. Priya Sharma" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" placeholder="e.g. priya.sharma@example.com" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={form.control} name="phoneNumber" render={({ field }) => (
-                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={form.control} name="address" render={({ field }) => (
-                  <FormItem><FormLabel>Address</FormLabel><FormControl><Textarea placeholder="Full address" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={form.control} name="yearOfJoining" render={({ field }) => (
-                  <FormItem><FormLabel>Year of Joining</FormLabel><FormControl><Input type="number" placeholder={currentYear.toString()} {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={form.control} name="profilePictureUrl" render={({ field }) => (
-                  <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/image.png" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField
-                  control={form.control}
-                  name="subjectsTaught"
-                  render={() => (
-                    <FormItem>
-                      <FormLabel>Subjects Taught</FormLabel>
-                      <div className="grid grid-cols-2 gap-2 p-2 border rounded-md">
-                        {subjectNamesArray.map((subject) => (
-                          <FormField
-                            key={subject}
-                            control={form.control}
-                            name="subjectsTaught"
-                            render={({ field }) => {
-                              return (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                  <FormControl>
-                                    <Checkbox
-                                      checked={field.value?.includes(subject)}
-                                      onCheckedChange={(checked) => {
-                                        return checked
-                                          ? field.onChange([...(field.value || []), subject])
-                                          : field.onChange(
-                                              (field.value || []).filter(
-                                                (value) => value !== subject
-                                              )
-                                            );
-                                      }}
-                                    />
-                                  </FormControl>
-                                  <FormLabel className="font-normal text-sm">{subject}</FormLabel>
-                                </FormItem>
-                              );
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </ScrollArea>
-            <DialogFooter className="pt-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2 pb-4">
+            {/* Form fields are now direct children of the form, DialogContent handles scrolling */}
+            <div className="space-y-4"> 
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. Priya Sharma" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" placeholder="e.g. priya.sharma@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField control={form.control} name="phoneNumber" render={({ field }) => (
+                <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField control={form.control} name="address" render={({ field }) => (
+                <FormItem><FormLabel>Address</FormLabel><FormControl><Textarea placeholder="Full address" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField control={form.control} name="yearOfJoining" render={({ field }) => (
+                <FormItem><FormLabel>Year of Joining</FormLabel><FormControl><Input type="number" placeholder={currentYear.toString()} {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField control={form.control} name="profilePictureUrl" render={({ field }) => (
+                <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/image.png" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField
+                control={form.control}
+                name="subjectsTaught"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>Subjects Taught</FormLabel>
+                    <div className="grid grid-cols-2 gap-2 p-2 border rounded-md max-h-40 overflow-y-auto"> {/* Added max-h and overflow here for subject list */}
+                      {subjectNamesArray.map((subject) => (
+                        <FormField
+                          key={subject}
+                          control={form.control}
+                          name="subjectsTaught"
+                          render={({ field }) => {
+                            return (
+                              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value?.includes(subject)}
+                                    onCheckedChange={(checked) => {
+                                      return checked
+                                        ? field.onChange([...(field.value || []), subject])
+                                        : field.onChange(
+                                            (field.value || []).filter(
+                                              (value) => value !== subject
+                                            )
+                                          );
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormLabel className="font-normal text-sm">{subject}</FormLabel>
+                              </FormItem>
+                            );
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            {/* DialogFooter is a direct child of the form, will scroll with form content */}
+            <DialogFooter className="pt-6"> {/* Increased top padding for better separation */}
               <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
