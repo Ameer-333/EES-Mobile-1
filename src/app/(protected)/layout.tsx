@@ -23,10 +23,10 @@ import { auth, firestore } from '@/lib/firebase';
 import { signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'next/image'; // Added for logo
+import Image from 'next/image';
 
-const LOCAL_STORAGE_APP_NAME_KEY = 'eesEducationAppName';
-const LOCAL_STORAGE_LOGO_URL_KEY = 'eesEducationLogoUrl';
+const APP_SETTINGS_COLLECTION = 'app_settings';
+const GENERAL_SETTINGS_DOC_ID = 'general';
 
 // Simplified and more direct role extraction from pathname
 function getExpectedRoleFromPathname(pathname: string): UserRole | null {
@@ -35,7 +35,6 @@ function getExpectedRoleFromPathname(pathname: string): UserRole | null {
   if (pathname.startsWith('/admin/')) return 'Admin';
   return null;
 }
-
 
 function getDashboardTitle(pathname: string, actualRole: UserRole | null, appName: string): string {
     const rolePrefix = actualRole ? actualRole.toLowerCase() : '';
@@ -76,13 +75,26 @@ export default function ProtectedLayout({
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
   
   useEffect(() => {
-    const updateAppSettings = () => {
-      const storedAppName = localStorage.getItem(LOCAL_STORAGE_APP_NAME_KEY);
-      if (storedAppName) setCurrentAppName(storedAppName);
-      const storedLogoUrl = localStorage.getItem(LOCAL_STORAGE_LOGO_URL_KEY);
-      if (storedLogoUrl) setCurrentLogoUrl(storedLogoUrl);
+    const fetchAppSettings = async () => {
+      const settingsDocRef = doc(firestore, APP_SETTINGS_COLLECTION, GENERAL_SETTINGS_DOC_ID);
+      try {
+        const settingsDocSnap = await getDoc(settingsDocRef);
+        if (settingsDocSnap.exists()) {
+          const appData = settingsDocSnap.data();
+          setCurrentAppName(appData.appName || 'EES Education');
+          setCurrentLogoUrl(appData.logoUrl || null);
+        } else {
+          setCurrentAppName('EES Education'); 
+          setCurrentLogoUrl(null);
+        }
+      } catch (error) {
+        console.error("Error fetching app settings for layout:", error);
+        setCurrentAppName('EES Education'); 
+        setCurrentLogoUrl(null);
+      }
     };
-    updateAppSettings(); // Initial load
+
+    fetchAppSettings(); // Fetch app settings on initial load
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setIsLoading(true); 
@@ -138,14 +150,11 @@ export default function ProtectedLayout({
           setIsLoading(false); 
         }
       }
-       setTimeout(() => setIsLoading(false), 100);
+       setTimeout(() => setIsLoading(false), 100); // Fallback to stop loading
     });
-
-    window.addEventListener('appSettingsChanged', updateAppSettings);
 
     return () => {
       unsubscribe();
-      window.removeEventListener('appSettingsChanged', updateAppSettings);
     };
   }, [pathname, router, toast]); 
 

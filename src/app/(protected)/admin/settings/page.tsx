@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Save, Bell, Palette, Lock, Settings, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { firestore } from '@/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-const LOCAL_STORAGE_APP_NAME_KEY = 'eesEducationAppName';
-const LOCAL_STORAGE_LOGO_URL_KEY = 'eesEducationLogoUrl';
+const APP_SETTINGS_COLLECTION = 'app_settings';
+const GENERAL_SETTINGS_DOC_ID = 'general';
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
@@ -25,28 +27,55 @@ export default function AdminSettingsPage() {
   const [smsNotifications, setSmsNotifications] = useState(false);
   const [sessionTimeout, setSessionTimeout] = useState(30);
   const [twoFactorAuth, setTwoFactorAuth] = useState(true);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   useEffect(() => {
-    const storedAppName = localStorage.getItem(LOCAL_STORAGE_APP_NAME_KEY);
-    if (storedAppName) {
-      setAppName(storedAppName);
-    }
-    const storedLogoUrl = localStorage.getItem(LOCAL_STORAGE_LOGO_URL_KEY);
-    if (storedLogoUrl) {
-      setLogoUrl(storedLogoUrl);
-    }
-  }, []);
+    const fetchSettings = async () => {
+      setIsLoadingSettings(true);
+      try {
+        const settingsDocRef = doc(firestore, APP_SETTINGS_COLLECTION, GENERAL_SETTINGS_DOC_ID);
+        const docSnap = await getDoc(settingsDocRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setAppName(data.appName || 'EES Education');
+          setLogoUrl(data.logoUrl || '');
+          // Potentially load other settings like defaultLanguage, maintenanceMode if stored
+        } else {
+          // Set default values if doc doesn't exist
+          setAppName('EES Education');
+          setLogoUrl('');
+        }
+      } catch (error) {
+        console.error("Error fetching app settings from Firestore:", error);
+        toast({
+          title: "Error Loading Settings",
+          description: "Could not fetch app settings from Firestore. Using defaults.",
+          variant: "destructive",
+        });
+        setAppName('EES Education');
+        setLogoUrl('');
+      }
+      setIsLoadingSettings(false);
+    };
+    fetchSettings();
+  }, [toast]);
 
-  const handleSaveGeneralSettings = () => {
-    localStorage.setItem(LOCAL_STORAGE_APP_NAME_KEY, appName);
-    localStorage.setItem(LOCAL_STORAGE_LOGO_URL_KEY, logoUrl);
-    // In a real app, also save defaultLanguage and maintenanceMode
-    toast({
-      title: "Settings Saved",
-      description: `General settings (App Name, Logo URL) have been updated in localStorage.`,
-    });
-    // Trigger a custom event to notify other parts of the app if needed
-    window.dispatchEvent(new CustomEvent('appSettingsChanged'));
+  const handleSaveGeneralSettings = async () => {
+    try {
+      const settingsDocRef = doc(firestore, APP_SETTINGS_COLLECTION, GENERAL_SETTINGS_DOC_ID);
+      await setDoc(settingsDocRef, { appName, logoUrl }, { merge: true });
+      toast({
+        title: "Settings Saved",
+        description: `General settings (App Name, Logo URL) have been updated in Firestore.`,
+      });
+    } catch (error) {
+      console.error("Error saving general settings to Firestore:", error);
+      toast({
+        title: "Save Failed",
+        description: "Could not save general settings to Firestore.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSaveNotificationSettings = () => {
@@ -81,50 +110,56 @@ export default function AdminSettingsPage() {
             </div>
           </AccordionTrigger>
           <AccordionContent className="p-6 pt-0">
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="appName">Application Name</Label>
-                <Input id="appName" value={appName} onChange={(e) => setAppName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="logoUrl">School Logo URL</Label>
-                <div className="flex items-center space-x-2">
-                   <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                   <Input id="logoUrl" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://example.com/logo.png" />
+            {isLoadingSettings ? (
+              <CardContent className="space-y-6">
+                <p>Loading settings...</p>
+              </CardContent>
+            ) : (
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="appName">Application Name</Label>
+                  <Input id="appName" value={appName} onChange={(e) => setAppName(e.target.value)} />
                 </div>
-                 {logoUrl && (
-                  <div className="mt-2 p-2 border rounded-md flex justify-center items-center bg-muted/50 max-h-32">
-                    <img src={logoUrl} alt="Logo Preview" className="max-h-28 object-contain rounded" 
-                      onError={(e) => (e.currentTarget.style.display = 'none')} 
-                      onLoad={(e) => (e.currentTarget.style.display = 'block')}
-                    />
+                <div className="space-y-2">
+                  <Label htmlFor="logoUrl">School Logo URL</Label>
+                  <div className="flex items-center space-x-2">
+                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                    <Input id="logoUrl" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://example.com/logo.png" />
                   </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="defaultLanguage">Default Language</Label>
-                <Select value={defaultLanguage} onValueChange={setDefaultLanguage}>
-                  <SelectTrigger id="defaultLanguage">
-                    <SelectValue placeholder="Select language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="kn">Kannada</SelectItem>
-                    <SelectItem value="hi">Hindi</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between space-y-2 border p-4 rounded-md">
-                <div>
-                  <Label htmlFor="maintenanceMode" className="font-medium">Maintenance Mode</Label>
-                  <p className="text-sm text-muted-foreground">Temporarily take the application offline for users.</p>
+                  {logoUrl && (
+                    <div className="mt-2 p-2 border rounded-md flex justify-center items-center bg-muted/50 max-h-32">
+                      <img src={logoUrl} alt="Logo Preview" className="max-h-28 object-contain rounded"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                        onLoad={(e) => (e.currentTarget.style.display = 'block')}
+                      />
+                    </div>
+                  )}
                 </div>
-                <Switch id="maintenanceMode" checked={maintenanceMode} onCheckedChange={setMaintenanceMode} />
-              </div>
-              <Button onClick={handleSaveGeneralSettings} className="w-full sm:w-auto">
-                <Save className="mr-2 h-4 w-4" /> Save General Settings
-              </Button>
-            </CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="defaultLanguage">Default Language</Label>
+                  <Select value={defaultLanguage} onValueChange={setDefaultLanguage}>
+                    <SelectTrigger id="defaultLanguage">
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="kn">Kannada</SelectItem>
+                      <SelectItem value="hi">Hindi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between space-y-2 border p-4 rounded-md">
+                  <div>
+                    <Label htmlFor="maintenanceMode" className="font-medium">Maintenance Mode</Label>
+                    <p className="text-sm text-muted-foreground">Temporarily take the application offline for users.</p>
+                  </div>
+                  <Switch id="maintenanceMode" checked={maintenanceMode} onCheckedChange={setMaintenanceMode} />
+                </div>
+                <Button onClick={handleSaveGeneralSettings} className="w-full sm:w-auto">
+                  <Save className="mr-2 h-4 w-4" /> Save General Settings
+                </Button>
+              </CardContent>
+            )}
           </AccordionContent>
         </AccordionItem>
 

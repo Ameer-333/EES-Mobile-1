@@ -7,46 +7,63 @@ import { LogoIcon } from '@/components/icons/logo-icon';
 import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
+import { firestore } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
-const LOCAL_STORAGE_APP_NAME_KEY = 'eesEducationAppName';
-const LOCAL_STORAGE_LOGO_URL_KEY = 'eesEducationLogoUrl';
+const APP_SETTINGS_COLLECTION = 'app_settings';
+const GENERAL_SETTINGS_DOC_ID = 'general';
 
 export default function LandingPage() {
   const [appName, setAppName] = useState('EES Education');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedAppName = localStorage.getItem(LOCAL_STORAGE_APP_NAME_KEY);
-    if (storedAppName) {
-      setAppName(storedAppName);
-    }
-    const storedLogoUrl = localStorage.getItem(LOCAL_STORAGE_LOGO_URL_KEY);
-    if (storedLogoUrl) {
-      setLogoUrl(storedLogoUrl);
-    }
-
-    const handleSettingsChange = () => {
-      const newAppName = localStorage.getItem(LOCAL_STORAGE_APP_NAME_KEY);
-      if (newAppName) setAppName(newAppName);
-      const newLogoUrl = localStorage.getItem(LOCAL_STORAGE_LOGO_URL_KEY);
-      if (newLogoUrl) setLogoUrl(newLogoUrl);
+    const fetchAppSettings = async () => {
+      setIsLoading(true);
+      try {
+        const settingsDocRef = doc(firestore, APP_SETTINGS_COLLECTION, GENERAL_SETTINGS_DOC_ID);
+        const settingsDocSnap = await getDoc(settingsDocRef);
+        if (settingsDocSnap.exists()) {
+          const appData = settingsDocSnap.data();
+          setAppName(appData.appName || 'EES Education');
+          setLogoUrl(appData.logoUrl || null);
+        } else {
+          // Defaults if document doesn't exist
+          setAppName('EES Education');
+          setLogoUrl(null);
+        }
+      } catch (error) {
+        console.error("Error fetching app settings for landing page:", error);
+        // Fallback to defaults on error
+        setAppName('EES Education');
+        setLogoUrl(null);
+      }
+      setIsLoading(false);
     };
 
-    window.addEventListener('appSettingsChanged', handleSettingsChange);
-    return () => {
-      window.removeEventListener('appSettingsChanged', handleSettingsChange);
-    };
+    fetchAppSettings();
   }, []);
+
+  if (isLoading) {
+    // You can show a more sophisticated loader here if needed
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-accent/30 p-4">
+        <LogoIcon className="h-24 w-24 text-primary mx-auto mb-3 animate-pulse" />
+        <h1 className="text-5xl font-headline font-bold text-primary animate-pulse">Loading...</h1>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-accent/30 p-4">
       <div className="mb-12 text-center">
         {logoUrl ? (
-          <Image 
-            src={logoUrl} 
+          <Image
+            src={logoUrl}
             alt={`${appName} Logo`}
-            width={96} 
-            height={96} 
+            width={96}
+            height={96}
             className="mx-auto mb-3 rounded-md object-contain"
             data-ai-hint="school logo custom"
             onError={() => setLogoUrl(null)} // Fallback if image fails to load
