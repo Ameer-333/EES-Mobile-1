@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import type { Teacher, TeacherFormData, SubjectName } from '@/types';
-import { subjectNamesArray } from '@/types'; // Import subjectNamesArray
+import { subjectNamesArray } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -30,8 +30,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-// Removed ScrollArea import as it's no longer used directly here.
+import { firestore } from '@/lib/firebase';
+import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
+const TEACHERS_COLLECTION = 'teachers';
 const currentYear = new Date().getFullYear();
 
 const teacherProfileSchema = z.object({
@@ -42,7 +44,7 @@ const teacherProfileSchema = z.object({
   yearOfJoining: z.coerce.number().min(1980, "Year too early.").max(currentYear, `Year cannot be in the future.`),
   subjectsTaught: z.array(z.custom<SubjectName>((val) => subjectNamesArray.includes(val as SubjectName)))
     .min(1, { message: "At least one subject must be selected." }),
-  profilePictureUrl: z.string().url({ message: "Invalid URL format." }).optional().or(z.literal('')),
+  profilePictureUrl: z.string().url({ message: "Invalid URL format for profile picture." }).optional().or(z.literal('')),
 });
 
 type TeacherProfileFormValues = z.infer<typeof teacherProfileSchema>;
@@ -50,7 +52,7 @@ type TeacherProfileFormValues = z.infer<typeof teacherProfileSchema>;
 interface TeacherProfileFormDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onTeacherSaved: (teacherData: Teacher, isEditing: boolean) => void;
+  onTeacherSaved: (teacherData: Teacher, isEditing: boolean) => void; // Callback still useful for UI updates/dialog close
   teacherToEdit?: Teacher | null;
 }
 
@@ -89,7 +91,7 @@ export function TeacherProfileFormDialog({
         profilePictureUrl: teacherToEdit.profilePictureUrl || '',
       });
     } else if (!isEditing && isOpen) {
-      form.reset({ // Reset to default for new teacher
+      form.reset({
         name: '',
         email: '',
         phoneNumber: '',
@@ -103,24 +105,53 @@ export function TeacherProfileFormDialog({
 
   async function onSubmit(values: TeacherProfileFormValues) {
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const totalYearsWorked = currentYear - values.yearOfJoining;
+      const teacherDataForFirestore: Omit<Teacher, 'id' | 'totalYearsWorked' | 'salaryHistory'> & Partial<Pick<Teacher, 'totalYearsWorked' | 'salaryHistory'>> = {
+        ...values,
+        profilePictureUrl: values.profilePictureUrl || undefined, // Store undefined if empty
+        totalYearsWorked: totalYearsWorked >= 0 ? totalYearsWorked : 0,
+        // salaryHistory, daysPresentThisMonth, daysAbsentThisMonth are not part of this form initially.
+        // They will be managed by the payroll component or kept as default if new.
+      };
 
-    const totalYearsWorked = teacherToEdit?.id ? currentYear - values.yearOfJoining : 0;
+      let docId = teacherToEdit?.id;
 
-    const savedTeacherData: Teacher = {
-      id: teacherToEdit?.id || `T${Date.now()}`, // Use existing ID or generate new
-      ...values,
-      totalYearsWorked: totalYearsWorked >= 0 ? totalYearsWorked : 0,
-    };
+      if (isEditing && docId) {
+        const teacherDocRef = doc(firestore, TEACHERS_COLLECTION, docId);
+        // Merge with existing document to preserve salaryHistory etc.
+        await setDoc(teacherDocRef, teacherDataForFirestore, { merge: true });
+      } else {
+        // Add new teacher, initialize optional fields
+        const completeNewTeacherData: Omit<Teacher, 'id'> = {
+            ...teacherDataForFirestore,
+            salaryHistory: [], // Initialize as empty array for new teachers
+            daysPresentThisMonth: 0,
+            daysAbsentThisMonth: 0,
+        };
+        const docRef = await addDoc(collection(firestore, TEACHERS_COLLECTION), completeNewTeacherData);
+        docId = docRef.id;
+      }
+      
+      // The onSnapshot listener in ManageTeacherProfiles will pick up the changes.
+      // onTeacherSaved can be used to close the dialog.
+      onTeacherSaved({ ...teacherDataForFirestore, id: docId!, salaryHistory: teacherToEdit?.salaryHistory || [] }, isEditing);
 
-    onTeacherSaved(savedTeacherData, isEditing);
-    setIsSubmitting(false);
-    onOpenChange(false);
-    toast({
-      title: isEditing ? "Teacher Updated" : "Teacher Added",
-      description: `${savedTeacherData.name}'s profile has been ${isEditing ? 'updated' : 'added'}.`,
-    });
+      toast({
+        title: isEditing ? "Teacher Updated" : "Teacher Added",
+        description: `${values.name}'s profile has been ${isEditing ? 'updated in' : 'added to'} Firestore.`,
+      });
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error saving teacher to Firestore:", error);
+      toast({
+        title: "Save Failed",
+        description: "Could not save teacher profile to Firestore.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -137,7 +168,6 @@ export function TeacherProfileFormDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2 pb-4">
-            {/* Form fields are now direct children of the form, DialogContent handles scrolling */}
             <div className="space-y-4"> 
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. Priya Sharma" {...field} /></FormControl><FormMessage /></FormItem>
@@ -155,7 +185,7 @@ export function TeacherProfileFormDialog({
                 <FormItem><FormLabel>Year of Joining</FormLabel><FormControl><Input type="number" placeholder={currentYear.toString()} {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
               <FormField control={form.control} name="profilePictureUrl" render={({ field }) => (
-                <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/image.png" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
               <FormField
                 control={form.control}
@@ -163,7 +193,7 @@ export function TeacherProfileFormDialog({
                 render={() => (
                   <FormItem>
                     <FormLabel>Subjects Taught</FormLabel>
-                    <div className="grid grid-cols-2 gap-2 p-2 border rounded-md max-h-40 overflow-y-auto"> {/* Added max-h and overflow here for subject list */}
+                    <div className="grid grid-cols-2 gap-2 p-2 border rounded-md max-h-40 overflow-y-auto">
                       {subjectNamesArray.map((subject) => (
                         <FormField
                           key={subject}
@@ -198,9 +228,8 @@ export function TeacherProfileFormDialog({
                 )}
               />
             </div>
-            {/* DialogFooter is a direct child of the form, will scroll with form content */}
-            <DialogFooter className="pt-6"> {/* Increased top padding for better separation */}
-              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+            <DialogFooter className="pt-6">
+              <DialogClose asChild><Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button></DialogClose>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 {isEditing ? "Save Changes" : "Add Teacher"}
@@ -212,3 +241,5 @@ export function TeacherProfileFormDialog({
     </Dialog>
   );
 }
+
+    

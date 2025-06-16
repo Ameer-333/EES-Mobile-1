@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Search, UserPlus, Trash2, Eye } from 'lucide-react';
+import { Edit, Search, UserPlus, Trash2, Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,42 +18,48 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TeacherProfileFormDialog } from './teacher-profile-form-dialog';
 import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
+import { firestore } from '@/lib/firebase';
+import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData } from 'firebase/firestore';
 
-const mockInitialTeachers: Teacher[] = [
-  {
-    id: 'T001', name: 'Priya Sharma', email: 'priya.sharma@ees.com', phoneNumber: '9876543210',
-    address: '123 Park Avenue, Bangalore', yearOfJoining: 2018, totalYearsWorked: 6,
-    subjectsTaught: ['English', 'Social Science'], profilePictureUrl: 'https://placehold.co/40x40/E6E6FA/300130.png?text=PS',
-    salaryHistory: [{ id: 'sal1-T001', monthYear: 'June 2024', dateIssued: '2024-07-01', amountIssued: 50000, amountDeducted: 2500, daysAbsent: 2, reasonForAbsence: 'Sick leave (approved)' }],
-    daysPresentThisMonth: 20, daysAbsentThisMonth: 2,
-  },
-  {
-    id: 'T002', name: 'Anand Singh', email: 'anand.singh@ees.com', phoneNumber: '9876543211',
-    address: '456 Lake View Rd, Mysore', yearOfJoining: 2020, totalYearsWorked: 4,
-    subjectsTaught: ['Maths', 'Science'], profilePictureUrl: 'https://placehold.co/40x40/FFE0B2/BF360C.png?text=AS',
-    salaryHistory: [{ id: 'sal1-T002', monthYear: 'June 2024', dateIssued: '2024-07-01', amountIssued: 45000, amountDeducted: 0, daysAbsent: 0 }],
-    daysPresentThisMonth: 22, daysAbsentThisMonth: 0,
-  },
-];
-
+const TEACHERS_COLLECTION = 'teachers';
 
 export function ManageTeacherProfiles() {
-  const [teachers, setTeachers] = useState<Teacher[]>(mockInitialTeachers);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null);
   const { toast } = useToast();
-  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    setHasMounted(true);
-  }, []);
+    setIsLoading(true);
+    const teachersCollectionRef = collection(firestore, TEACHERS_COLLECTION);
+    
+    const unsubscribe = onSnapshot(teachersCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
+      const fetchedTeachers = snapshot.docs.map(docSnapshot => ({ // Renamed doc to docSnapshot to avoid conflict
+        id: docSnapshot.id,
+        ...docSnapshot.data(),
+      } as Teacher));
+      setTeachers(fetchedTeachers);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching teachers from Firestore:", error);
+      toast({
+        title: "Error Loading Teachers",
+        description: "Could not fetch teacher data from Firestore.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [toast]);
+
 
   const filteredTeachers = useMemo(() => {
     return teachers.filter(
@@ -61,7 +67,7 @@ export function ManageTeacherProfiles() {
         teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         teacher.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        teacher.subjectsTaught.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()))
+        (teacher.subjectsTaught && teacher.subjectsTaught.some(s => s.toLowerCase().includes(searchTerm.toLowerCase())))
     );
   }, [teachers, searchTerm]);
 
@@ -75,25 +81,37 @@ export function ManageTeacherProfiles() {
     setIsFormOpen(true);
   };
 
-  const handleDeleteTeacher = (teacherId: string) => {
-    setTeachers(prev => prev.filter(t => t.id !== teacherId));
-    toast({ title: "Teacher Deleted", description: `Teacher profile with ID: ${teacherId} has been removed.` });
+  const handleDeleteTeacher = async (teacherId: string, teacherName: string) => {
+    try {
+      const teacherDocRef = doc(firestore, TEACHERS_COLLECTION, teacherId);
+      await deleteDoc(teacherDocRef);
+      // onSnapshot will update the list. Toast here provides immediate feedback.
+      toast({ title: "Teacher Deleted", description: `Teacher profile for ${teacherName} has been removed from Firestore.` });
+    } catch (error) {
+      console.error("Error deleting teacher from Firestore:", error);
+      toast({
+        title: "Deletion Failed",
+        description: `Could not delete teacher ${teacherName} from Firestore.`,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleTeacherSaved = (savedTeacher: Teacher, isEditing: boolean) => {
-    if (isEditing) {
-      setTeachers(prev => prev.map(t => t.id === savedTeacher.id ? savedTeacher : t));
-    } else {
-      setTeachers(prev => [savedTeacher, ...prev]);
-    }
+    // Firestore listener will update the state. This callback primarily closes the dialog.
+    // Toast is handled within TeacherProfileFormDialog.
+    setIsFormOpen(false);
   };
   
-  if (!hasMounted) {
+  if (isLoading) {
     return (
       <Card className="w-full shadow-lg rounded-lg border-accent/50 mt-8">
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <Skeleton className="h-8 w-1/2" />
+            <div>
+                <Skeleton className="h-8 w-48 mb-2" />
+                <Skeleton className="h-4 w-72" />
+            </div>
             <Skeleton className="h-10 w-36" />
           </div>
           <div className="mt-4">
@@ -110,8 +128,13 @@ export function ManageTeacherProfiles() {
               </TableHeader>
               <TableBody>
                 {Array(3).fill(0).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array(6).fill(0).map((_,j) => <TableCell key={j}><Skeleton className="h-5 w-full"/></TableCell>)}
+                  <TableRow key={`skel-row-${i}`}>
+                    <TableCell colSpan={6} className="p-4">
+                        <div className="flex items-center justify-center">
+                           <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                           <span className="ml-2">Loading teacher profiles...</span>
+                        </div>
+                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -130,7 +153,7 @@ export function ManageTeacherProfiles() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <CardTitle className="text-2xl font-headline text-primary">Teacher Profiles</CardTitle>
-              <CardDescription>Manage teacher information, contact details, and subjects.</CardDescription>
+              <CardDescription>Manage teacher information, contact details, and subjects from Firestore.</CardDescription>
             </div>
             <Button onClick={handleAddTeacher} className="bg-primary hover:bg-primary/90">
               <UserPlus className="mr-2 h-4 w-4" /> Add New Teacher
@@ -174,12 +197,12 @@ export function ManageTeacherProfiles() {
                         data-ai-hint="teacher avatar"
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{teacher.id}</TableCell>
+                    <TableCell className="font-medium truncate max-w-[100px]">{teacher.id}</TableCell>
                     <TableCell>{teacher.name}</TableCell>
                     <TableCell className="text-muted-foreground">{teacher.email}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {teacher.subjectsTaught.map(subject => (
+                        {teacher.subjectsTaught && teacher.subjectsTaught.map(subject => (
                           <Badge key={subject} variant="secondary" className="text-xs">{subject}</Badge>
                         ))}
                       </div>
@@ -198,12 +221,12 @@ export function ManageTeacherProfiles() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the profile for <strong>{teacher.name}</strong>.
+                              This action cannot be undone. This will permanently delete the profile for <strong>{teacher.name}</strong> from Firestore.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.id)}>
+                            <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}>
                               Yes, delete profile
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -214,7 +237,7 @@ export function ManageTeacherProfiles() {
                 )) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
-                      No teachers found matching your criteria.
+                      {isLoading ? 'Loading teachers...' : 'No teachers found matching your criteria or no teachers in Firestore.'}
                     </TableCell>
                   </TableRow>
                 )}
@@ -223,7 +246,7 @@ export function ManageTeacherProfiles() {
           </div>
           {filteredTeachers.length > 0 && (
             <div className="mt-4 text-right text-sm text-muted-foreground">
-              Showing {filteredTeachers.length} of {teachers.length} total teacher profiles.
+              Showing {filteredTeachers.length} of {teachers.length} total teacher profiles from Firestore.
             </div>
           )}
         </CardContent>
@@ -238,3 +261,5 @@ export function ManageTeacherProfiles() {
     </>
   );
 }
+
+    
