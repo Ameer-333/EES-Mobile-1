@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Edit, Search, UserPlus, Trash2 } from 'lucide-react';
+import { Edit, Search, UserPlus, Trash2, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import {
   AlertDialog,
@@ -24,27 +24,43 @@ import { useToast } from "@/hooks/use-toast";
 import { AddStudentDialog } from '@/components/teacher/add-student-dialog';
 import { EditStudentDialog } from '@/components/teacher/edit-student-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { firestore } from '@/lib/firebase';
+import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData } from 'firebase/firestore';
 
-const mockStudentsData: Student[] = [
-  { id: 'S001', name: 'Aarav Sharma', satsNumber: 'SAT001', class: '10th', section: 'A', caste: 'General', religion: 'Hindu', address: '1st Street, Bangalore', profilePictureUrl: 'https://placehold.co/40x40/FFE0B2/BF360C.png?text=AS' , dataAiHint: "student avatar"},
-  { id: 'S002', name: 'Bhavna Singh', satsNumber: 'SAT002', class: '10th', section: 'B', caste: 'OBC', religion: 'Hindu', address: '2nd Street, Mysore', profilePictureUrl: 'https://placehold.co/40x40/C8E6C9/2E7D32.png?text=BS' , dataAiHint: "student avatar"},
-  { id: 'S003', name: 'Chetan Reddy', satsNumber: 'SAT003', class: '9th', section: 'A', caste: 'General', religion: 'Hindu', address: '3rd Street, Hubli' },
-  { id: 'S004', name: 'Diya Patel', satsNumber: 'SAT004', class: '9th', section: 'B', caste: 'OBC', religion: 'Hindu', address: '4th Street, Mangalore', profilePictureUrl: 'https://placehold.co/40x40/B3E5FC/01579B.png?text=DP', dataAiHint: "student avatar" },
-  { id: 'S005', name: 'Ethan Dsouza', satsNumber: 'SAT005', class: '10th', section: 'A', caste: 'General', religion: 'Christian', address: '5th Street, Belgaum' },
-];
+const STUDENTS_COLLECTION = 'students';
 
 export function TeacherStudentManagement() {
-  const [students, setStudents] = useState<Student[]>(mockStudentsData);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
   const [currentStudentToEdit, setCurrentStudentToEdit] = useState<Student | null>(null);
-  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    setHasMounted(true);
-  }, []);
+    setIsLoading(true);
+    const studentsCollectionRef = collection(firestore, STUDENTS_COLLECTION);
+    
+    const unsubscribe = onSnapshot(studentsCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
+      const fetchedStudents = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Student));
+      setStudents(fetchedStudents);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching students from Firestore:", error);
+      toast({
+        title: "Error Loading Students",
+        description: "Could not fetch student data from Firestore.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe(); // Cleanup listener on component unmount
+  }, [toast]);
 
   const filteredStudents = useMemo(() => {
     if (!searchTerm) return students;
@@ -52,7 +68,7 @@ export function TeacherStudentManagement() {
       (student) =>
         student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.satsNumber.toLowerCase().includes(searchTerm.toLowerCase())
+        (student.satsNumber && student.satsNumber.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [students, searchTerm]);
 
@@ -61,22 +77,33 @@ export function TeacherStudentManagement() {
     setIsEditStudentDialogOpen(true);
   };
   
-  const handleDeleteStudent = (studentId: string) => {
-    setStudents(prev => prev.filter(s => s.id !== studentId));
-    toast({ title: "Student Record Deleted", description: `Student with ID: ${studentId} has been removed.` });
+  const handleDeleteStudent = async (studentId: string, studentName: string) => {
+    try {
+      const studentDocRef = doc(firestore, STUDENTS_COLLECTION, studentId);
+      await deleteDoc(studentDocRef);
+      // The onSnapshot listener will automatically update the local state
+      toast({ title: "Student Record Deleted", description: `Student ${studentName} has been removed from Firestore.` });
+    } catch (error) {
+      console.error("Error deleting student from Firestore:", error);
+      toast({
+        title: "Deletion Failed",
+        description: "Could not delete student from Firestore.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleStudentAdded = (newStudent: Student) => {
-    setStudents(prevStudents => [newStudent, ...prevStudents]);
-    // Toast is handled within AddStudentDialog
+    // Firestore listener updates the table. Toast is in AddStudentDialog.
+    setIsAddStudentDialogOpen(false);
   };
 
   const handleStudentEdited = (editedStudent: Student) => {
-    setStudents(prevStudents => prevStudents.map(s => s.id === editedStudent.id ? editedStudent : s));
-    // Toast is handled within EditStudentDialog
+    // Firestore listener updates the table. Toast is in EditStudentDialog.
+    setIsEditStudentDialogOpen(false);
   };
 
-  if (!hasMounted) {
+  if (isLoading) {
     return (
       <Card className="w-full shadow-lg rounded-lg">
         <CardHeader>
@@ -102,7 +129,12 @@ export function TeacherStudentManagement() {
               <TableBody>
                 {Array(3).fill(0).map((_, i) => (
                   <TableRow key={i}>
-                    {Array(7).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
+                    <TableCell colSpan={7} className="p-4">
+                      <div className="flex items-center justify-center">
+                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                         <span className="ml-2">Loading students...</span>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -121,7 +153,7 @@ export function TeacherStudentManagement() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <CardTitle className="text-2xl font-headline text-primary">Student Management</CardTitle>
-            <CardDescription>View, search, and manage student records.</CardDescription>
+            <CardDescription>View, search, and manage student records from Firestore.</CardDescription>
           </div>
           <Button onClick={() => setIsAddStudentDialogOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" /> Add New Student
@@ -164,8 +196,8 @@ export function TeacherStudentManagement() {
                       data-ai-hint="student avatar"
                     />
                   </TableCell>
-                  <TableCell>{student.id}</TableCell>
-                  <TableCell className="font-medium">{student.name}</TableCell>
+                  <TableCell className="font-medium truncate max-w-[100px]">{student.id}</TableCell>
+                  <TableCell>{student.name}</TableCell>
                   <TableCell>{student.satsNumber}</TableCell>
                   <TableCell>{student.class}</TableCell>
                   <TableCell>{student.section}</TableCell>
@@ -184,12 +216,12 @@ export function TeacherStudentManagement() {
                           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                           <AlertDialogDescription>
                             This action cannot be undone. This will permanently delete the student
-                            record for {student.name}.
+                            record for {student.name} from Firestore.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteStudent(student.id)}>
+                          <AlertDialogAction onClick={() => handleDeleteStudent(student.id, student.name)}>
                             Continue
                           </AlertDialogAction>
                         </AlertDialogFooter>
@@ -200,7 +232,7 @@ export function TeacherStudentManagement() {
               )) : (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
-                    No students found matching your criteria.
+                    No students found matching your criteria or no students in Firestore.
                   </TableCell>
                 </TableRow>
               )}
@@ -209,7 +241,7 @@ export function TeacherStudentManagement() {
         </div>
         {filteredStudents.length > 0 && (
           <div className="mt-4 text-right text-sm text-muted-foreground">
-            Showing {filteredStudents.length} of {students.length} students.
+            Showing {filteredStudents.length} of {students.length} students from Firestore.
           </div>
         )}
       </CardContent>

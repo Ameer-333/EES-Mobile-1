@@ -28,6 +28,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { firestore } from '@/lib/firebase';
+import { collection, addDoc } from 'firebase/firestore';
+
+const STUDENTS_COLLECTION = 'students';
 
 const addStudentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -45,7 +49,7 @@ type AddStudentFormValues = z.infer<typeof addStudentSchema>;
 interface AddStudentDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onStudentAdded: (newStudent: Student) => void;
+  onStudentAdded: (newStudent: Student) => void; // Kept for dialog closure, actual data update via listener
 }
 
 export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddStudentDialogProps) {
@@ -68,31 +72,46 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
 
   async function onSubmit(values: AddStudentFormValues) {
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const studentDataToSave: StudentFormData & { profilePictureUrl?: string } = {
+        ...values,
+        profilePictureUrl: values.profilePictureUrl || undefined,
+      };
+      // Remarks, scholarships, backgroundInfo would be empty arrays/undefined initially for a new student.
+      // These can be added via the edit functionality or specific forms later.
 
-    const newStudent: Student = {
-      id: `S${Math.floor(Math.random() * 9000) + 1000}`, // Mock ID
-      ...values,
-      profilePictureUrl: values.profilePictureUrl || undefined, // Ensure empty string becomes undefined
-    };
-    onStudentAdded(newStudent);
-    setIsSubmitting(false);
-    onOpenChange(false); // Close dialog
-    form.reset();
-    toast({
-        title: "Student Added",
-        description: `${newStudent.name} has been successfully added to the records.`,
-    });
+      const docRef = await addDoc(collection(firestore, STUDENTS_COLLECTION), studentDataToSave);
+      
+      onStudentAdded({ ...studentDataToSave, id: docRef.id }); // Pass new student with Firestore ID
+      
+      toast({
+          title: "Student Added",
+          description: `${values.name} has been successfully added to Firestore.`,
+      });
+      form.reset();
+      onOpenChange(false); 
+    } catch (error) {
+      console.error("Error adding student to Firestore:", error);
+      toast({
+        title: "Error Adding Student",
+        description: "Could not add student to Firestore.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+        if (!open) form.reset(); // Reset form if dialog is closed without submitting
+        onOpenChange(open);
+    }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add New Student</DialogTitle>
           <DialogDescription>
-            Enter the details for the new student. Click save when you're done.
+            Enter the details for the new student. This will create a record in Firestore.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -104,7 +123,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                 <FormItem>
                   <FormLabel>Full Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Priya Sharma" {...field} />
+                    <Input placeholder="e.g. Priya Sharma" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -117,7 +136,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                 <FormItem>
                   <FormLabel>SATS Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. SAT00123" {...field} />
+                    <Input placeholder="e.g. SAT00123" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -131,7 +150,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                 <FormItem>
                   <FormLabel>Class (e.g., 10th)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. 10th" {...field} />
+                    <Input placeholder="e.g. 10th" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -144,7 +163,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                 <FormItem>
                   <FormLabel>Section</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. A" {...field} />
+                    <Input placeholder="e.g. A" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -158,7 +177,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                 <FormItem>
                   <FormLabel>Caste</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. General" {...field} />
+                    <Input placeholder="e.g. General" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -171,7 +190,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                 <FormItem>
                   <FormLabel>Religion</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Hinduism" {...field} />
+                    <Input placeholder="e.g. Hinduism" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -184,7 +203,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                 <FormItem>
                   <FormLabel>Address</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" />
+                    <Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" disabled={isSubmitting}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -197,7 +216,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                 <FormItem>
                   <FormLabel>Profile Picture URL (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://example.com/student.png" {...field} />
+                    <Input placeholder="https://example.com/student.png" {...field} disabled={isSubmitting}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -205,7 +224,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
             />
             <DialogFooter className="pt-3">
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => form.reset()}>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                   Cancel
                 </Button>
               </DialogClose>

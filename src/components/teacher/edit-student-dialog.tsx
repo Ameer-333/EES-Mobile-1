@@ -28,6 +28,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { firestore } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore'; // Changed updateDoc to setDoc for merge behavior
+
+const STUDENTS_COLLECTION = 'students';
 
 const editStudentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -45,7 +49,7 @@ type EditStudentFormValues = z.infer<typeof editStudentSchema>;
 interface EditStudentDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onStudentEdited: (editedStudent: Student) => void;
+  onStudentEdited: (editedStudent: Student) => void; // Kept for dialog closure
   studentToEdit: Student | null;
 }
 
@@ -55,16 +59,6 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
 
   const form = useForm<EditStudentFormValues>({
     resolver: zodResolver(editStudentSchema),
-    defaultValues: {
-      name: '',
-      satsNumber: '',
-      class: '',
-      section: '',
-      caste: '',
-      religion: '',
-      address: '',
-      profilePictureUrl: '',
-    },
   });
 
   useEffect(() => {
@@ -86,21 +80,36 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
     if (!studentToEdit) return;
 
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const studentDocRef = doc(firestore, STUDENTS_COLLECTION, studentToEdit.id);
+      
+      // Prepare data for Firestore, ensuring profilePictureUrl is handled correctly
+      const studentDataToUpdate: Partial<Student> = { // Use Partial<Student> to only send updated fields
+        ...values,
+        profilePictureUrl: values.profilePictureUrl || undefined, // Store undefined if empty string
+      };
 
-    const editedStudent: Student = {
-      id: studentToEdit.id, // Keep existing ID
-      ...values,
-      profilePictureUrl: values.profilePictureUrl || undefined,
-    };
-    onStudentEdited(editedStudent);
-    setIsSubmitting(false);
-    onOpenChange(false); // Close dialog
-    toast({
-        title: "Student Updated",
-        description: `${editedStudent.name}'s details have been successfully updated.`,
-    });
+      // Using setDoc with merge: true will update existing fields or add new ones
+      // without overwriting fields not present in studentDataToUpdate (like remarks, scholarships)
+      await setDoc(studentDocRef, studentDataToUpdate, { merge: true });
+      
+      onStudentEdited({ ...studentToEdit, ...studentDataToUpdate }); // Pass merged data
+
+      toast({
+          title: "Student Updated",
+          description: `${values.name}'s details have been successfully updated in Firestore.`,
+      });
+      onOpenChange(false); 
+    } catch (error) {
+      console.error("Error updating student in Firestore:", error);
+      toast({
+        title: "Update Failed",
+        description: "Could not update student details in Firestore.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
   
   if (!studentToEdit) return null;
@@ -126,7 +135,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
                 <FormItem>
                   <FormLabel>Full Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Priya Sharma" {...field} />
+                    <Input placeholder="e.g. Priya Sharma" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -139,7 +148,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
                 <FormItem>
                   <FormLabel>SATS Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. SAT00123" {...field} />
+                    <Input placeholder="e.g. SAT00123" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -153,7 +162,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
                 <FormItem>
                   <FormLabel>Class (e.g., 10th)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. 10th" {...field} />
+                    <Input placeholder="e.g. 10th" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -166,7 +175,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
                 <FormItem>
                   <FormLabel>Section</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. A" {...field} />
+                    <Input placeholder="e.g. A" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -180,7 +189,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
                 <FormItem>
                   <FormLabel>Caste</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. General" {...field} />
+                    <Input placeholder="e.g. General" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -193,7 +202,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
                 <FormItem>
                   <FormLabel>Religion</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Hinduism" {...field} />
+                    <Input placeholder="e.g. Hinduism" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -206,7 +215,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
                 <FormItem>
                   <FormLabel>Address</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" />
+                    <Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -219,7 +228,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
                 <FormItem>
                   <FormLabel>Profile Picture URL (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://example.com/student.png" {...field} />
+                    <Input placeholder="https://example.com/student.png" {...field} disabled={isSubmitting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -227,7 +236,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
             />
             <DialogFooter className="pt-3">
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => form.reset()}>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                   Cancel
                 </Button>
               </DialogClose>
