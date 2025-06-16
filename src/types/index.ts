@@ -38,6 +38,7 @@ export interface Student {
   remarks?: StudentRemark[];
   scholarships?: Scholarship[];
   backgroundInfo?: string;
+  authUid?: string; // Firebase Authentication User ID, for linking student profile to their login
 }
 
 export type SubjectName = 'English' | 'Kannada' | 'Hindi' | 'Science' | 'Maths' | 'Social Science';
@@ -65,13 +66,13 @@ export interface StudentSubjectAttendance {
 export type UserRole = 'Admin' | 'Teacher' | 'Student';
 
 export interface ManagedUser {
-  id: string; // This will be the Firestore document ID
+  id: string; // This will be the Firestore document ID (and likely Firebase Auth UID)
   name: string;
   email: string;
   role: UserRole;
   status: 'Active' | 'Inactive' | 'Pending';
   lastLogin: string; // Should be a date string, or N/A
-  // Note: Password is not stored here; it's handled by Firebase Authentication.
+  studentProfileId?: string; // Optional: if student document in 'students' collection has a different ID
 }
 
 // Fields for Add/Edit Student forms by Teacher
@@ -84,6 +85,7 @@ export interface StudentFormData {
   religion: string;
   address: string;
   profilePictureUrl?: string;
+  authUid?: string; // Added here as well if linking during creation
 }
 
 export interface TeacherSalaryRecord {
@@ -97,7 +99,7 @@ export interface TeacherSalaryRecord {
 }
 
 export interface Teacher {
-  id: string; // This will often be the Firestore document ID
+  id: string; // This will often be the Firestore document ID (and likely Firebase Auth UID)
   name: string;
   email: string;
   phoneNumber: string;

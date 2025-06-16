@@ -1,0 +1,97 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions to get user role from the 'users' collection
+    // Assumes the document ID in 'users' collection is the user's auth UID.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function getUserRole() {
+      if (!isSignedIn()) {
+        return '';
+      }
+      return getUserData(request.auth.uid).role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserRole() == 'Admin';
+    }
+
+    function isTeacher() {
+      return isSignedIn() && getUserRole() == 'Teacher';
+    }
+
+    function isStudent() {
+      return isSignedIn() && getUserRole() == 'Student';
+    }
+
+    // Collection: app_settings
+    // Document: general (hardcoded ID for app settings)
+    match /app_settings/general {
+      allow read: if true; // Publicly readable for app name/logo
+      allow write: if isAdmin(); // Only admins can change app settings
+    }
+    // Deny writes to other documents in app_settings for now
+    match /app_settings/{settingId} {
+        allow read: if settingId == 'general'; // Only allow reading the 'general' doc
+        allow write: if false; // Deny writes to any other doc ID
+    }
+
+
+    // Collection: users
+    // Stores user profiles (name, email, role, status)
+    // Document ID is expected to be the Firebase Auth UID
+    match /users/{userId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow create: if isAdmin(); // Admins create user profiles (linked to Auth users)
+      allow update: if isAdmin(); // Admins can update role/status.
+                      // For users updating their own limited data, more granular field checks would be needed.
+      allow delete: if isAdmin();
+    }
+
+    // Collection: students
+    // Stores student profiles
+    match /students/{studentDocId} {
+      allow read: if isAdmin() || isTeacher() || (isStudent() && resource.data.authUid == request.auth.uid);
+                  // Student can read if their authUid is on the student document
+      allow create: if isAdmin() || isTeacher();
+      allow update: if isAdmin() || isTeacher(); // Teachers/Admins can update student data (marks, attendance etc.)
+                                              // Student updates to their own profile (e.g. address) would need
+                                              // more specific field-level rules if allowed.
+      allow delete: if isAdmin() || isTeacher();
+    }
+
+    // Collection: teachers
+    // Stores teacher profiles
+    // Document ID is expected to be the Firebase Auth UID
+    match /teachers/{teacherId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == teacherId); // Admins or the teacher themselves
+      allow create: if isAdmin(); // Only admins can create teacher profiles
+      allow update: if isAdmin() || (isTeacher() && request.auth.uid == teacherId);
+                      // Admins can update any teacher.
+                      // Teachers can update their own profile (e.g. address, phone).
+                      // Rules for specific fields (e.g. salaryHistory only by Admin) would require
+                      // checking request.resource.data vs resource.data.
+      allow delete: if isAdmin();
+    }
+
+    // Collection: hall_of_fame_items
+    // Stores items for the Hall of Fame
+    match /hall_of_fame_items/{itemId} {
+      allow read: if true; // Hall of Fame is publicly viewable
+      allow create, update, delete: if isAdmin(); // Only admins can manage Hall of Fame
+    }
+
+    // Add rules for any other collections here if they are created.
+    // e.g., match /messages/{messageId} { ... }
+
+  }
+}
