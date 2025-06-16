@@ -42,6 +42,7 @@ const addStudentSchema = z.object({
   religion: z.string().min(1, { message: 'Religion is required.' }),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
   profilePictureUrl: z.string().url({ message: "Invalid URL format. Please enter a full URL (e.g., https://example.com/image.png)" }).optional().or(z.literal('')),
+  authUid: z.string().optional().describe("Firebase Auth UID, if linking student to an auth account."),
 });
 
 type AddStudentFormValues = z.infer<typeof addStudentSchema>;
@@ -49,7 +50,7 @@ type AddStudentFormValues = z.infer<typeof addStudentSchema>;
 interface AddStudentDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onStudentAdded: (newStudent: Student) => void; // Kept for dialog closure, actual data update via listener
+  onStudentAdded: (newStudent: Student) => void;
 }
 
 export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddStudentDialogProps) {
@@ -67,22 +68,42 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       religion: '',
       address: '',
       profilePictureUrl: '',
+      authUid: '',
     },
   });
 
   async function onSubmit(values: AddStudentFormValues) {
     setIsSubmitting(true);
     try {
-      const studentDataToSave: StudentFormData & { profilePictureUrl?: string } = {
-        ...values,
-        profilePictureUrl: values.profilePictureUrl || undefined,
+      const studentDataToSave: Omit<Student, 'id' | 'remarks' | 'scholarships' | 'backgroundInfo'> & { profilePictureUrl: string | null } = {
+        name: values.name,
+        satsNumber: values.satsNumber,
+        class: values.class,
+        section: values.section,
+        caste: values.caste,
+        religion: values.religion,
+        address: values.address,
+        profilePictureUrl: values.profilePictureUrl || null, // Save null if empty string
+        authUid: values.authUid || undefined, // Omit if empty, or save as null if your type allows
       };
-      // Remarks, scholarships, backgroundInfo would be empty arrays/undefined initially for a new student.
-      // These can be added via the edit functionality or specific forms later.
 
-      const docRef = await addDoc(collection(firestore, STUDENTS_COLLECTION), studentDataToSave);
+      // Initialize optional fields for a new student document
+      const fullStudentDataForFirestore = {
+        ...studentDataToSave,
+        remarks: [], // Initialize as empty array
+        scholarships: [], // Initialize as empty array
+        backgroundInfo: "", // Initialize as empty string
+      };
       
-      onStudentAdded({ ...studentDataToSave, id: docRef.id }); // Pass new student with Firestore ID
+      // Remove authUid from the object if it's undefined to avoid writing 'undefined' to Firestore
+      if (fullStudentDataForFirestore.authUid === undefined) {
+        delete (fullStudentDataForFirestore as Partial<typeof fullStudentDataForFirestore>).authUid;
+      }
+
+
+      const docRef = await addDoc(collection(firestore, STUDENTS_COLLECTION), fullStudentDataForFirestore);
+      
+      onStudentAdded({ ...fullStudentDataForFirestore, id: docRef.id, profilePictureUrl: fullStudentDataForFirestore.profilePictureUrl ?? undefined }); 
       
       toast({
           title: "Student Added",
@@ -94,7 +115,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       console.error("Error adding student to Firestore:", error);
       toast({
         title: "Error Adding Student",
-        description: "Could not add student to Firestore.",
+        description: "Could not add student to Firestore. Check permissions or console for details.",
         variant: "destructive",
       });
     } finally {
@@ -104,7 +125,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-        if (!open) form.reset(); // Reset form if dialog is closed without submitting
+        if (!open) form.reset();
         onOpenChange(open);
     }}>
       <DialogContent className="sm:max-w-md">
@@ -217,6 +238,19 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                   <FormLabel>Profile Picture URL (Optional)</FormLabel>
                   <FormControl>
                     <Input placeholder="https://example.com/student.png" {...field} disabled={isSubmitting}/>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="authUid"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Firebase Auth UID (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Link to Firebase Auth user (if any)" {...field} disabled={isSubmitting}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
