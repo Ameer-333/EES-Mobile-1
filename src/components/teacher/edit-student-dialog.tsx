@@ -83,17 +83,21 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
     try {
       const studentDocRef = doc(firestore, STUDENTS_COLLECTION, studentToEdit.id);
       
-      // Prepare data for Firestore, ensuring profilePictureUrl is handled correctly
-      const studentDataToUpdate: Partial<Student> = { // Use Partial<Student> to only send updated fields
+      const studentDataToUpdate: Partial<Student> = {
         ...values,
-        profilePictureUrl: values.profilePictureUrl || undefined, // Store undefined if empty string
+        profilePictureUrl: values.profilePictureUrl || null, // Save null if empty string
       };
 
-      // Using setDoc with merge: true will update existing fields or add new ones
-      // without overwriting fields not present in studentDataToUpdate (like remarks, scholarships)
       await setDoc(studentDocRef, studentDataToUpdate, { merge: true });
       
-      onStudentEdited({ ...studentToEdit, ...studentDataToUpdate }); // Pass merged data
+      // Construct a representation of the edited student for the callback
+      // This ensures that the parent component gets data consistent with what was saved
+      const updatedStudentForCallback: Student = {
+        ...studentToEdit, // Start with existing data
+        ...studentDataToUpdate, // Override with updated fields
+        profilePictureUrl: studentDataToUpdate.profilePictureUrl ?? undefined, // Ensure type consistency
+      };
+      onStudentEdited(updatedStudentForCallback);
 
       toast({
           title: "Student Updated",

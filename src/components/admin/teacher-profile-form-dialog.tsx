@@ -52,7 +52,7 @@ type TeacherProfileFormValues = z.infer<typeof teacherProfileSchema>;
 interface TeacherProfileFormDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onTeacherSaved: (teacherData: Teacher, isEditing: boolean) => void; // Callback still useful for UI updates/dialog close
+  onTeacherSaved: (teacherData: Teacher, isEditing: boolean) => void; 
   teacherToEdit?: Teacher | null;
 }
 
@@ -107,35 +107,47 @@ export function TeacherProfileFormDialog({
     setIsSubmitting(true);
     try {
       const totalYearsWorked = currentYear - values.yearOfJoining;
-      const teacherDataForFirestore: Omit<Teacher, 'id' | 'totalYearsWorked' | 'salaryHistory'> & Partial<Pick<Teacher, 'totalYearsWorked' | 'salaryHistory'>> = {
+      
+      // Prepare data for Firestore
+      const teacherDataForFirestore: Partial<Omit<Teacher, 'id'>> = {
         ...values,
-        profilePictureUrl: values.profilePictureUrl || undefined, // Store undefined if empty
+        profilePictureUrl: values.profilePictureUrl || null, // Save null if empty string
         totalYearsWorked: totalYearsWorked >= 0 ? totalYearsWorked : 0,
-        // salaryHistory, daysPresentThisMonth, daysAbsentThisMonth are not part of this form initially.
-        // They will be managed by the payroll component or kept as default if new.
       };
 
+
       let docId = teacherToEdit?.id;
+      let resultingTeacherData: Teacher;
 
       if (isEditing && docId) {
         const teacherDocRef = doc(firestore, TEACHERS_COLLECTION, docId);
-        // Merge with existing document to preserve salaryHistory etc.
         await setDoc(teacherDocRef, teacherDataForFirestore, { merge: true });
+        resultingTeacherData = { 
+            ...teacherToEdit, 
+            ...teacherDataForFirestore, 
+            id: docId,
+            profilePictureUrl: teacherDataForFirestore.profilePictureUrl ?? undefined, // ensure type for callback
+        };
       } else {
-        // Add new teacher, initialize optional fields
         const completeNewTeacherData: Omit<Teacher, 'id'> = {
-            ...teacherDataForFirestore,
-            salaryHistory: [], // Initialize as empty array for new teachers
+            name: values.name,
+            email: values.email,
+            phoneNumber: values.phoneNumber,
+            address: values.address,
+            yearOfJoining: values.yearOfJoining,
+            subjectsTaught: values.subjectsTaught,
+            profilePictureUrl: values.profilePictureUrl || null,
+            totalYearsWorked: totalYearsWorked >= 0 ? totalYearsWorked : 0,
+            salaryHistory: [], 
             daysPresentThisMonth: 0,
             daysAbsentThisMonth: 0,
         };
         const docRef = await addDoc(collection(firestore, TEACHERS_COLLECTION), completeNewTeacherData);
         docId = docRef.id;
+        resultingTeacherData = { ...completeNewTeacherData, id: docId };
       }
       
-      // The onSnapshot listener in ManageTeacherProfiles will pick up the changes.
-      // onTeacherSaved can be used to close the dialog.
-      onTeacherSaved({ ...teacherDataForFirestore, id: docId!, salaryHistory: teacherToEdit?.salaryHistory || [] }, isEditing);
+      onTeacherSaved(resultingTeacherData, isEditing);
 
       toast({
         title: isEditing ? "Teacher Updated" : "Teacher Added",
@@ -241,5 +253,3 @@ export function TeacherProfileFormDialog({
     </Dialog>
   );
 }
-
-    
