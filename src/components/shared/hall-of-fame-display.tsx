@@ -4,46 +4,68 @@
 import type { HallOfFameItem, UserRole } from '@/types';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Award, Briefcase, Building, Edit, Crown } from 'lucide-react'; // Changed UserTie to Briefcase
+import { Award, Briefcase, Building, Edit, Crown, Loader2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { firestore } from '@/lib/firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
-// Mock data for demonstration - typically passed as prop
-const defaultMockItems: HallOfFameItem[] = [
-  { id: 'hof1', category: 'founder', name: 'Dr. Aramane Manjunath', title: 'Founder & Chairman', description: 'Visionary leader who established EES Education with a dream to provide quality education for all.', imageUrl: 'https://placehold.co/300x300.png', dataAiHint: 'founder portrait elderly man' },
-  { id: 'hof2', category: 'co-founder', name: 'Mrs. Sumitra Devi', title: 'Co-Founder & Director', description: 'Instrumental in shaping the curriculum and fostering a nurturing learning environment.', imageUrl: 'https://placehold.co/300x300.png', dataAiHint: 'co-founder portrait woman' },
-  { id: 'hof3', category: 'principal', name: 'Mr. Ramesh Gowda', title: 'Principal', description: 'Leading the school with dedication and commitment to academic excellence since 2010.', imageUrl: 'https://placehold.co/300x300.png', dataAiHint: 'principal portrait man' },
-  { id: 'hof4', category: 'school-award', name: 'Best School Award - District Level', year: 2022, description: 'Recognized for outstanding academic performance and infrastructure.', imageUrl: 'https://placehold.co/400x250.png', dataAiHint: 'award trophy' },
-  { id: 'hof5', category: 'founder-award', name: 'Lifetime Achievement in Education', year: 2020, description: 'Awarded to Dr. Aramane Manjunath for his contributions to the field of education.', imageUrl: 'https://placehold.co/400x250.png', dataAiHint: 'certificate award' },
-  { id: 'hof6', category: 'student-achievement', name: 'National Robotics Champions', year: 2023, description: 'Our students won the National Level Robotics Competition.', imageUrl: 'https://placehold.co/400x250.png', dataAiHint: 'students robotics' },
-];
+const HALL_OF_FAME_COLLECTION = 'hall_of_fame_items';
 
 interface HallOfFameDisplayProps {
-  items?: HallOfFameItem[];
   currentRole?: UserRole | null;
 }
 
 const categoryIcons: Record<HallOfFameItem['category'] | 'Founders & Visionaries', React.ElementType> = {
-  'founder': Briefcase, // Changed from UserTie
-  'co-founder': Briefcase, // Changed from UserTie
-  'principal': Briefcase, // Changed from UserTie
+  'founder': Briefcase,
+  'co-founder': Briefcase,
+  'principal': Briefcase,
   'school-award': Award,
   'founder-award': Award,
   'student-achievement': Crown,
-  'Founders & Visionaries': Briefcase, // Changed from UserTie
+  'Founders & Visionaries': Briefcase,
 };
 
 const categoryTitles: Record<HallOfFameItem['category'], string> = {
-    founder: 'Founders & Visionaries', 
-    'co-founder': 'Founders & Visionaries', 
+    founder: 'Founders & Visionaries',
+    'co-founder': 'Founders & Visionaries',
     principal: 'Leadership',
     'school-award': 'School Accolades',
     'founder-award': 'Founder Accolades',
     'student-achievement': 'Student Achievements',
 }
 
-export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: HallOfFameDisplayProps) {
-  
+export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
+  const [items, setItems] = useState<HallOfFameItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setIsLoading(true);
+    const q = query(collection(firestore, HALL_OF_FAME_COLLECTION), orderBy("name")); // Basic ordering
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedItems: HallOfFameItem[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedItems.push({ id: doc.id, ...doc.data() } as HallOfFameItem);
+      });
+      setItems(fetchedItems);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching Hall of Fame items:", error);
+      toast({
+        title: "Error Loading Hall of Fame",
+        description: "Could not fetch Hall of Fame data. Please try again later.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [toast]);
+
   const mainFounder = items.find(item => item.category === 'founder');
   const otherItems = mainFounder ? items.filter(item => item.id !== mainFounder.id) : items;
 
@@ -57,6 +79,30 @@ export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: Hal
   }, {} as Record<HallOfFameItem['category'], HallOfFameItem[]>);
 
   const orderedCategories: HallOfFameItem['category'][] = ['founder', 'co-founder', 'principal', 'school-award', 'founder-award', 'student-achievement'];
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">Loading Hall of Fame...</p>
+      </div>
+    );
+  }
+
+  if (!isLoading && items.length === 0) {
+     return (
+      <div className="text-center py-10">
+        <Building className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+        <h1 className="text-2xl font-semibold text-primary mb-2">Hall of Fame is Empty</h1>
+        <p className="text-muted-foreground mb-6">No entries have been added to the Hall of Fame yet.</p>
+        {currentRole === 'Admin' && (
+            <Button asChild>
+                <Link href="/admin/hall-of-fame-management"><Edit className="mr-2 h-4 w-4"/>Manage Hall of Fame</Link>
+            </Button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-12">
@@ -80,10 +126,11 @@ export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: Hal
                 <Image
                   src={mainFounder.imageUrl}
                   alt={mainFounder.name}
-                  layout="fill"
-                  objectFit="cover"
-                  className="transform transition-transform duration-500 hover:scale-105"
+                  fill // Use fill for responsive images with aspect ratio
+                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  className="object-cover transform transition-transform duration-500 hover:scale-105"
                   data-ai-hint={mainFounder.dataAiHint || "founder portrait"}
+                  priority // Prioritize loading for LCP element
                 />
               </div>
             </div>
@@ -95,7 +142,7 @@ export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: Hal
                 {mainFounder.title || 'Founder & Visionary Leader'}
               </p>
               <blockquote className="text-lg text-foreground/80 leading-relaxed border-l-4 border-accent pl-6 italic">
-                {mainFounder.description && mainFounder.description.length > 50 ? mainFounder.description : 
+                {mainFounder.description && mainFounder.description.length > 50 ? mainFounder.description :
                 "With unwavering dedication and a pioneering spirit, " + mainFounder.name + " laid the foundation for EES Education, transforming a bold vision into a beacon of knowledge and excellence. Their tireless efforts continue to inspire generations, shaping futures and fostering a community where every student can achieve their highest potential."}
               </blockquote>
             </div>
@@ -106,8 +153,8 @@ export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: Hal
       {orderedCategories.map(categoryKey => {
         let itemsToDisplayThisCategory: HallOfFameItem[] = [];
         let currentDisplayTitle = "";
-        let IconToUse: React.ElementType = Award; 
-        let sectionKey = categoryKey; 
+        let IconToUse: React.ElementType = Award;
+        let sectionKey = categoryKey;
 
         if (categoryKey === 'founder') {
           const otherFoundersList = groupedOtherItems['founder'] || [];
@@ -115,14 +162,14 @@ export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: Hal
           itemsToDisplayThisCategory = [...otherFoundersList, ...coFoundersList];
           currentDisplayTitle = "Founders & Visionaries";
           IconToUse = categoryIcons['Founders & Visionaries'];
-          sectionKey = 'founders-visionaries'; 
+          sectionKey = 'founders-visionaries';
           if (itemsToDisplayThisCategory.length === 0) return null;
         } else if (categoryKey === 'co-founder') {
           if (groupedOtherItems['founder'] && groupedOtherItems['founder'].length > 0) {
-            return null; 
+            return null;
           }
           itemsToDisplayThisCategory = groupedOtherItems['co-founder'] || [];
-          currentDisplayTitle = "Founders & Visionaries"; 
+          currentDisplayTitle = "Founders & Visionaries";
           IconToUse = categoryIcons['Founders & Visionaries'];
           sectionKey = 'co-founders-standalone';
           if (itemsToDisplayThisCategory.length === 0) return null;
@@ -132,7 +179,7 @@ export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: Hal
           IconToUse = categoryIcons[categoryKey] || Award;
           if (itemsToDisplayThisCategory.length === 0) return null;
         }
-        
+
         return (
             <section key={sectionKey} className="mb-12">
                 <h2 className="text-3xl font-semibold text-primary mb-8 flex items-center border-b-2 border-primary/20 pb-3">
@@ -141,13 +188,13 @@ export function HallOfFameDisplay({ items = defaultMockItems, currentRole }: Hal
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
                     {itemsToDisplayThisCategory.map(item => (
                         <Card key={item.id} className="overflow-hidden shadow-xl hover:shadow-2xl transition-shadow duration-300 ease-in-out flex flex-col group bg-card rounded-lg border border-border/50 hover:border-primary/30">
-                            <div className="relative w-full h-60 md:h-64"> 
-                                <Image 
-                                    src={item.imageUrl} 
-                                    alt={item.name} 
-                                    layout="fill" 
-                                    objectFit="cover"
-                                    className="transform transition-transform duration-300 group-hover:scale-105"
+                            <div className="relative w-full h-60 md:h-64">
+                                <Image
+                                    src={item.imageUrl}
+                                    alt={item.name}
+                                    fill
+                                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                    className="object-cover transform transition-transform duration-300 group-hover:scale-105"
                                     data-ai-hint={item.dataAiHint || 'hall of fame image'}
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
