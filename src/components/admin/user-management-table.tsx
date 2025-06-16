@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Search, UserPlus, Trash2, ShieldCheck, School, User } from 'lucide-react';
+import { Edit, Search, UserPlus, Trash2, ShieldCheck, School, User, Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added import here
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -29,18 +29,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AddUserDialog } from '@/components/admin/add-user-dialog';
-import { EditUserDialog } from '@/components/admin/edit-user-dialog'; // Import EditUserDialog
+import { EditUserDialog } from '@/components/admin/edit-user-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { firestore } from '@/lib/firebase';
+import { collection, getDocs, deleteDoc, doc, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
 
-
-const mockUsers: ManagedUser[] = [
-  { id: 'U001', name: 'Admin User', email: 'admin@ees.com', role: 'Admin', status: 'Active', lastLogin: '2024-07-28' },
-  { id: 'U002', name: 'Primary Teacher', email: 'teacher1@ees.com', role: 'Teacher', status: 'Active', lastLogin: '2024-07-27' },
-  { id: 'U003', name: 'Ravi Kumar', email: 'ravi.k@example.com', role: 'Student', status: 'Active', lastLogin: '2024-07-28' },
-  { id: 'U004', name: 'Secondary Teacher', email: 'teacher2@ees.com', role: 'Teacher', status: 'Inactive', lastLogin: '2024-06-15' },
-  { id: 'U005', name: 'Priya Sharma', email: 'priya.s@example.com', role: 'Student', status: 'Pending', lastLogin: 'N/A' },
-  { id: 'U006', name: 'Anil Yadav', email: 'anil.y@example.com', role: 'Student', status: 'Active', lastLogin: '2024-07-25' },
-];
+const USERS_COLLECTION = 'users';
 
 const roleIcons: Record<UserRole, React.ElementType> = {
   Admin: ShieldCheck,
@@ -49,18 +43,38 @@ const roleIcons: Record<UserRole, React.ElementType> = {
 };
 
 export function UserManagementTable() {
-  const [users, setUsers] = useState<ManagedUser[]>(mockUsers);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'All'>('All');
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
-  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false); // State for edit dialog
-  const [currentUserToEdit, setCurrentUserToEdit] = useState<ManagedUser | null>(null); // State for user being edited
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  const [currentUserToEdit, setCurrentUserToEdit] = useState<ManagedUser | null>(null);
   const { toast } = useToast();
-  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    setHasMounted(true);
-  }, []);
+    setIsLoading(true);
+    const usersCollectionRef = collection(firestore, USERS_COLLECTION);
+    
+    const unsubscribe = onSnapshot(usersCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
+      const fetchedUsers = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as ManagedUser));
+      setUsers(fetchedUsers);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching users from Firestore:", error);
+      toast({
+        title: "Error Loading Users",
+        description: "Could not fetch user data from Firestore.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe(); // Cleanup listener on component unmount
+  }, [toast]);
 
   const filteredUsers = useMemo(() => {
     return users.filter(
@@ -77,25 +91,35 @@ export function UserManagementTable() {
     setIsEditUserDialogOpen(true);
   };
   
-  const handleDeleteUser = (userId: string) => {
-    setUsers(prev => prev.filter(u => u.id !== userId));
-    toast({ title: "User Deleted", description: `User with ID: ${userId} has been removed.` });
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    try {
+      const userDocRef = doc(firestore, USERS_COLLECTION, userId);
+      await deleteDoc(userDocRef);
+      // The onSnapshot listener will automatically update the local state
+      toast({ title: "User Deleted", description: `User ${userName} has been removed.` });
+    } catch (error) {
+      console.error("Error deleting user from Firestore:", error);
+      toast({
+        title: "Deletion Failed",
+        description: "Could not delete user from Firestore.",
+        variant: "destructive",
+      });
+    }
   };
 
+  // onUserAdded and onUserEdited are now primarily for closing dialogs, 
+  // as Firestore listener updates the table.
   const handleUserAdded = (newUser: ManagedUser) => {
-    setUsers(prevUsers => [newUser, ...prevUsers]); // Add to the beginning of the list
-    toast({
-      title: "User Added Successfully",
-      description: `${newUser.name} (${newUser.role}) has been added to the system.`,
-    });
+    // Firestore listener will update the state. Toast from AddUserDialog.
+    setIsAddUserDialogOpen(false);
   };
 
   const handleUserEdited = (editedUser: ManagedUser) => {
-    setUsers(prevUsers => prevUsers.map(user => user.id === editedUser.id ? editedUser : user));
-    // Toast is handled within EditUserDialog
+    // Firestore listener will update the state. Toast from EditUserDialog.
+    setIsEditUserDialogOpen(false);
   };
-
-  if (!hasMounted) {
+  
+  if (isLoading) {
     return (
       <Card className="w-full shadow-xl rounded-lg border-primary/10">
         <CardHeader>
@@ -122,7 +146,12 @@ export function UserManagementTable() {
               <TableBody>
                 {Array(5).fill(0).map((_, i) => (
                   <TableRow key={i}>
-                    {Array(7).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}
+                     <TableCell colSpan={7} className="p-4">
+                        <div className="flex items-center justify-center">
+                           <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                           <span className="ml-2">Loading users...</span>
+                        </div>
+                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -140,7 +169,7 @@ export function UserManagementTable() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <CardTitle className="text-2xl font-headline text-primary">All Users</CardTitle>
-              <CardDescription>View, search, and manage all system users.</CardDescription>
+              <CardDescription>View, search, and manage all system users from Firestore.</CardDescription>
             </div>
             <Button className="bg-primary hover:bg-primary/90" onClick={() => setIsAddUserDialogOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" /> Add New User
@@ -188,7 +217,7 @@ export function UserManagementTable() {
                   const RoleIcon = roleIcons[user.role];
                   return (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.id}</TableCell>
+                    <TableCell className="font-medium truncate max-w-[100px]">{user.id}</TableCell>
                     <TableCell>{user.name}</TableCell>
                     <TableCell className="text-muted-foreground">{user.email}</TableCell>
                     <TableCell>
@@ -215,7 +244,7 @@ export function UserManagementTable() {
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm" disabled={user.role === 'Admin' && users.filter(u => u.role === 'Admin').length <= 1}>
+                          <Button variant="destructive" size="sm" disabled={user.role === 'Admin' && users.filter(u => u.role === 'Admin').length <= 1 && user.id === users.find(u => u.role === 'Admin')?.id}>
                             <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                           </Button>
                         </AlertDialogTrigger>
@@ -223,13 +252,13 @@ export function UserManagementTable() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the user account for <strong>{user.name} ({user.email})</strong> and all associated data.
+                              This action cannot be undone. This will permanently delete the user profile for <strong>{user.name} ({user.email})</strong> from Firestore. This does not delete their authentication account.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteUser(user.id)}>
-                              Yes, delete user
+                            <AlertDialogAction onClick={() => handleDeleteUser(user.id, user.name)}>
+                              Yes, delete user profile
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -239,7 +268,7 @@ export function UserManagementTable() {
                 )}) : (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
-                      No users found matching your criteria.
+                      No users found matching your criteria or no users in Firestore.
                     </TableCell>
                   </TableRow>
                 )}
@@ -248,7 +277,7 @@ export function UserManagementTable() {
           </div>
           {filteredUsers.length > 0 && (
             <div className="mt-4 text-right text-sm text-muted-foreground">
-              Showing {filteredUsers.length} of {users.length} total users.
+              Showing {filteredUsers.length} of {users.length} total users from Firestore.
             </div>
           )}
         </CardContent>
@@ -256,12 +285,12 @@ export function UserManagementTable() {
       <AddUserDialog 
         isOpen={isAddUserDialogOpen} 
         onOpenChange={setIsAddUserDialogOpen}
-        onUserAdded={handleUserAdded}
+        onUserAdded={handleUserAdded} // Prop might be removed if dialog directly updates Firestore and table re-fetches
       />
       <EditUserDialog
         isOpen={isEditUserDialogOpen}
         onOpenChange={setIsEditUserDialogOpen}
-        onUserEdited={handleUserEdited}
+        onUserEdited={handleUserEdited} // Prop might be removed for same reason
         userToEdit={currentUserToEdit}
       />
     </>

@@ -26,7 +26,7 @@ export interface Scholarship {
 }
 
 export interface Student {
-  id: string;
+  id: string; // This will often be the Firestore document ID
   name: string;
   satsNumber: string;
   class: string;
@@ -34,10 +34,10 @@ export interface Student {
   caste: string;
   religion: string;
   address: string;
-  profilePictureUrl?: string; // Added for student image
+  profilePictureUrl?: string;
   remarks?: StudentRemark[];
   scholarships?: Scholarship[];
-  backgroundInfo?: string; // For the "background of the student" section
+  backgroundInfo?: string;
 }
 
 export type SubjectName = 'English' | 'Kannada' | 'Hindi' | 'Science' | 'Maths' | 'Social Science';
@@ -65,12 +65,13 @@ export interface StudentSubjectAttendance {
 export type UserRole = 'Admin' | 'Teacher' | 'Student';
 
 export interface ManagedUser {
-  id: string;
+  id: string; // This will be the Firestore document ID
   name: string;
   email: string;
   role: UserRole;
   status: 'Active' | 'Inactive' | 'Pending';
   lastLogin: string; // Should be a date string, or N/A
+  // Note: Password is not stored here; it's handled by Firebase Authentication.
 }
 
 // Fields for Add/Edit Student forms by Teacher
@@ -82,7 +83,7 @@ export interface StudentFormData {
   caste: string;
   religion: string;
   address: string;
-  profilePictureUrl?: string; // Added for student image form
+  profilePictureUrl?: string;
 }
 
 export interface TeacherSalaryRecord {
@@ -92,21 +93,20 @@ export interface TeacherSalaryRecord {
   amountIssued: number;
   amountDeducted: number;
   daysAbsent: number;
-  reasonForAbsence?: string; // Teacher can fill this
+  reasonForAbsence?: string;
 }
 
 export interface Teacher {
-  id: string;
+  id: string; // This will often be the Firestore document ID
   name: string;
-  email: string; // For login, assuming email is username
+  email: string;
   phoneNumber: string;
   address: string;
   yearOfJoining: number;
-  totalYearsWorked?: number; // Admin can update this or it can be calculated
+  totalYearsWorked?: number;
   subjectsTaught: SubjectName[];
   profilePictureUrl?: string;
   salaryHistory?: TeacherSalaryRecord[];
-  // For Admin view of teacher attendance/salary
   daysPresentThisMonth?: number;
   daysAbsentThisMonth?: number;
 }
@@ -125,24 +125,23 @@ export interface TeacherFormData {
 
 export interface AppMessage {
   id: string;
-  senderId: string; // User ID
-  receiverId: string; // User ID
+  senderId: string;
+  receiverId: string;
   senderRole: UserRole;
   receiverRole: UserRole;
   content: string;
   timestamp: string; // ISO Date string
   read: boolean;
-  // For prototype, type will be 'app'. SMS/email are external.
   messageType: 'app';
 }
 
 export interface HallOfFameItem {
-  id: string;
+  id: string; // This will often be the Firestore document ID
   category: 'founder' | 'co-founder' | 'principal' | 'school-award' | 'founder-award' | 'student-achievement';
-  name: string; // Name of person, award, or achievement
-  title?: string; // e.g., "Principal", "Co-Founder"
+  name: string;
+  title?: string;
   description: string;
   imageUrl: string;
-  year?: string | number; // Year of award or relevance
+  year?: string | number;
   dataAiHint?: string;
 }

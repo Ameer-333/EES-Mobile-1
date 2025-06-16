@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState }
+from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -33,11 +34,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
+import { firestore } from '@/lib/firebase'; // Import firestore
+import { collection, addDoc } from 'firebase/firestore'; // Import firestore functions
+import { useToast } from "@/hooks/use-toast";
 
 const addUserSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }),
   role: z.custom<UserRole>(val => ['Admin', 'Teacher', 'Student'].includes(val as UserRole), 'Role is required.'),
+  // For this prototype, password is not handled here. User creation in Firebase Auth is separate.
+  // status will default to 'Pending'
 });
 
 type AddUserFormValues = z.infer<typeof addUserSchema>;
@@ -45,11 +51,14 @@ type AddUserFormValues = z.infer<typeof addUserSchema>;
 interface AddUserDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onUserAdded: (newUser: ManagedUser) => void;
+  onUserAdded: (newUser: ManagedUser) => void; // This prop might change or be removed if table directly listens to Firestore
 }
+
+const USERS_COLLECTION = 'users';
 
 export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<AddUserFormValues>({
     resolver: zodResolver(addUserSchema),
@@ -62,30 +71,49 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
 
   async function onSubmit(values: AddUserFormValues) {
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const newUserProfileData = {
+        name: values.name,
+        email: values.email,
+        role: values.role,
+        status: 'Pending' as ManagedUser['status'], // Default status for new users
+        lastLogin: 'N/A', // Default last login
+      };
 
-    const newUser: ManagedUser = {
-      id: `U${Math.floor(Math.random() * 900) + 100}`, // Mock ID
-      name: values.name,
-      email: values.email,
-      role: values.role,
-      status: 'Pending', // Default status for new users
-      lastLogin: 'N/A',
-    };
-    onUserAdded(newUser);
-    setIsSubmitting(false);
-    onOpenChange(false); // Close dialog
-    form.reset();
+      const docRef = await addDoc(collection(firestore, USERS_COLLECTION), newUserProfileData);
+      
+      // The onSnapshot listener in UserManagementTable will pick up this new user.
+      // onUserAdded might still be useful for immediately closing the dialog.
+      onUserAdded({ ...newUserProfileData, id: docRef.id }); 
+      
+      toast({
+        title: "User Profile Added",
+        description: `${values.name}'s profile has been added to Firestore. Note: Firebase Auth account needs separate creation.`,
+      });
+      form.reset();
+      onOpenChange(false); // Close dialog
+    } catch (error) {
+      console.error("Error adding user profile to Firestore:", error);
+      toast({
+        title: "Error Adding User",
+        description: "Could not add user profile to Firestore.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+        if (!open) form.reset();
+        onOpenChange(open);
+    }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New User</DialogTitle>
+          <DialogTitle>Add New User Profile</DialogTitle>
           <DialogDescription>
-            Enter the details for the new user. Click save when you're done.
+            Enter the details for the new user's profile. This will create a record in Firestore.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -97,7 +125,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
                 <FormItem>
                   <FormLabel>Full Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. John Doe" {...field} />
+                    <Input placeholder="e.g. John Doe" {...field} disabled={isSubmitting}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -110,7 +138,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
                 <FormItem>
                   <FormLabel>Email Address</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="e.g. john.doe@example.com" {...field} />
+                    <Input type="email" placeholder="e.g. john.doe@example.com" {...field} disabled={isSubmitting}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -122,7 +150,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Role</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a role" />
@@ -140,7 +168,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
             />
             <DialogFooter className="pt-4">
               <DialogClose asChild>
-                <Button type="button" variant="outline">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                   Cancel
                 </Button>
               </DialogClose>
@@ -148,7 +176,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
                 {isSubmitting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Add User
+                Add User Profile
               </Button>
             </DialogFooter>
           </form>
