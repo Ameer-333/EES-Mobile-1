@@ -73,6 +73,7 @@ export interface ExamRecord {
   subjectMarks: SubjectMarks[];
 }
 
+export type GradeType = 'Distinction' | 'First Class' | 'Second Class' | 'Pass Class' | 'Not Completed';
 
 export interface AttendanceRecord {
   date: string; // YYYY-MM-DD
@@ -118,6 +119,7 @@ export interface StudentFormData {
   parentContactNumber?: string;
   email?: string;
   siblingReference?: string;
+  backgroundInfo?: string;
 }
 
 export interface TeacherSalaryRecord {
