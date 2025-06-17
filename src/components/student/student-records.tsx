@@ -1,9 +1,14 @@
+
+'use client';
+
 import type { SubjectMarks, StudentSubjectAttendance, SubjectName } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
-import { BookCheck, Percent, CalendarDays, CheckCircle, XCircle } from 'lucide-react';
+import { BookCheck, Percent, CalendarDays, BarChart3, LineChart } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
+
 
 // Mock data
 const mockMarks: SubjectMarks[] = [
@@ -24,33 +29,111 @@ const mockAttendance: StudentSubjectAttendance[] = [
   { subjectName: 'Social Science', totalClasses: 55, attendedClasses: 50, records: [{date: '2023-10-01', status: 'Present'}] },
 ];
 
+const chartConfigMarks = {
+  marks: { label: "Marks Obtained", color: "hsl(var(--chart-1))" },
+};
+
+const chartConfigAttendance = {
+  percentage: { label: "Attendance %", color: "hsl(var(--chart-2))" },
+};
+
 
 export function StudentRecords({ marks = mockMarks, attendance = mockAttendance }: { marks?: SubjectMarks[], attendance?: StudentSubjectAttendance[] }) {
+  
+  const marksChartData = marks.map(subject => ({
+    name: subject.subjectName,
+    marks: subject.marks,
+    maxMarks: subject.maxMarks,
+  }));
+
+  const attendanceChartData = attendance.map(record => ({
+    name: record.subjectName,
+    percentage: record.totalClasses > 0 ? parseFloat(((record.attendedClasses / record.totalClasses) * 100).toFixed(2)) : 0,
+  }));
+
   return (
-    <Card className="w-full shadow-lg rounded-lg">
-      <CardHeader>
-        <CardTitle className="text-2xl font-headline text-primary">Academic Records</CardTitle>
-        <CardDescription>View your marks and attendance details.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="marks" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="marks" className="gap-2"><BookCheck className="h-4 w-4" /> Marks</TabsTrigger>
-            <TabsTrigger value="attendance" className="gap-2"><CalendarDays className="h-4 w-4" /> Attendance</TabsTrigger>
-          </TabsList>
-          <TabsContent value="marks">
-            <MarksTable marks={marks} />
-          </TabsContent>
-          <TabsContent value="attendance">
-            <AttendanceTable attendance={attendance} />
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+    <div className="space-y-8">
+      {/* Academic Performance Section */}
+      <Card className="w-full shadow-lg rounded-lg border-primary/10">
+        <CardHeader>
+          <CardTitle className="text-2xl font-headline text-primary flex items-center">
+            <BookCheck className="mr-3 h-7 w-7" /> Academic Performance
+          </CardTitle>
+          <CardDescription>Detailed breakdown of your marks by subject.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <MarksTable marks={marks} />
+          {marks.length > 0 && (
+            <Card className="shadow-md rounded-md border-accent/50">
+              <CardHeader>
+                <CardTitle className="text-xl font-medium flex items-center"><BarChart3 className="mr-2 h-5 w-5 text-primary"/>Subject Marks Overview</CardTitle>
+                <CardDescription>Visual representation of marks obtained in each subject.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer config={chartConfigMarks} className="h-[350px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={marksChartData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tickMargin={10} angle={-15} textAnchor="end" height={50} interval={0} />
+                      <YAxis domain={[0, 100]} allowDataOverflow={true}/>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="marks" fill="var(--color-marks)" radius={[4, 4, 0, 0]} barSize={40}>
+                        <LabelList dataKey="marks" position="top" offset={5} fontSize={12} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Attendance Overview Section */}
+      <Card className="w-full shadow-lg rounded-lg border-primary/10">
+        <CardHeader>
+          <CardTitle className="text-2xl font-headline text-primary flex items-center">
+            <CalendarDays className="mr-3 h-7 w-7" /> Attendance Overview
+          </CardTitle>
+          <CardDescription>Summary of your attendance records by subject.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <AttendanceTable attendance={attendance} />
+           {attendance.length > 0 && (
+            <Card className="shadow-md rounded-md border-accent/50">
+              <CardHeader>
+                <CardTitle className="text-xl font-medium flex items-center"><LineChart className="mr-2 h-5 w-5 text-primary"/>Subject Attendance Percentage</CardTitle>
+                <CardDescription>Visual representation of attendance percentage in each subject.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer config={chartConfigAttendance} className="h-[350px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={attendanceChartData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                      <XAxis dataKey="name" tickMargin={10} angle={-15} textAnchor="end" height={50} interval={0} />
+                      <YAxis domain={[0, 100]} unit="%" />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="percentage" fill="var(--color-percentage)" radius={[4, 4, 0, 0]} barSize={40}>
+                        <LabelList dataKey="percentage" position="top" offset={5} fontSize={12} formatter={(value: number) => `${value}%`} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
 function MarksTable({ marks }: { marks: SubjectMarks[] }) {
+  if (marks.length === 0) {
+    return <p className="text-muted-foreground">No marks data available.</p>;
+  }
   return (
     <div className="rounded-md border">
       <Table>
@@ -73,7 +156,11 @@ function MarksTable({ marks }: { marks: SubjectMarks[] }) {
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center space-x-2">
                     <span>{percentage.toFixed(2)}%</span>
-                    <Progress value={percentage} className="w-24 h-2" />
+                    <Progress value={percentage} className="w-24 h-2" 
+                       indicatorClassName={
+                        percentage >= 75 ? 'bg-green-500' : percentage >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                       }
+                    />
                   </div>
                 </TableCell>
               </TableRow>
@@ -86,6 +173,9 @@ function MarksTable({ marks }: { marks: SubjectMarks[] }) {
 }
 
 function AttendanceTable({ attendance }: { attendance: StudentSubjectAttendance[] }) {
+  if (attendance.length === 0) {
+    return <p className="text-muted-foreground">No attendance data available.</p>;
+  }
   return (
     <div className="rounded-md border">
       <Table>
@@ -109,7 +199,9 @@ function AttendanceTable({ attendance }: { attendance: StudentSubjectAttendance[
                   <div className="flex items-center justify-center space-x-2">
                     <span>{percentage.toFixed(2)}%</span>
                     <Progress value={percentage} className="w-24 h-2" 
-                      indicatorClassName={percentage < 75 ? 'bg-destructive' : 'bg-primary'}
+                      indicatorClassName={
+                        percentage >= 75 ? 'bg-green-500' : percentage >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                       }
                     />
                   </div>
                 </TableCell>
