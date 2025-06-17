@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart, MessageSquarePlus, Mail, Award, MessageCircle, Building, BarChartHorizontalBig, CalendarCheck, DollarSign } from 'lucide-react';
+import { Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart, MessageSquarePlus, Mail, Award, MessageCircle, Building, BarChartHorizontalBig, CalendarCheck, DollarSign, CalendarClock } from 'lucide-react';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -20,6 +20,7 @@ const navItems: NavItem[] = [
   { href: '/student/dashboard', label: 'Dashboard', icon: Home, roles: ['Student'] },
   { href: '/student/profile', label: 'Profile & Activities', icon: User, roles: ['Student'] },
   { href: '/student/records', label: 'Academic Records', icon: BookOpen, roles: ['Student'] },
+  { href: '/student/attendance', label: 'My Attendance', icon: CalendarClock, roles: ['Student'] },
   { href: '/student/remarks', label: 'My Remarks', icon: BarChartHorizontalBig, roles: ['Student'] },
   { href: '/student/events', label: 'Upcoming Events', icon: CalendarCheck, roles: ['Student'] },
   { href: '/student/scholarships', label: 'My Scholarships', icon: Award, roles: ['Student'] },
@@ -160,4 +161,3 @@ export function SidebarNav_Corrected() {
     </nav>
   );
 }
-

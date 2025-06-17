@@ -2,13 +2,13 @@
 'use client';
 
 import { StudentProfileCard } from '@/components/student/student-profile-card';
+// StudentRecords component is now focused on Marks, so its name is still appropriate here.
 import { StudentRecords } from '@/components/student/student-records';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Home, LogIn, BarChartHorizontalBig, CalendarCheck, Award as AwardIcon } from 'lucide-react'; // Added AwardIcon
+import { Home, LogIn, BarChartHorizontalBig, CalendarCheck, Award as AwardIcon, CalendarClock } from 'lucide-react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-// ScholarshipInfoDisplay removed from here
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
 import type { Student, StudentRemark, Scholarship, ReligionType, SubjectName } from '@/types';
 
@@ -96,6 +96,24 @@ export default function StudentDashboardPage() {
                     <Button asChild>
                         <Link href="/student/remarks">
                             Go to My Remarks
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
+             <Card className="shadow-lg border-primary/10">
+                <CardHeader>
+                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
+                        <CalendarClock className="mr-2 h-6 w-6" /> My Attendance
+                    </CardTitle>
+                    <CardDescription>Review your attendance records for all subjects.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Monitor your attendance in the "My Attendance" section.
+                    </p>
+                    <Button asChild>
+                        <Link href="/student/attendance">
+                            Go to My Attendance
                         </Link>
                     </Button>
                 </CardContent>

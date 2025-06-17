@@ -4,12 +4,11 @@
 import { StudentProfileCard } from '@/components/student/student-profile-card';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Image from 'next/image';
-// ScholarshipInfoDisplay removed
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
 import type { Student, Scholarship, ReligionType, SubjectName } from '@/types';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { BarChartHorizontalBig, CalendarCheck, Award as AwardIcon } from 'lucide-react'; // Added AwardIcon
+import { BarChartHorizontalBig, CalendarCheck, Award as AwardIcon, CalendarClock } from 'lucide-react';
 
 // Mock data - in a real app, this would be fetched
 const mockStudentData: Student = {
@@ -96,6 +95,24 @@ export default function StudentProfilePage() {
                     <Button asChild>
                         <Link href="/student/remarks">
                             Go to My Remarks
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
+            <Card className="shadow-lg border-primary/10">
+                <CardHeader>
+                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
+                        <CalendarClock className="mr-2 h-6 w-6" /> View My Attendance
+                    </CardTitle>
+                    <CardDescription>Review your attendance records for all subjects.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        For a detailed breakdown of your attendance, please visit the "My Attendance" page.
+                    </p>
+                    <Button asChild>
+                        <Link href="/student/attendance">
+                            Go to My Attendance
                         </Link>
                     </Button>
                 </CardContent>
