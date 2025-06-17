@@ -5,6 +5,7 @@ import type { UpcomingEvent } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarDays, Clock, MapPin, Info, Image as ImageIcon } from 'lucide-react';
 import NextImage from 'next/image'; // Renamed to avoid conflict
+import { Button } from '@/components/ui/button'; // Added import for Button
 
 // Mock data updated with imageUrl and note
 const mockEvents: UpcomingEvent[] = [
