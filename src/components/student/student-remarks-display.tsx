@@ -60,8 +60,14 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
   if (!remarks || remarks.length === 0) {
     return (
       <Card className="shadow-lg border-primary/10">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold text-primary flex items-center">
+        <CardHeader className="items-center text-center">
+           {profilePictureUrl && (
+             <Avatar className="h-24 w-24 mb-4 border-4 border-primary/30 shadow-md">
+                <AvatarImage src={profilePictureUrl} alt={`${studentName}'s profile picture`} data-ai-hint="student portrait"/>
+                <AvatarFallback>{studentName ? studentName.charAt(0) : 'S'}</AvatarFallback>
+             </Avatar>
+            )}
+          <CardTitle className="text-xl font-semibold text-primary flex items-center justify-center">
             <MessageSquareText className="mr-2 h-6 w-6" /> {studentName}'s Remarks
           </CardTitle>
         </CardHeader>
@@ -76,36 +82,27 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
   }
   
   const totalRemarks = remarksSentimentData.reduce((acc, curr) => acc + curr.value, 0);
-  const donutInnerRadius = 80; 
-  const imageSize = donutInnerRadius * 1.2; 
+  const donutInnerRadius = 70; 
+
 
   return (
     <div className="space-y-8">
       <Card className="shadow-xl border-primary/10 rounded-lg">
-        <CardHeader>
-          <CardTitle className="text-2xl font-headline text-primary flex items-center">
+        <CardHeader className="items-center text-center">
+           {profilePictureUrl && (
+             <Avatar className="h-24 w-24 mb-4 border-4 border-primary/30 shadow-md">
+                <AvatarImage src={profilePictureUrl} alt={`${studentName}'s profile picture`} data-ai-hint="student portrait"/>
+                <AvatarFallback>{studentName ? studentName.charAt(0) : 'S'}</AvatarFallback>
+             </Avatar>
+            )}
+          <CardTitle className="text-2xl font-headline text-primary flex items-center justify-center">
             <PieChartIcon className="mr-3 h-7 w-7" /> Remarks Sentiment Overview
           </CardTitle>
           <CardDescription>Overall distribution of feedback sentiment for {studentName}.</CardDescription>
         </CardHeader>
         <CardContent>
           {remarksSentimentData.length > 0 ? (
-            <div className="relative h-[350px] w-full max-w-md mx-auto">
-               {profilePictureUrl && (
-                <div 
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full overflow-hidden border-4 border-background shadow-lg z-10 flex items-center justify-center"
-                  style={{ width: imageSize, height: imageSize }}
-                >
-                  <Image
-                    src={profilePictureUrl}
-                    alt={`${studentName}'s profile picture`}
-                    width={imageSize} 
-                    height={imageSize}
-                    className="object-cover rounded-full" 
-                    data-ai-hint="student portrait"
-                  />
-                </div>
-              )}
+            <div className="relative h-[300px] w-full max-w-md mx-auto">
               <ChartContainer config={chartConfig} className="h-full w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsPieChart>
@@ -113,12 +110,15 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
                       cursor={{ fill: 'hsl(var(--accent))', radius: 4 }}
                       content={<ChartTooltipContent 
                           nameKey="name" 
-                          formatter={(value, name) => (
-                              <div className="flex items-center">
-                                 <span className="mr-2 h-2.5 w-2.5 rounded-full" style={{backgroundColor: chartConfig[name as keyof typeof chartConfig]?.color}} />
-                                 {chartConfig[name as keyof typeof chartConfig]?.label}: {value} ({( (value / totalRemarks) * 100 ).toFixed(1)}%)
-                              </div>
-                          )}
+                          formatter={(value, name) => {
+                              if (!name || !chartConfig[name as keyof typeof chartConfig]) return null;
+                              return (
+                                <div className="flex items-center">
+                                   <span className="mr-2 h-2.5 w-2.5 rounded-full" style={{backgroundColor: chartConfig[name as keyof typeof chartConfig]?.color}} />
+                                   {chartConfig[name as keyof typeof chartConfig]?.label}: {value} ({( (value / totalRemarks) * 100 ).toFixed(1)}%)
+                                </div>
+                              );
+                          }}
                       />}
                     />
                     <Pie
@@ -127,7 +127,7 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
                       nameKey="name"
                       cx="50%"
                       cy="50%"
-                      outerRadius={130} 
+                      outerRadius={110} 
                       innerRadius={donutInnerRadius} 
                       paddingAngle={2}
                       labelLine={false}
@@ -140,7 +140,7 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
                           position="outside"
                           offset={15}
                           formatter={(value: number, entry: any) => {
-                             if (!entry || !entry.name) return null;
+                             if (!entry || !entry.name || !chartConfig[entry.name as keyof typeof chartConfig]) return null;
                              const percentage = ((value / totalRemarks) * 100).toFixed(0);
                              if (parseInt(percentage) < 8) return null; 
                              return `${chartConfig[entry.name as keyof typeof chartConfig]?.label}: ${percentage}%`;
@@ -221,3 +221,5 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
     </div>
   );
 }
+
+    
