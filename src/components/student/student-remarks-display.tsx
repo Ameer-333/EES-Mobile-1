@@ -93,7 +93,7 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
             <div className="relative h-[350px] w-full max-w-md mx-auto">
                {profilePictureUrl && (
                 <div 
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full overflow-hidden border-4 border-background shadow-lg z-10"
+                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full overflow-hidden border-4 border-background shadow-lg z-10 flex items-center justify-center"
                   style={{ width: imageSize, height: imageSize }}
                 >
                   <Image
@@ -221,3 +221,4 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
     </div>
   );
 }
+
