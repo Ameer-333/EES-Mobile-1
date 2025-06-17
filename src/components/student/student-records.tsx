@@ -7,45 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BookCheck, BarChart3, TrendingUp, Layers, Percent, CheckCircle, XCircle, Award, TrendingDown, CircleSlash, ChevronsRight, ShieldAlert, ShieldCheck } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
+import { BookCheck, BarChart3, TrendingUp, Layers, CheckCircle, XCircle, Award, CircleSlash, ChevronsRight, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
+import { ChartContainer, ChartTooltip as RechartsChartTooltip, ChartTooltipContent as RechartsChartTooltipContent, ChartLegend as RechartsChartLegend, ChartLegendContent as RechartsChartLegendContent } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 
-// Function to generate mock marks for a single exam
-const generateExamMarks = (examName: ExamName): ExamRecord => {
-  const marks: SubjectMarks[] = subjectNamesArray.map(subject => ({
-    subjectName: subject,
-    marks: Math.floor(Math.random() * (95 - (examName === 'SA2' ? 20 : 25) + 1)) + (examName === 'SA2' ? 20 : 25), // Random marks, ensure SA2 can fail
-    maxMarks: 100,
-  }));
-  return { examName, subjectMarks: marks };
-};
-
-const mockExamRecords: ExamRecord[] = examNamesArray.map(examName => generateExamMarks(examName));
-// Ensure at least one student fails SA2 for testing "Detained"
-if (mockExamRecords.find(e => e.examName === 'SA2')) {
-  const sa2Index = mockExamRecords.findIndex(e => e.examName === 'SA2');
-  if (sa2Index !== -1 && mockExamRecords[sa2Index].subjectMarks.length > 0) {
-     // Forcing a fail in one subject for SA2 for demonstration if all subjects are passing by chance
-    let sa2Record = mockExamRecords[sa2Index];
-    const { grade } = calculateGradeAndOverallPercentage(sa2Record.subjectMarks);
-    if (grade !== 'Not Completed') { // if SA2 is not already failing, force one subject to fail
-        sa2Record.subjectMarks[0].marks = 20; // Fail the first subject
-    }
-  }
-}
-
-
-const chartConfig = {
-  marks: { label: "Marks Obtained", color: "hsl(var(--chart-1))" },
-  averageMarks: { label: "Average Marks", color: "hsl(var(--chart-2))" }
-};
-
+// Helper function to calculate grade and overall percentage - DEFINED FIRST
 export const calculateGradeAndOverallPercentage = (subjectMarks: SubjectMarks[]): { grade: GradeType; overallPercentage: number; failingSubjects: SubjectName[] } => {
   let totalMarksObtained = 0;
   let totalMaxMarks = 0;
   const failingSubjects: SubjectName[] = [];
+
+  if (!subjectMarks || subjectMarks.length === 0) {
+    return { grade: 'Not Completed', overallPercentage: 0, failingSubjects: [] };
+  }
 
   for (const subject of subjectMarks) {
     totalMarksObtained += subject.marks;
@@ -55,13 +30,9 @@ export const calculateGradeAndOverallPercentage = (subjectMarks: SubjectMarks[])
     }
   }
 
-  if (totalMaxMarks === 0 && subjectMarks.length > 0) { // If there are subjects but no max marks, it's problematic
+  if (totalMaxMarks === 0) {
     return { grade: 'Not Completed', overallPercentage: 0, failingSubjects: subjectMarks.map(s => s.subjectName) };
   }
-  if (totalMaxMarks === 0) { // No subjects or no max marks for any subject
-    return { grade: 'Not Completed', overallPercentage: 0, failingSubjects };
-  }
-
 
   const overallPercentage = (totalMarksObtained / totalMaxMarks) * 100;
 
@@ -73,7 +44,7 @@ export const calculateGradeAndOverallPercentage = (subjectMarks: SubjectMarks[])
   if (overallPercentage >= 60) return { grade: 'First Class', overallPercentage, failingSubjects };
   if (overallPercentage >= 50) return { grade: 'Second Class', overallPercentage, failingSubjects };
   if (overallPercentage >= 35) return { grade: 'Pass Class', overallPercentage, failingSubjects };
-  return { grade: 'Not Completed', overallPercentage, failingSubjects }; // Should be caught by failingSubjects check
+  return { grade: 'Not Completed', overallPercentage, failingSubjects };
 };
 
 const gradeStyles: Record<GradeType, { color: string; icon: React.ElementType; badgeVariant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -84,15 +55,98 @@ const gradeStyles: Record<GradeType, { color: string; icon: React.ElementType; b
   'Not Completed': { color: 'text-red-600 dark:text-red-400', icon: CircleSlash, badgeVariant: 'destructive' },
 };
 
+// Function to generate mock marks for a single exam
+const generateExamMarks = (examName: ExamName): ExamRecord => {
+  const marks: SubjectMarks[] = subjectNamesArray.map(subject => ({
+    subjectName: subject,
+    marks: Math.floor(Math.random() * (95 - (examName === 'SA2' ? 30 : 25) + 1)) + (examName === 'SA2' ? 30 : 25),
+    maxMarks: 100,
+  }));
+  return { examName, subjectMarks: marks };
+};
+
+const mockExamRecordsInitial: ExamRecord[] = examNamesArray.map(examName => generateExamMarks(examName));
+
+// Ensure SA2 has at least one failing subject for "Detained" testing, IF it's not already failing.
+const sa2IndexForMock = mockExamRecordsInitial.findIndex(e => e.examName === 'SA2');
+if (sa2IndexForMock !== -1) {
+  const sa2RecordForMock = mockExamRecordsInitial[sa2IndexForMock];
+  // Recalculate grade for SA2 specifically *before* potentially modifying it.
+  const { grade: currentSa2Grade } = calculateGradeAndOverallPercentage(sa2RecordForMock.subjectMarks);
+
+  if (currentSa2Grade !== 'Not Completed') {
+    if (sa2RecordForMock.subjectMarks.length > 0) {
+        sa2RecordForMock.subjectMarks[0].marks = 20; // Force fail the first subject
+    } else {
+        sa2RecordForMock.subjectMarks.push({ subjectName: 'Maths', marks: 20, maxMarks: 100 });
+    }
+  }
+}
+const mockExamRecords = mockExamRecordsInitial;
+
+
+const chartConfig = {
+  marks: { label: "Marks Obtained", color: "hsl(var(--chart-1))" },
+  averageMarks: { label: "Average Marks", color: "hsl(var(--chart-2))" }
+};
 
 interface StudentRecordsProps {
   examRecords?: ExamRecord[];
 }
 
+interface MarksTableProps {
+  marks: SubjectMarks[];
+  examName: ExamName;
+  failingSubjects: SubjectName[];
+}
+
+function MarksTable({ marks, examName, failingSubjects }: MarksTableProps) {
+  if (marks.length === 0) {
+    return <p className="text-muted-foreground italic">No marks data available for {examName}.</p>;
+  }
+  return (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="font-semibold">Subject</TableHead>
+            <TableHead className="font-semibold text-center">Marks Obtained</TableHead>
+            <TableHead className="font-semibold text-center">Max Marks</TableHead>
+            <TableHead className="font-semibold text-center">Percentage</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {marks.map((subject) => {
+            const percentage = subject.maxMarks > 0 ? (subject.marks / subject.maxMarks) * 100 : 0;
+            const isFailing = failingSubjects.includes(subject.subjectName);
+            return (
+              <TableRow key={`${examName}-${subject.subjectName}`} className={cn(isFailing ? "bg-red-500/10 hover:bg-red-500/15" : "")}>
+                <TableCell className={cn(isFailing && "text-destructive font-medium")}>{subject.subjectName}</TableCell>
+                <TableCell className={cn("text-center", isFailing && "text-destructive font-medium")}>{subject.marks}</TableCell>
+                <TableCell className="text-center">{subject.maxMarks}</TableCell>
+                <TableCell className={cn("text-center", isFailing && "text-destructive font-medium")}>
+                  <div className="flex items-center justify-center space-x-2">
+                    <span>{percentage.toFixed(2)}%</span>
+                    <Progress value={percentage} className="w-24 h-2"
+                       indicatorClassName={
+                        isFailing ? 'bg-destructive' :
+                        percentage >= 85 ? 'bg-green-500' : percentage >= 60 ? 'bg-blue-500' : percentage >= 50 ? 'bg-yellow-500' : 'bg-orange-500'
+                       }
+                    />
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 export function StudentRecords({ examRecords = mockExamRecords }: StudentRecordsProps) {
-  
   const overallAverageMarks: { subjectName: SubjectName; averageMarks: number; maxMarks: number }[] = [];
-  if (examRecords.length > 0) {
+  if (examRecords && examRecords.length > 0) {
     subjectNamesArray.forEach(subject => {
       let totalMarksForSubject = 0;
       let examsWithSubjectCount = 0;
@@ -106,35 +160,36 @@ export function StudentRecords({ examRecords = mockExamRecords }: StudentRecords
       overallAverageMarks.push({
         subjectName: subject,
         averageMarks: examsWithSubjectCount > 0 ? parseFloat((totalMarksForSubject / examsWithSubjectCount).toFixed(2)) : 0,
-        maxMarks: 100, 
+        maxMarks: 100,
       });
     });
   }
-  
+
   const overallAverageChartData = overallAverageMarks.map(s => ({ name: s.subjectName, averageMarks: s.averageMarks }));
 
   const sa2Record = examRecords.find(er => er.examName === 'SA2');
-  let sa2Grade: GradeType | null = null;
-  let sa2FailingSubjects: SubjectName[] = [];
-  let promotionStatus: "Promoted to Next Class" | "Detained" | "Pending SA2 Results" = "Pending SA2 Results";
-  let promotionStatusIcon: React.ElementType = ShieldAlert;
-  let promotionStatusColor = "text-yellow-600";
+  let sa2GradeResult: { grade: GradeType; failingSubjects: SubjectName[] } | null = null;
 
   if (sa2Record) {
     const { grade, failingSubjects } = calculateGradeAndOverallPercentage(sa2Record.subjectMarks);
-    sa2Grade = grade;
-    sa2FailingSubjects = failingSubjects;
-    if (grade === 'Not Completed') {
+    sa2GradeResult = { grade, failingSubjects };
+  }
+
+  let promotionStatus: "Promoted to Next Class" | "Detained" | "Pending SA2 Results" = "Pending SA2 Results";
+  let PromotionStatusIconComponent: React.ElementType = ShieldAlert;
+  let promotionStatusColor = "text-yellow-600";
+
+  if (sa2GradeResult) {
+    if (sa2GradeResult.grade === 'Not Completed') {
       promotionStatus = "Detained";
-      promotionStatusIcon = ShieldAlert;
+      PromotionStatusIconComponent = ShieldAlert;
       promotionStatusColor = "text-red-600";
     } else {
       promotionStatus = "Promoted to Next Class";
-      promotionStatusIcon = ShieldCheck;
+      PromotionStatusIconComponent = ShieldCheck;
       promotionStatusColor = "text-green-600";
     }
   }
-
 
   if (!examRecords || examRecords.length === 0) {
     return (
@@ -187,16 +242,16 @@ export function StudentRecords({ examRecords = mockExamRecords }: StudentRecords
                 <CardContent>
                   <ChartContainer config={chartConfig} className="h-[350px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={examChartData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
+                      <RechartsBarChart data={examChartData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="name" tickMargin={10} angle={-15} textAnchor="end" height={50} interval={0} />
                         <YAxis domain={[0, 100]} allowDataOverflow={true}/>
-                        <ChartTooltip content={<ChartTooltipContent />} />
-                        <ChartLegend content={<ChartLegendContent />} />
+                        <RechartsChartTooltip content={<RechartsChartTooltipContent />} />
+                        <RechartsChartLegend content={<RechartsChartLegendContent />} />
                         <Bar dataKey="marks" fill="var(--color-marks)" radius={[4, 4, 0, 0]} barSize={40}>
                           <LabelList dataKey="marks" position="top" offset={5} fontSize={12} />
                         </Bar>
-                      </BarChart>
+                      </RechartsBarChart>
                     </ResponsiveContainer>
                   </ChartContainer>
                 </CardContent>
@@ -212,7 +267,7 @@ export function StudentRecords({ examRecords = mockExamRecords }: StudentRecords
         );
       })}
 
-      {sa2Record && sa2Grade && (
+      {sa2GradeResult && (
         <Card className="w-full shadow-2xl rounded-lg border-primary/20 bg-gradient-to-br from-accent/10 via-background to-background">
            <CardHeader className="rounded-t-lg">
             <CardTitle className="text-2xl font-headline text-primary flex items-center">
@@ -222,19 +277,19 @@ export function StudentRecords({ examRecords = mockExamRecords }: StudentRecords
           <CardContent className="pt-6 text-center space-y-4">
             <div>
               <p className="text-sm text-muted-foreground mb-1">SA2 Exam Grade:</p>
-               <Badge variant={gradeStyles[sa2Grade].badgeVariant} className={cn("text-xl px-4 py-2", gradeStyles[sa2Grade].color.replace('text-','bg-').replace('-600', '-100').replace('-400', '-900/20'), gradeStyles[sa2Grade].color )}>
-                  <gradeStyles[sa2Grade].icon className="mr-2 h-6 w-6" /> {sa2Grade}
+               <Badge variant={gradeStyles[sa2GradeResult.grade].badgeVariant} className={cn("text-xl px-4 py-2", gradeStyles[sa2GradeResult.grade].color.replace('text-','bg-').replace('-600', '-100').replace('-400', '-900/20'), gradeStyles[sa2GradeResult.grade].color )}>
+                  <gradeStyles[sa2GradeResult.grade].icon className="mr-2 h-6 w-6" /> {sa2GradeResult.grade}
                </Badge>
             </div>
-             {sa2Grade === 'Not Completed' && sa2FailingSubjects.length > 0 && (
+             {sa2GradeResult.grade === 'Not Completed' && sa2GradeResult.failingSubjects.length > 0 && (
                 <p className="text-sm text-destructive">
-                  Reason for "Not Completed" in SA2: Failed in {sa2FailingSubjects.join(', ')}.
+                  Reason for "Not Completed" in SA2: Failed in {sa2GradeResult.failingSubjects.join(', ')}.
                 </p>
             )}
             <div>
               <p className="text-sm text-muted-foreground mb-1">Promotion Status:</p>
               <div className={cn("text-2xl font-bold flex items-center justify-center", promotionStatusColor)}>
-                <promotionStatusIcon className="mr-2 h-7 w-7" /> {promotionStatus}
+                <PromotionStatusIconComponent className="mr-2 h-7 w-7" /> {promotionStatus}
               </div>
             </div>
           </CardContent>
@@ -259,20 +314,20 @@ export function StudentRecords({ examRecords = mockExamRecords }: StudentRecords
                 <CardContent>
                     <ChartContainer config={chartConfig} className="h-[350px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={overallAverageChartData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
+                        <RechartsBarChart data={overallAverageChartData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false}/>
                         <XAxis dataKey="name" tickMargin={10} angle={-15} textAnchor="end" height={50} interval={0} />
                         <YAxis domain={[0, 100]} allowDataOverflow={true} unit=" avg"/>
-                        <ChartTooltip 
-                            content={<ChartTooltipContent 
-                                formatter={(value, name, props) => [`${value} avg`, name]}
-                            />} 
+                        <RechartsChartTooltip
+                            content={<RechartsChartTooltipContent
+                                formatter={(value, name, props) => [`${Number(value).toFixed(2)} avg`, name as string]}
+                            />}
                         />
-                        <ChartLegend content={<ChartLegendContent />} />
+                        <RechartsChartLegend content={<RechartsChartLegendContent />} />
                         <Bar dataKey="averageMarks" fill="var(--color-averageMarks)" radius={[4, 4, 0, 0]} barSize={40}>
-                            <LabelList dataKey="averageMarks" position="top" offset={5} fontSize={12} />
+                            <LabelList dataKey="averageMarks" position="top" offset={5} fontSize={12} formatter={(value: number) => value.toFixed(2)} />
                         </Bar>
-                        </BarChart>
+                        </RechartsBarChart>
                     </ResponsiveContainer>
                     </ChartContainer>
                 </CardContent>
@@ -283,54 +338,3 @@ export function StudentRecords({ examRecords = mockExamRecords }: StudentRecords
     </div>
   );
 }
-
-interface MarksTableProps {
-  marks: SubjectMarks[];
-  examName: ExamName;
-  failingSubjects: SubjectName[];
-}
-
-function MarksTable({ marks, examName, failingSubjects }: MarksTableProps) {
-  if (marks.length === 0) {
-    return <p className="text-muted-foreground italic">No marks data available for {examName}.</p>;
-  }
-  return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="font-semibold">Subject</TableHead>
-            <TableHead className="font-semibold text-center">Marks Obtained</TableHead>
-            <TableHead className="font-semibold text-center">Max Marks</TableHead>
-            <TableHead className="font-semibold text-center">Percentage</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {marks.map((subject) => {
-            const percentage = subject.maxMarks > 0 ? (subject.marks / subject.maxMarks) * 100 : 0;
-            const isFailing = failingSubjects.includes(subject.subjectName);
-            return (
-              <TableRow key={`${examName}-${subject.subjectName}`} className={cn(isFailing ? "bg-red-500/10 hover:bg-red-500/15" : "")}>
-                <TableCell className={cn(isFailing && "text-destructive font-medium")}>{subject.subjectName}</TableCell>
-                <TableCell className={cn("text-center", isFailing && "text-destructive font-medium")}>{subject.marks}</TableCell>
-                <TableCell className="text-center">{subject.maxMarks}</TableCell>
-                <TableCell className={cn("text-center", isFailing && "text-destructive font-medium")}>
-                  <div className="flex items-center justify-center space-x-2">
-                    <span>{percentage.toFixed(2)}%</span>
-                    <Progress value={percentage} className="w-24 h-2" 
-                       indicatorClassName={
-                        isFailing ? 'bg-destructive' :
-                        percentage >= 85 ? 'bg-green-500' : percentage >= 60 ? 'bg-blue-500' : percentage >= 50 ? 'bg-yellow-500' : 'bg-orange-500'
-                       }
-                    />
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
