@@ -56,21 +56,10 @@ export function LoginForm({ role }: LoginFormProps) {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       
-      // TODO: In a real app, after successful Firebase login, you would typically:
-      // 1. Get the user's UID from the auth.currentUser object.
-      // 2. Query Firestore (or another database) to fetch the user's custom role (Admin, Teacher, Student).
-      // 3. Verify if the fetched role matches the `role` prop of this LoginForm.
-      //    - If it matches, proceed with redirection.
-      //    - If it doesn't match (e.g., a "Student" tries to log in via "/admin/login"), show an error and sign them out.
-      // For this iteration, we are directly redirecting based on the login form's `role` prop.
-
       toast({
         title: 'Login Successful',
         description: `Welcome, ${role}! Redirecting to dashboard...`,
       });
-
-      // Simulate API call delay for toast visibility if needed, otherwise can be immediate
-      // await new Promise(resolve => setTimeout(resolve, 500));
 
       if (role === 'Admin') {
         router.push('/admin/dashboard');
@@ -81,6 +70,9 @@ export function LoginForm({ role }: LoginFormProps) {
       }
     } catch (error) {
       let errorMessage = 'An unexpected error occurred. Please try again.';
+      // Log the full error object for detailed debugging
+      console.error('Firebase Login Full Error:', error); 
+
       if (error instanceof FirebaseError) {
         switch (error.code) {
           case 'auth/user-not-found':
@@ -94,12 +86,17 @@ export function LoginForm({ role }: LoginFormProps) {
           case 'auth/too-many-requests':
             errorMessage = 'Too many login attempts. Please try again later.';
             break;
+          case 'auth/network-request-failed':
+            errorMessage = 'Network error. Please check your internet connection.';
+            break;
           default:
-            errorMessage = 'Login failed. Please check your credentials or try again later.';
+            errorMessage = `Login failed: ${error.message} (Code: ${error.code})`;
             break;
         }
+      } else if (error instanceof Error) {
+        errorMessage = `Login failed: ${error.message}`;
       }
-      console.error('Firebase Login Error:', error);
+      
       toast({
         title: 'Login Failed',
         description: errorMessage,
