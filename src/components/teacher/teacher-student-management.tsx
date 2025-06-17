@@ -66,8 +66,8 @@ export function TeacherStudentManagement() {
     if (!searchTerm) return students;
     return students.filter(
       (student) =>
-        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (student.name && student.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (student.id && student.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (student.satsNumber && student.satsNumber.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [students, searchTerm]);
@@ -188,8 +188,8 @@ export function TeacherStudentManagement() {
                 <TableRow key={student.id}>
                   <TableCell>
                     <Image
-                      src={student.profilePictureUrl || `https://placehold.co/40x40.png?text=${student.name.charAt(0)}`}
-                      alt={student.name}
+                      src={student.profilePictureUrl || `https://placehold.co/40x40.png?text=${student.name && student.name.length > 0 ? student.name.charAt(0) : 'S'}`}
+                      alt={student.name || 'Student'}
                       width={40}
                       height={40}
                       className="rounded-full"
@@ -197,10 +197,10 @@ export function TeacherStudentManagement() {
                     />
                   </TableCell>
                   <TableCell className="font-medium truncate max-w-[100px]">{student.id}</TableCell>
-                  <TableCell>{student.name}</TableCell>
-                  <TableCell>{student.satsNumber}</TableCell>
-                  <TableCell>{student.class}</TableCell>
-                  <TableCell>{student.section}</TableCell>
+                  <TableCell>{student.name || 'N/A'}</TableCell>
+                  <TableCell>{student.satsNumber || 'N/A'}</TableCell>
+                  <TableCell>{student.class || 'N/A'}</TableCell>
+                  <TableCell>{student.section || 'N/A'}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(student)}>
                       <Edit className="h-4 w-4 mr-1" /> Edit
@@ -216,12 +216,12 @@ export function TeacherStudentManagement() {
                           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                           <AlertDialogDescription>
                             This action cannot be undone. This will permanently delete the student
-                            record for {student.name} from Firestore.
+                            record for {student.name || 'this student'} from Firestore.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteStudent(student.id, student.name)}>
+                          <AlertDialogAction onClick={() => handleDeleteStudent(student.id, student.name || 'Unknown Student')}>
                             Continue
                           </AlertDialogAction>
                         </AlertDialogFooter>
@@ -260,3 +260,4 @@ export function TeacherStudentManagement() {
     </>
   );
 }
+
