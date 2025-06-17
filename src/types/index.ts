@@ -50,12 +50,20 @@ export interface Student {
 export type SubjectName = 'English' | 'Kannada' | 'Hindi' | 'Science' | 'Maths' | 'Social Science';
 export const subjectNamesArray: SubjectName[] = ['English', 'Kannada', 'Hindi', 'Science', 'Maths', 'Social Science'];
 
+export type ExamName = 'FA1' | 'FA2' | 'SA1' | 'FA3' | 'FA4' | 'SA2';
+export const examNamesArray: ExamName[] = ['FA1', 'FA2', 'SA1', 'FA3', 'FA4', 'SA2'];
 
 export interface SubjectMarks {
   subjectName: SubjectName;
   marks: number;
   maxMarks: number;
 }
+
+export interface ExamRecord {
+  examName: ExamName;
+  subjectMarks: SubjectMarks[];
+}
+
 
 export interface AttendanceRecord {
   date: string; // YYYY-MM-DD
@@ -151,4 +159,3 @@ export interface HallOfFameItem {
   year?: string | number;
   dataAiHint?: string;
 }
-
