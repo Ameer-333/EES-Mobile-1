@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageSquareText, Smile, Frown, Meh, BookOpen, CalendarDays, BarChart3, Info } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList, ResponsiveContainer } from "recharts";
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList, ResponsiveContainer, Tooltip } from "recharts";
 import { useMemo } from 'react';
 
 // Mock data for demonstration - in a real app, this would be fetched
@@ -24,16 +24,16 @@ interface StudentRemarksDisplayProps {
   remarks?: StudentRemark[];
 }
 
-const sentimentIconsAndColors = {
-  good: { icon: Smile, color: 'text-green-500', fill: 'hsl(var(--chart-2))' },
-  bad: { icon: Frown, color: 'text-red-500', fill: 'hsl(var(--chart-1))' },
-  neutral: { icon: Meh, color: 'text-yellow-500', fill: 'hsl(var(--chart-3))' },
+const sentimentDetails = {
+  good: { icon: Smile, color: 'text-green-500', fill: 'hsl(var(--chart-2))', label: 'Good' },
+  bad: { icon: Frown, color: 'text-red-500', fill: 'hsl(var(--chart-1))', label: 'Needs Improvement' },
+  neutral: { icon: Meh, color: 'text-yellow-500', fill: 'hsl(var(--chart-3))', label: 'Neutral' },
 };
 
 const chartConfig = {
-  good: { label: "Good", color: sentimentIconsAndColors.good.fill },
-  bad: { label: "Needs Improvement", color: sentimentIconsAndColors.bad.fill },
-  neutral: { label: "Neutral", color: sentimentIconsAndColors.neutral.fill },
+  good: { label: sentimentDetails.good.label, color: sentimentDetails.good.fill },
+  bad: { label: sentimentDetails.bad.label, color: sentimentDetails.bad.fill },
+  neutral: { label: sentimentDetails.neutral.label, color: sentimentDetails.neutral.fill },
 };
 
 
@@ -81,15 +81,20 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
       <Card className="shadow-xl border-primary/10 rounded-lg">
         <CardHeader>
           <CardTitle className="text-2xl font-headline text-primary flex items-center">
-            <BarChart3 className="mr-3 h-7 w-7" /> Remarks Overview
+            <BarChart3 className="mr-3 h-7 w-7" /> Remarks Sentiment Trend
           </CardTitle>
-          <CardDescription>A monthly summary of the feedback you've received.</CardDescription>
+          <CardDescription>Monthly breakdown of feedback sentiment.</CardDescription>
         </CardHeader>
         <CardContent>
           {remarksChartData.length > 0 ? (
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height={300}>
-                <RechartsBarChart data={remarksChartData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
+            <ChartContainer config={chartConfig} className="h-[350px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart 
+                  data={remarksChartData} 
+                  margin={{ top: 20, right: 20, left: -10, bottom: 5 }}
+                  barGap={4} // Space between bars of different categories (good, bad, neutral) for the same month
+                  barCategoryGap="20%" // Space between groups of bars (each month)
+                >
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                   <XAxis 
                     dataKey="month" 
@@ -97,7 +102,7 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
                     axisLine={false} 
                     tickMargin={10}
                     tickFormatter={(value) => {
-                      const date = new Date(value + "-02"); // Use 2nd day to avoid timezone shifts to prev month
+                      const date = new Date(value + "-02"); 
                       return date.toLocaleString('default', { month: 'short', year: '2-digit' });
                     }}
                   />
@@ -106,10 +111,10 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
                     cursor={{fill: 'hsl(var(--accent))', radius: 4}}
                     content={<ChartTooltipContent 
                         formatter={(value, name, props) => {
-                             if (value === 0) return null; // Hide if count is 0
+                             if (value === 0) return null; 
                              return (
                                 <div className="flex items-center">
-                                   <span className="mr-2 h-2.5 w-2.5 rounded-full" style={{backgroundColor: props.fill}} />
+                                   <span className="mr-2 h-2.5 w-2.5 rounded-full" style={{backgroundColor: chartConfig[name as keyof typeof chartConfig]?.color}} />
                                    {chartConfig[name as keyof typeof chartConfig]?.label}: {value}
                                 </div>
                              );
@@ -117,13 +122,13 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
                     />} 
                   />
                   <ChartLegend content={<ChartLegendContent />} />
-                  <Bar dataKey="good" fill="var(--color-good)" radius={[4, 4, 0, 0]} stackId="a">
+                  <Bar dataKey="good" fill="var(--color-good)" radius={[4, 4, 0, 0]} barSize={20}>
                     <LabelList dataKey="good" position="top" offset={5} fontSize={10} formatter={(value: number) => value > 0 ? value : ''} />
                   </Bar>
-                  <Bar dataKey="bad" fill="var(--color-bad)" radius={[4, 4, 0, 0]} stackId="a">
+                  <Bar dataKey="bad" fill="var(--color-bad)" radius={[4, 4, 0, 0]} barSize={20}>
                     <LabelList dataKey="bad" position="top" offset={5} fontSize={10} formatter={(value: number) => value > 0 ? value : ''} />
                   </Bar>
-                  <Bar dataKey="neutral" fill="var(--color-neutral)" radius={[4, 4, 0, 0]} stackId="a">
+                  <Bar dataKey="neutral" fill="var(--color-neutral)" radius={[4, 4, 0, 0]} barSize={20}>
                     <LabelList dataKey="neutral" position="top" offset={5} fontSize={10} formatter={(value: number) => value > 0 ? value : ''} />
                   </Bar>
                 </RechartsBarChart>
@@ -146,22 +151,20 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
           <CardDescription>All feedback from your teachers, sorted by most recent.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[400px] pr-3 -mr-3"> {/* Offset padding for scrollbar */}
+          <ScrollArea className="h-[400px] pr-3 -mr-3"> 
             <div className="space-y-5">
               {remarks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((remark) => {
-                const SentimentIcon = sentimentIconsAndColors[remark.sentiment].icon;
-                const sentimentColor = sentimentIconsAndColors[remark.sentiment].color;
-                const sentimentBgColor = sentimentIconsAndColors[remark.sentiment].fill;
+                const sentimentInfo = sentimentDetails[remark.sentiment];
                 
                 return (
                   <div key={remark.id} className="p-4 border rounded-lg shadow-sm bg-card hover:shadow-md transition-shadow duration-200 ease-in-out relative overflow-hidden group">
                     <div 
                         className="absolute top-0 right-0 h-full w-1.5"
-                        style={{ backgroundColor: sentimentBgColor }}
+                        style={{ backgroundColor: sentimentInfo.fill }}
                     />
                     <div className="flex items-start space-x-4">
                       <Avatar className="mt-1 h-12 w-12 border-2 border-primary/30 flex-shrink-0">
-                        <AvatarImage src={`https://placehold.co/48x48/${sentimentBgColor.substring(4,10)}/300130.png?text=${remark.teacherName.charAt(0)}`} alt={remark.teacherName} data-ai-hint="teacher avatar"/>
+                        <AvatarImage src={`https://placehold.co/48x48/${sentimentInfo.fill.substring(4,10)}/300130.png?text=${remark.teacherName.charAt(0)}`} alt={remark.teacherName} data-ai-hint="teacher avatar"/>
                         <AvatarFallback>{remark.teacherName.charAt(0)}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
@@ -179,9 +182,9 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
                           </p>
                         </div>
                         <p className="text-sm text-foreground/90 leading-relaxed my-2">{remark.remark}</p>
-                        <div className={`mt-2 flex items-center px-2 py-1 rounded-md text-xs font-medium w-fit ${sentimentColor.replace('text-','bg-').replace('-500','-100')} ${sentimentColor}`}>
-                           <SentimentIcon className={`h-4 w-4 mr-1.5`} />
-                           {remark.sentiment.charAt(0).toUpperCase() + remark.sentiment.slice(1)} Feedback
+                        <div className={`mt-2 flex items-center px-2 py-1 rounded-md text-xs font-medium w-fit ${sentimentInfo.color.replace('text-','bg-').replace('-500','-100')} ${sentimentInfo.color}`}>
+                           <sentimentInfo.icon className={`h-4 w-4 mr-1.5`} />
+                           {sentimentInfo.label} Feedback
                         </div>
                       </div>
                     </div>
