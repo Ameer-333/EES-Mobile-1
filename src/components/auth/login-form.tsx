@@ -53,7 +53,7 @@ export function LoginForm({ role }: LoginFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    console.log('Email being sent to Firebase:', values.email); // Added for debugging
+    console.log('Email being sent to Firebase:', values.email); // For debugging
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       
@@ -78,20 +78,21 @@ export function LoginForm({ role }: LoginFormProps) {
         switch (error.code) {
           case 'auth/user-not-found':
           case 'auth/wrong-password':
-          case 'auth/invalid-credential': // This can also be triggered by malformed email/password before server check
+          case 'auth/invalid-credential':
             errorMessage = 'Invalid email or password.';
             break;
           case 'auth/invalid-email':
-            errorMessage = 'Invalid email address format. Please check for typos or extra spaces.';
+            errorMessage = 'Invalid email address format. Please ensure your email is correct or contact support if the issue persists after verifying hosting configuration.';
             break;
           case 'auth/too-many-requests':
             errorMessage = 'Too many login attempts. Please try again later.';
             break;
           case 'auth/network-request-failed':
-            errorMessage = 'Network error. Please check your internet connection.';
+            errorMessage = 'Network error. Please check your internet connection and try again.';
             break;
-          case 'auth/configuration-not-found': // Could indicate issues with Firebase project setup
-            errorMessage = 'Firebase configuration error. Please contact support.';
+          case 'auth/configuration-not-found': 
+          case 'auth/invalid-api-key': // Often related to SDK initialization problems
+            errorMessage = 'Firebase configuration error. The application might not be set up correctly. Please contact support.';
             break;
           default:
             errorMessage = `Login failed: ${error.message} (Code: ${error.code})`;
