@@ -2,12 +2,9 @@
 'use client';
 
 import { StudentProfileCard } from '@/components/student/student-profile-card';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
-import type { Student, Scholarship, ReligionType, SubjectName } from '@/types';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { BarChartHorizontalBig, CalendarCheck, Award as AwardIcon, CalendarClock, UserCircle2 } from 'lucide-react';
+import type { Student, ReligionType, SubjectName } from '@/types';
+import { UserCircle2 } from 'lucide-react';
 
 // Mock data - updated with new fields
 const mockStudentData: Student = {
@@ -54,84 +51,9 @@ export default function StudentProfilePage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Profile Card - takes up more space on larger screens */}
-        <div className="lg:col-span-2">
-            <StudentProfileCard student={student} isFullPage={true} />
-        </div>
-
-        {/* Sidebar for other links */}
-        <div className="lg:col-span-1 space-y-6">
-            <Card className="shadow-lg border-primary/10">
-                <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
-                        <CalendarCheck className="mr-2 h-6 w-6" /> View Upcoming Events
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Explore all school events, holidays, and important dates.
-                    </p>
-                    <Button asChild className="w-full">
-                        <Link href="/student/events">
-                            Go to Upcoming Events
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
-             <Card className="shadow-lg border-primary/10">
-                <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
-                        <BarChartHorizontalBig className="mr-2 h-6 w-6" /> View My Remarks
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Access all feedback and observations from your teachers.
-                    </p>
-                    <Button asChild className="w-full">
-                        <Link href="/student/remarks">
-                            Go to My Remarks
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
-            <Card className="shadow-lg border-primary/10">
-                <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
-                        <CalendarClock className="mr-2 h-6 w-6" /> View My Attendance
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Review your attendance records for all subjects.
-                    </p>
-                    <Button asChild className="w-full">
-                        <Link href="/student/attendance">
-                            Go to My Attendance
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
-             <Card className="shadow-lg border-primary/10">
-                <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
-                        <AwardIcon className="mr-2 h-6 w-6" /> View My Scholarships
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Review all scholarships you have been awarded.
-                    </p>
-                    <Button asChild className="w-full">
-                        <Link href="/student/scholarships">
-                            Go to My Scholarships
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
-        </div>
-       </div>
+      {/* The StudentProfileCard will now take up the main space */}
+      <StudentProfileCard student={student} isFullPage={true} />
+      
       {student.backgroundInfo && <StudentBackgroundDisplay backgroundInfo={student.backgroundInfo} />}
     </div>
   );

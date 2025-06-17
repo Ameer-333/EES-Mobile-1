@@ -42,6 +42,11 @@ function getDashboardTitle(pathname: string, actualRole: UserRole | null, appNam
     if (pathname === `/${rolePrefix}/dashboard`) return `${actualRole} Dashboard`;
     if (pathname === `/${rolePrefix}/profile`) return `${actualRole} Profile`;
     if (pathname === `/${rolePrefix}/records`) return `My Academic Records`;
+    if (pathname === `/${rolePrefix}/attendance`) return `My Attendance`;
+    if (pathname === `/${rolePrefix}/remarks`) return `My Remarks`;
+    if (pathname === `/${rolePrefix}/events`) return `Upcoming Events`;
+    if (pathname === `/${rolePrefix}/scholarships`) return `My Scholarships`;
+    
     if (pathname === `/${rolePrefix}/students`) return `Manage Students`;
     if (pathname === `/${rolePrefix}/data-entry`) return `Student Data Entry`;
     if (pathname === `/${rolePrefix}/give-remark`) return `Provide Student Remark`;
@@ -70,6 +75,7 @@ export default function ProtectedLayout({
 
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [userDisplayName, setUserDisplayName] = useState<string | null>(null); // For welcome message
   const [isLoading, setIsLoading] = useState(true);
   const [currentAppName, setCurrentAppName] = useState('EES Education');
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
@@ -94,7 +100,7 @@ export default function ProtectedLayout({
       }
     };
 
-    fetchAppSettings(); // Fetch app settings on initial load
+    fetchAppSettings(); 
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setIsLoading(true); 
@@ -105,11 +111,17 @@ export default function ProtectedLayout({
 
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
-          const roleFromDb = userData.role;
+          const roleFromDb = userData.role as UserRole;
+          const nameFromDb = userData.name as string || user.displayName || user.email || null;
 
           if (roleFromDb && ['Admin', 'Teacher', 'Student'].includes(roleFromDb)) {
-            const fetchedRole = roleFromDb as UserRole;
-            setUserRole(fetchedRole);
+            setUserRole(roleFromDb);
+            if (roleFromDb === 'Student') {
+              setUserDisplayName(nameFromDb);
+            } else {
+              setUserDisplayName(null); // Clear for non-students
+            }
+
             const expectedRole = getExpectedRoleFromPathname(pathname);
 
             if (pathname.startsWith('/hall-of-fame') && !expectedRole) {
@@ -117,8 +129,8 @@ export default function ProtectedLayout({
                return; 
             }
 
-            if (expectedRole && fetchedRole !== expectedRole) {
-              toast({ title: "Access Denied", description: `Your role (${fetchedRole}) does not permit access to this ${expectedRole} page.`, variant: "destructive" });
+            if (expectedRole && roleFromDb !== expectedRole) {
+              toast({ title: "Access Denied", description: `Your role (${roleFromDb}) does not permit access to this ${expectedRole} page.`, variant: "destructive" });
               router.push('/'); 
             } else if (!expectedRole && !pathname.startsWith('/hall-of-fame') && !pathname.startsWith('/login') && pathname !== '/') {
                toast({ title: "Page Not Found", description: `The page (${pathname}) you are trying to access is not valid for your role.`, variant: "destructive" });
@@ -132,6 +144,7 @@ export default function ProtectedLayout({
             await signOut(auth); 
             setAuthUser(null);
             setUserRole(null);
+            setUserDisplayName(null);
             router.push('/'); 
           }
         } else {
@@ -139,18 +152,20 @@ export default function ProtectedLayout({
           await signOut(auth);
           setAuthUser(null);
           setUserRole(null);
+          setUserDisplayName(null);
           router.push('/'); 
         }
       } else {
         setAuthUser(null);
         setUserRole(null);
+        setUserDisplayName(null);
         if (!pathname.startsWith('/login') && pathname !== '/') { 
             router.push('/'); 
         } else {
           setIsLoading(false); 
         }
       }
-       setTimeout(() => setIsLoading(false), 100); // Fallback to stop loading
+       setTimeout(() => setIsLoading(false), 100); 
     });
 
     return () => {
@@ -167,6 +182,7 @@ export default function ProtectedLayout({
       });
       setAuthUser(null);
       setUserRole(null);
+      setUserDisplayName(null);
       router.push('/'); 
     } catch (error) {
       console.error('Logout Error:', error);
@@ -256,7 +272,10 @@ export default function ProtectedLayout({
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-             <h1 className="font-semibold text-lg">{pageTitle}</h1>
+            {userRole === 'Student' && userDisplayName && (
+              <p className="text-sm text-muted-foreground">Hello, {userDisplayName}!</p>
+            )}
+            <h1 className="font-semibold text-lg">{pageTitle}</h1>
           </div>
           {authUser && userRole && (
             <DropdownMenu>
