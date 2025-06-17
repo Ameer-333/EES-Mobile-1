@@ -40,10 +40,20 @@ const editStudentSchema = z.object({
   satsNumber: z.string().min(3, { message: 'SATS number must be at least 3 characters.' }),
   class: z.string().min(1, { message: 'Class is required.' }),
   section: z.string().min(1, { message: 'Section is required (e.g., A, B).' }).max(2),
+  dateOfBirth: z.string().optional().or(z.literal('')), // YYYY-MM-DD or empty
+  fatherName: z.string().optional().or(z.literal('')),
+  motherName: z.string().optional().or(z.literal('')),
+  fatherOccupation: z.string().optional().or(z.literal('')),
+  motherOccupation: z.string().optional().or(z.literal('')),
+  parentsAnnualIncome: z.coerce.number().nonnegative("Income must be a positive number").optional().or(z.literal(0)),
+  parentContactNumber: z.string().optional().or(z.literal('')),
+  email: z.string().email({ message: "Invalid email address." }).optional().or(z.literal('')),
   caste: z.string().min(1, { message: 'Caste is required.' }),
   religion: z.custom<ReligionType>(val => religionOptions.includes(val as ReligionType), 'Religion is required.'),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
+  siblingReference: z.string().optional().or(z.literal('')),
   profilePictureUrl: z.string().url({ message: "Invalid URL format. Please enter a full URL (e.g., https://example.com/image.png)" }).optional().or(z.literal('')),
+  backgroundInfo: z.string().optional().or(z.literal('')),
 });
 
 type EditStudentFormValues = z.infer<typeof editStudentSchema>;
@@ -70,10 +80,20 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
         satsNumber: studentToEdit.satsNumber,
         class: studentToEdit.class,
         section: studentToEdit.section,
+        dateOfBirth: studentToEdit.dateOfBirth || '',
+        fatherName: studentToEdit.fatherName || '',
+        motherName: studentToEdit.motherName || '',
+        fatherOccupation: studentToEdit.fatherOccupation || '',
+        motherOccupation: studentToEdit.motherOccupation || '',
+        parentsAnnualIncome: studentToEdit.parentsAnnualIncome || 0,
+        parentContactNumber: studentToEdit.parentContactNumber || '',
+        email: studentToEdit.email || '',
         caste: studentToEdit.caste,
         religion: studentToEdit.religion,
         address: studentToEdit.address,
+        siblingReference: studentToEdit.siblingReference || '',
         profilePictureUrl: studentToEdit.profilePictureUrl || '',
+        backgroundInfo: studentToEdit.backgroundInfo || '',
       });
     }
   }, [studentToEdit, isOpen, form]);
@@ -86,8 +106,24 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
       const studentDocRef = doc(firestore, STUDENTS_COLLECTION, studentToEdit.id);
       
       const studentDataToUpdate: Partial<Student> = {
-        ...values,
+        name: values.name,
+        satsNumber: values.satsNumber,
+        class: values.class,
+        section: values.section,
+        dateOfBirth: values.dateOfBirth || undefined,
+        fatherName: values.fatherName || undefined,
+        motherName: values.motherName || undefined,
+        fatherOccupation: values.fatherOccupation || undefined,
+        motherOccupation: values.motherOccupation || undefined,
+        parentsAnnualIncome: values.parentsAnnualIncome || undefined,
+        parentContactNumber: values.parentContactNumber || undefined,
+        email: values.email || undefined,
+        caste: values.caste,
+        religion: values.religion,
+        address: values.address,
+        siblingReference: values.siblingReference || undefined,
         profilePictureUrl: values.profilePictureUrl || null,
+        backgroundInfo: values.backgroundInfo || undefined,
       };
 
       await setDoc(studentDocRef, studentDataToUpdate, { merge: true });
@@ -95,7 +131,6 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
       const updatedStudentForCallback: Student = {
         ...studentToEdit, 
         ...studentDataToUpdate, 
-        profilePictureUrl: studentDataToUpdate.profilePictureUrl ?? undefined, 
       };
       onStudentEdited(updatedStudentForCallback);
 
@@ -123,7 +158,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
       if (!open) form.reset();
       onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Student: {studentToEdit.name}</DialogTitle>
           <DialogDescription>
@@ -131,122 +166,69 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 py-3 max-h-[70vh] overflow-y-auto pr-2">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Priya Sharma" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="satsNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>SATS Number</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. SAT00123" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 py-3 pr-2">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. Priya Sharma" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="satsNumber" render={({ field }) => (
+              <FormItem><FormLabel>SATS Number</FormLabel><FormControl><Input placeholder="e.g. SAT00123" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+             <FormField control={form.control} name="email" render={({ field }) => (
+              <FormItem><FormLabel>Student Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="student@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
             <div className="grid grid-cols-2 gap-3">
-            <FormField
-              control={form.control}
-              name="class"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Class (e.g., 10th)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. 10th" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="section"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Section</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. A" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField control={form.control} name="class" render={({ field }) => (
+                <FormItem><FormLabel>Class (e.g., 10th)</FormLabel><FormControl><Input placeholder="e.g. 10th" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField control={form.control} name="section" render={({ field }) => (
+                <FormItem><FormLabel>Section</FormLabel><FormControl><Input placeholder="e.g. A" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
             </div>
-            <FormField
-              control={form.control}
-              name="caste"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Caste</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. General" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
+            <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
+              <FormItem><FormLabel>Date of Birth (Optional, YYYY-MM-DD)</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField control={form.control} name="caste" render={({ field }) => (
+                <FormItem><FormLabel>Caste</FormLabel><FormControl><Input placeholder="e.g. General" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField control={form.control} name="religion" render={({ field }) => (
+                <FormItem><FormLabel>Religion</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select religion" /></SelectTrigger></FormControl>
+                    <SelectContent>{religionOptions.map(option => (<SelectItem key={option} value={option}>{option}</SelectItem>))}</SelectContent>
+                  </Select><FormMessage />
                 </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="religion"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Religion</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select religion" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {religionOptions.map(option => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Address</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="profilePictureUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Profile Picture URL (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://example.com/student.png" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              )}/>
+            </div>
+            <FormField control={form.control} name="fatherName" render={({ field }) => (
+              <FormItem><FormLabel>Father's Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="fatherOccupation" render={({ field }) => (
+              <FormItem><FormLabel>Father's Occupation (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="motherName" render={({ field }) => (
+              <FormItem><FormLabel>Mother's Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="motherOccupation" render={({ field }) => (
+              <FormItem><FormLabel>Mother's Occupation (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+             <FormField control={form.control} name="parentsAnnualIncome" render={({ field }) => (
+              <FormItem><FormLabel>Parents' Annual Income (Optional, INR)</FormLabel><FormControl><Input type="number" placeholder="e.g. 500000" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="parentContactNumber" render={({ field }) => (
+              <FormItem><FormLabel>Parent's Contact Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="+91..." {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="address" render={({ field }) => (
+              <FormItem><FormLabel>Address</FormLabel><FormControl><Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" /></FormControl><FormMessage /></FormItem>
+            )}/>
+             <FormField control={form.control} name="siblingReference" render={({ field }) => (
+              <FormItem><FormLabel>Sibling Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., Sister: Ananya, Class 8B" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="profilePictureUrl" render={({ field }) => (
+              <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/student.png" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="backgroundInfo" render={({ field }) => (
+              <FormItem><FormLabel>Background Info (Optional)</FormLabel><FormControl><Textarea placeholder="Any additional notes or background..." {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
             <DialogFooter className="pt-3">
               <DialogClose asChild>
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
@@ -254,9 +236,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
+                {isSubmitting ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : null}
                 Save Changes
               </Button>
             </DialogFooter>

@@ -65,12 +65,6 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
               data-ai-hint="student portrait"
               priority
             />
-            {isFullPage && (
-                <Button variant="outline" size="icon" className="absolute bottom-1 right-1 h-8 w-8 bg-background/80 hover:bg-background border-primary/30">
-                    <Edit3 className="h-4 w-4 text-primary" />
-                    <span className="sr-only">Edit Profile Picture</span>
-                </Button>
-            )}
           </div>
           <div className="text-center sm:text-left pt-1">
             <CardTitle className={cn("font-headline text-primary tracking-tight", isFullPage ? "text-3xl md:text-4xl" : "text-2xl")}>
@@ -121,11 +115,7 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
         )}
 
       </CardContent>
-      {isFullPage && (
-          <CardFooter className="p-6 border-t border-muted/20 justify-end">
-            <Button variant="outline"><Edit3 className="mr-2 h-4 w-4"/> Edit Profile Details</Button>
-          </CardFooter>
-      )}
+      {/* Removed edit button from footer for students */}
     </Card>
   );
 }
@@ -171,14 +161,3 @@ function ProfileItem({ icon: Icon, label, value, className }: ProfileItemProps) 
     </div>
   );
 }
-
-// Dummy Button for placeholder
-const Button = ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string, size?: string}) => (
-    <button {...props} className={cn("inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-        props.variant === "outline" ? "border border-input bg-background hover:bg-accent hover:text-accent-foreground" : "bg-primary text-primary-foreground hover:bg-primary/90",
-        props.size === "icon" ? "h-10 w-10" : "h-9 px-3 py-2",
-        props.className
-    )}>
-        {children}
-    </button>
-);

@@ -41,10 +41,20 @@ const addStudentSchema = z.object({
   satsNumber: z.string().min(3, { message: 'SATS number must be at least 3 characters.' }).regex(/^[a-zA-Z0-9]+$/, "SATS number should be alphanumeric."),
   class: z.string().min(1, { message: 'Class is required.' }),
   section: z.string().min(1, { message: 'Section is required (e.g., A, B).' }).max(2),
+  dateOfBirth: z.string().optional().or(z.literal('')), // YYYY-MM-DD or empty
+  fatherName: z.string().optional().or(z.literal('')),
+  motherName: z.string().optional().or(z.literal('')),
+  fatherOccupation: z.string().optional().or(z.literal('')),
+  motherOccupation: z.string().optional().or(z.literal('')),
+  parentsAnnualIncome: z.coerce.number().nonnegative("Income must be a positive number").optional().or(z.literal(0)),
+  parentContactNumber: z.string().optional().or(z.literal('')),
+  email: z.string().email({ message: "Invalid email address." }).optional().or(z.literal('')),
   caste: z.string().min(1, { message: 'Caste is required.' }),
   religion: z.custom<ReligionType>(val => religionOptions.includes(val as ReligionType), 'Religion is required.'),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
+  siblingReference: z.string().optional().or(z.literal('')),
   profilePictureUrl: z.string().url({ message: "Invalid URL format. Please enter a full URL (e.g., https://example.com/image.png)" }).optional().or(z.literal('')),
+  backgroundInfo: z.string().optional().or(z.literal('')),
 });
 
 type AddStudentFormValues = z.infer<typeof addStudentSchema>;
@@ -67,10 +77,20 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       satsNumber: '',
       class: '',
       section: '',
+      dateOfBirth: '',
+      fatherName: '',
+      motherName: '',
+      fatherOccupation: '',
+      motherOccupation: '',
+      parentsAnnualIncome: 0,
+      parentContactNumber: '',
+      email: '',
       caste: '',
-      religion: 'Hindu', // Default to one of the options
+      religion: 'Hindu',
       address: '',
+      siblingReference: '',
       profilePictureUrl: '',
+      backgroundInfo: '',
     },
   });
 
@@ -78,30 +98,35 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     setIsSubmitting(true);
     setGeneratedCredentials(null);
 
-    const generatedEmail = `${values.satsNumber.toUpperCase()}@ees-student.com`;
+    const generatedLoginEmail = `${values.satsNumber.toLowerCase().replace(/[^a-z0-9]/gi, '')}.student@eesedu.com`;
     const generatedPassword = `${values.satsNumber.toUpperCase()}Default@123`; 
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, generatedEmail, generatedPassword);
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, generatedLoginEmail, generatedPassword);
       const authUid = userCredential.user.uid;
       
-      const studentDataToSave: Omit<Student, 'id' | 'remarks' | 'scholarships' | 'backgroundInfo'> & { profilePictureUrl: string | null, authUid: string } = {
+      const fullStudentDataForFirestore: Omit<Student, 'id'> = {
         name: values.name,
         satsNumber: values.satsNumber,
         class: values.class,
         section: values.section,
+        dateOfBirth: values.dateOfBirth || undefined,
+        fatherName: values.fatherName || undefined,
+        motherName: values.motherName || undefined,
+        fatherOccupation: values.fatherOccupation || undefined,
+        motherOccupation: values.motherOccupation || undefined,
+        parentsAnnualIncome: values.parentsAnnualIncome || undefined,
+        parentContactNumber: values.parentContactNumber || undefined,
+        email: values.email || undefined,
         caste: values.caste,
         religion: values.religion,
         address: values.address,
+        siblingReference: values.siblingReference || undefined,
         profilePictureUrl: values.profilePictureUrl || null,
+        backgroundInfo: values.backgroundInfo || undefined,
         authUid: authUid,
-      };
-
-      const fullStudentDataForFirestore: Omit<Student, 'id'> = {
-        ...studentDataToSave,
         remarks: [], 
         scholarships: [], 
-        backgroundInfo: "", 
       };
       
       const docRef = await addDoc(collection(firestore, STUDENTS_COLLECTION), fullStudentDataForFirestore);
@@ -109,17 +134,16 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       const newStudentForCallback: Student = {
         ...fullStudentDataForFirestore,
         id: docRef.id,
-        profilePictureUrl: fullStudentDataForFirestore.profilePictureUrl, 
       };
       onStudentAdded(newStudentForCallback); 
       
-      setGeneratedCredentials({ email: generatedEmail, password: generatedPassword });
+      setGeneratedCredentials({ email: generatedLoginEmail, password: generatedPassword });
       toast({
           title: "Student Added Successfully!",
           description: (
             <div>
               <p>{values.name} has been added to Firestore and an authentication account created.</p>
-              <p className="mt-2 font-semibold">Generated Email: {generatedEmail}</p>
+              <p className="mt-2 font-semibold">Generated Email: {generatedLoginEmail}</p>
               <p className="font-semibold">Default Password: {generatedPassword}</p>
               <p className="text-xs mt-1 text-destructive">Note: Advise student to change password on first login.</p>
             </div>
@@ -131,7 +155,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       console.error("Error adding student or creating auth user:", error);
       let errorMessage = "Could not add student. Please check console for details.";
       if (error.code === 'auth/email-already-in-use') {
-        errorMessage = `The email ${generatedEmail} is already in use. Please check the SATS number or contact an admin.`;
+        errorMessage = `The email ${generatedLoginEmail} is already in use. Please check the SATS number or contact an admin.`;
       } else if (error.code === 'auth/weak-password') {
         errorMessage = "The generated password is too weak. This is a system issue, please contact an admin.";
       } else if (error.message) {
@@ -155,7 +179,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
         }
         onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Student</DialogTitle>
           <DialogDescription>
@@ -163,122 +187,69 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 py-3 max-h-[70vh] overflow-y-auto pr-2">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Priya Sharma" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="satsNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>SATS Number (Alphanumeric)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. SAT00123" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 py-3 pr-2">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. Priya Sharma" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="satsNumber" render={({ field }) => (
+              <FormItem><FormLabel>SATS Number (Alphanumeric)</FormLabel><FormControl><Input placeholder="e.g. SAT00123" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+             <FormField control={form.control} name="email" render={({ field }) => (
+              <FormItem><FormLabel>Student Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="student@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
             <div className="grid grid-cols-2 gap-3">
-            <FormField
-              control={form.control}
-              name="class"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Class (e.g., 10th)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. 10th" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="section"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Section</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. A" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField control={form.control} name="class" render={({ field }) => (
+                <FormItem><FormLabel>Class (e.g., 10th)</FormLabel><FormControl><Input placeholder="e.g. 10th" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField control={form.control} name="section" render={({ field }) => (
+                <FormItem><FormLabel>Section</FormLabel><FormControl><Input placeholder="e.g. A" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
             </div>
-            <FormField
-              control={form.control}
-              name="caste"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Caste</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. General" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
+             <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
+              <FormItem><FormLabel>Date of Birth (Optional, YYYY-MM-DD)</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField control={form.control} name="caste" render={({ field }) => (
+                <FormItem><FormLabel>Caste</FormLabel><FormControl><Input placeholder="e.g. General" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField control={form.control} name="religion" render={({ field }) => (
+                <FormItem><FormLabel>Religion</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select religion" /></SelectTrigger></FormControl>
+                    <SelectContent>{religionOptions.map(option => (<SelectItem key={option} value={option}>{option}</SelectItem>))}</SelectContent>
+                  </Select><FormMessage />
                 </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="religion"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Religion</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select religion" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {religionOptions.map(option => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Address</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" disabled={isSubmitting}/>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="profilePictureUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Profile Picture URL (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://example.com/student.png" {...field} disabled={isSubmitting}/>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              )}/>
+            </div>
+            <FormField control={form.control} name="fatherName" render={({ field }) => (
+              <FormItem><FormLabel>Father's Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="fatherOccupation" render={({ field }) => (
+              <FormItem><FormLabel>Father's Occupation (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="motherName" render={({ field }) => (
+              <FormItem><FormLabel>Mother's Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="motherOccupation" render={({ field }) => (
+              <FormItem><FormLabel>Mother's Occupation (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="parentsAnnualIncome" render={({ field }) => (
+              <FormItem><FormLabel>Parents' Annual Income (Optional, INR)</FormLabel><FormControl><Input type="number" placeholder="e.g. 500000" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="parentContactNumber" render={({ field }) => (
+              <FormItem><FormLabel>Parent's Contact Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="+91..." {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="address" render={({ field }) => (
+              <FormItem><FormLabel>Address</FormLabel><FormControl><Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="siblingReference" render={({ field }) => (
+              <FormItem><FormLabel>Sibling Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., Sister: Ananya, Class 8B" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="profilePictureUrl" render={({ field }) => (
+              <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/student.png" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
+            <FormField control={form.control} name="backgroundInfo" render={({ field }) => (
+              <FormItem><FormLabel>Background Info (Optional)</FormLabel><FormControl><Textarea placeholder="Any additional notes or background..." {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
 
             {generatedCredentials && (
               <div className="mt-4 p-3 border border-green-500 bg-green-50 rounded-md text-sm">
@@ -301,9 +272,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
               </DialogClose>
               {!generatedCredentials && (
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
+                  {isSubmitting ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : null}
                   Add Student & Create Account
                 </Button>
               )}
