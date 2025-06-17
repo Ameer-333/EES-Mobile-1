@@ -75,6 +75,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
   async function onSubmit(values: AddStudentFormValues) {
     setIsSubmitting(true);
     try {
+      // Prepare base data ensuring all StudentFormData fields are included
       const studentDataToSave: Omit<Student, 'id' | 'remarks' | 'scholarships' | 'backgroundInfo'> & { profilePictureUrl: string | null } = {
         name: values.name,
         satsNumber: values.satsNumber,
@@ -83,27 +84,34 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
         caste: values.caste,
         religion: values.religion,
         address: values.address,
-        profilePictureUrl: values.profilePictureUrl || null, // Save null if empty string
-        authUid: values.authUid || undefined, // Omit if empty, or save as null if your type allows
+        profilePictureUrl: values.profilePictureUrl || null,
+        authUid: values.authUid || undefined,
       };
 
-      // Initialize optional fields for a new student document
-      const fullStudentDataForFirestore = {
+      // Initialize optional fields for a new student document for Firestore
+      const fullStudentDataForFirestore: Omit<Student, 'id'> = {
         ...studentDataToSave,
-        remarks: [], // Initialize as empty array
-        scholarships: [], // Initialize as empty array
-        backgroundInfo: "", // Initialize as empty string
+        remarks: [], 
+        scholarships: [], 
+        backgroundInfo: "", 
       };
       
       // Remove authUid from the object if it's undefined to avoid writing 'undefined' to Firestore
       if (fullStudentDataForFirestore.authUid === undefined) {
-        delete (fullStudentDataForFirestore as Partial<typeof fullStudentDataForFirestore>).authUid;
+        delete (fullStudentDataForFirestore as Partial<Omit<Student, 'id'>>).authUid;
       }
 
 
       const docRef = await addDoc(collection(firestore, STUDENTS_COLLECTION), fullStudentDataForFirestore);
       
-      onStudentAdded({ ...fullStudentDataForFirestore, id: docRef.id, profilePictureUrl: fullStudentDataForFirestore.profilePictureUrl ?? undefined }); 
+      // Construct the object for the callback, ensuring profilePictureUrl type matches Student
+      const newStudentForCallback: Student = {
+        ...fullStudentDataForFirestore,
+        id: docRef.id,
+        // profilePictureUrl will be string | null from fullStudentDataForFirestore, or undefined if it was not set and type allows it
+        profilePictureUrl: fullStudentDataForFirestore.profilePictureUrl, 
+      };
+      onStudentAdded(newStudentForCallback); 
       
       toast({
           title: "Student Added",

@@ -34,7 +34,7 @@ export interface Student {
   caste: string;
   religion: string;
   address: string;
-  profilePictureUrl?: string;
+  profilePictureUrl?: string | null; // Explicitly allow null
   remarks?: StudentRemark[];
   scholarships?: Scholarship[];
   backgroundInfo?: string;
@@ -107,7 +107,7 @@ export interface Teacher {
   yearOfJoining: number;
   totalYearsWorked?: number;
   subjectsTaught: SubjectName[];
-  profilePictureUrl?: string;
+  profilePictureUrl?: string | null; // Explicitly allow null
   salaryHistory?: TeacherSalaryRecord[];
   daysPresentThisMonth?: number;
   daysAbsentThisMonth?: number;
