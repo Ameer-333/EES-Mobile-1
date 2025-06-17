@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, LogOut, UserCircle, Award, Loader2 } from 'lucide-react';
+import { Menu, LogOut, UserCircle, Award, Loader2, SettingsIcon } from 'lucide-react';
 import { LogoIcon } from '@/components/icons/logo-icon';
 import { SidebarNav_Corrected as SidebarNav } from '@/components/shared/sidebar-nav';
 import {
@@ -28,7 +28,6 @@ import Image from 'next/image';
 const APP_SETTINGS_COLLECTION = 'app_settings';
 const GENERAL_SETTINGS_DOC_ID = 'general';
 
-// Simplified and more direct role extraction from pathname
 function getExpectedRoleFromPathname(pathname: string): UserRole | null {
   if (pathname.startsWith('/student/')) return 'Student';
   if (pathname.startsWith('/teacher/')) return 'Teacher';
@@ -58,7 +57,7 @@ function getDashboardTitle(pathname: string, actualRole: UserRole | null, appNam
     if (pathname === `/admin/analytics`) return `System Analytics`;
     if (pathname === `/admin/settings`) return `Admin Settings`;
     
-    if (pathname.startsWith(`/hall-of-fame`)) return `Excellent Hall of Fame`;
+    if (pathname.startsWith(`/hall-of-fame`)) return `EES Hall of Fame`;
 
     return actualRole ? `${actualRole} View` : appName;
 }
@@ -75,7 +74,7 @@ export default function ProtectedLayout({
 
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [userDisplayName, setUserDisplayName] = useState<string | null>(null); // For welcome message
+  const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentAppName, setCurrentAppName] = useState('EES Education');
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
@@ -112,15 +111,11 @@ export default function ProtectedLayout({
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
           const roleFromDb = userData.role as UserRole;
-          const nameFromDb = userData.name as string || user.displayName || user.email || null;
+          const nameFromDb = userData.name as string || user.displayName || user.email?.split('@')[0] || "User";
 
           if (roleFromDb && ['Admin', 'Teacher', 'Student'].includes(roleFromDb)) {
             setUserRole(roleFromDb);
-            if (roleFromDb === 'Student') {
-              setUserDisplayName(nameFromDb);
-            } else {
-              setUserDisplayName(null); // Clear for non-students
-            }
+            setUserDisplayName(nameFromDb); // Set display name for all roles
 
             const expectedRole = getExpectedRoleFromPathname(pathname);
 
@@ -135,8 +130,7 @@ export default function ProtectedLayout({
             } else if (!expectedRole && !pathname.startsWith('/hall-of-fame') && !pathname.startsWith('/login') && pathname !== '/') {
                toast({ title: "Page Not Found", description: `The page (${pathname}) you are trying to access is not valid for your role.`, variant: "destructive" });
                router.push('/');
-            }
-             else {
+            } else {
               setIsLoading(false);
             }
           } else {
@@ -165,7 +159,7 @@ export default function ProtectedLayout({
           setIsLoading(false); 
         }
       }
-       setTimeout(() => setIsLoading(false), 100); 
+       setTimeout(() => setIsLoading(false), 150); // Adjusted timeout slightly
     });
 
     return () => {
@@ -196,21 +190,20 @@ export default function ProtectedLayout({
   
   const pageTitle = getDashboardTitle(pathname, userRole, currentAppName);
 
-
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Verifying access...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Verifying access & loading application...</p>
       </div>
     );
   }
 
   if (!authUser && !pathname.startsWith('/login') && pathname !=='/') {
       return (
-        <div className="flex items-center justify-center min-h-screen">
-             <Loader2 className="h-12 w-12 animate-spin text-primary" />
-             <p className="ml-4 text-lg">Redirecting to login...</p>
+        <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+             <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+             <p className="text-lg text-muted-foreground">Redirecting to login...</p>
         </div>
       );
   }
@@ -219,89 +212,107 @@ export default function ProtectedLayout({
                            ( (getExpectedRoleFromPathname(pathname) === null && pathname.startsWith('/hall-of-fame')) || 
                              (getExpectedRoleFromPathname(pathname) === userRole) );
 
-
   return (
-    <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-      <div className="hidden border-r bg-muted/40 md:block">
+    <div className="grid min-h-screen w-full md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] bg-muted/30">
+      <div className="hidden border-r bg-sidebar text-sidebar-foreground md:block shadow-md">
         <div className="flex h-full max-h-screen flex-col gap-2">
-          <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-            <Link href={userRole ? `/${userRole.toLowerCase()}/dashboard` : "/"} className="flex items-center gap-2 font-semibold text-primary">
+          <div className="flex h-[60px] items-center border-b border-sidebar-border px-4 lg:px-6">
+            <Link href={userRole ? `/${userRole.toLowerCase()}/dashboard` : "/"} className="flex items-center gap-3 font-semibold text-primary">
               {currentLogoUrl ? (
-                 <Image src={currentLogoUrl} alt="Logo" width={24} height={24} className="object-contain rounded-sm" data-ai-hint="school logo custom small" onError={() => setCurrentLogoUrl(null)} />
+                 <Image src={currentLogoUrl} alt="Logo" width={32} height={32} className="object-contain rounded-md" data-ai-hint="school logo custom small" onError={() => setCurrentLogoUrl(null)} />
               ) : (
-                <LogoIcon className="h-6 w-6" />
+                <LogoIcon className="h-7 w-7 text-sidebar-primary" />
               )}
-              <span className="font-headline">{currentAppName}</span>
+              <span className="font-headline text-lg text-sidebar-primary">{currentAppName}</span>
             </Link>
           </div>
-          <div className="flex-1">
-            <nav className="grid items-start px-2 text-sm font-medium lg:px-4 py-4">
+          <div className="flex-1 py-4">
+            <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
               {authUser && userRole && <SidebarNav />}
             </nav>
+          </div>
+          <div className="mt-auto p-4 border-t border-sidebar-border">
+             <p className="text-xs text-sidebar-foreground/60 text-center">&copy; {new Date().getFullYear()} {currentAppName}</p>
           </div>
         </div>
       </div>
       <div className="flex flex-col">
-        <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
+        <header className="flex h-[60px] items-center gap-4 border-b bg-background px-4 lg:px-6 shadow-sm">
           <Sheet>
             <SheetTrigger asChild>
               <Button
                 variant="outline"
                 size="icon"
-                className="shrink-0 md:hidden"
+                className="shrink-0 md:hidden border-border/70 hover:bg-accent"
               >
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Toggle navigation menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex flex-col">
-              <nav className="grid gap-2 text-lg font-medium">
+            <SheetContent side="left" className="flex flex-col p-0 bg-sidebar text-sidebar-foreground">
+              <div className="flex h-[60px] items-center border-b border-sidebar-border px-4">
                 <Link
-                  href={userRole ? `/${userRole.toLowerCase()}/dashboard` : "/"}
-                  className="flex items-center gap-2 text-lg font-semibold mb-4 text-primary"
+                    href={userRole ? `/${userRole.toLowerCase()}/dashboard` : "/"}
+                    className="flex items-center gap-3 text-lg font-semibold text-sidebar-primary"
                 >
-                  {currentLogoUrl ? (
-                    <Image src={currentLogoUrl} alt="Logo" width={24} height={24} className="object-contain rounded-sm" data-ai-hint="school logo custom small" onError={() => setCurrentLogoUrl(null)} />
-                  ) : (
-                    <LogoIcon className="h-6 w-6" />
-                  )}
-                  <span className="sr-only">{currentAppName}</span>
+                    {currentLogoUrl ? (
+                        <Image src={currentLogoUrl} alt="Logo" width={28} height={28} className="object-contain rounded-md" data-ai-hint="school logo custom small" onError={() => setCurrentLogoUrl(null)} />
+                    ) : (
+                        <LogoIcon className="h-6 w-6" />
+                    )}
+                    <span className="font-headline">{currentAppName}</span>
                 </Link>
+              </div>
+              <nav className="grid gap-2 text-lg font-medium p-4">
                 {authUser && userRole && <SidebarNav />}
               </nav>
+               <div className="mt-auto p-4 border-t border-sidebar-border">
+                 <p className="text-xs text-sidebar-foreground/60 text-center">&copy; {new Date().getFullYear()} {currentAppName}</p>
+              </div>
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-            {userRole === 'Student' && userDisplayName && (
+            {userDisplayName && (
               <p className="text-sm text-muted-foreground">Hello, {userDisplayName}!</p>
             )}
-            <h1 className="font-semibold text-lg">{pageTitle}</h1>
+            <h1 className="font-semibold text-lg text-foreground">{pageTitle}</h1>
           </div>
           {authUser && userRole && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="secondary" size="icon" className="rounded-full">
-                  <Avatar>
+                <Button variant="ghost" size="icon" className="rounded-full w-10 h-10 hover:bg-accent">
+                  <Avatar className="h-9 w-9">
                     <AvatarImage src={authUser.photoURL || `https://placehold.co/40x40.png?text=${userRole?.charAt(0)}`} alt="User Avatar" data-ai-hint="user avatar generic"/>
-                    <AvatarFallback>{userRole?.charAt(0) || 'U'}</AvatarFallback>
+                    <AvatarFallback className="bg-muted text-muted-foreground">{userRole?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
                   </Avatar>
                   <span className="sr-only">Toggle user menu</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account ({userRole || 'User'})</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{userDisplayName || authUser.email}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {userRole}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {userRole && ['Student', 'Teacher'].includes(userRole) && (
-                  <DropdownMenuItem onClick={() => router.push(`/${userRole.toLowerCase()}/profile`)}>Profile</DropdownMenuItem>
+                {userRole && (userRole === 'Student' || userRole === 'Teacher') && (
+                  <DropdownMenuItem onClick={() => router.push(`/${userRole.toLowerCase()}/profile`)}>
+                    <UserCircle className="mr-2 h-4 w-4 text-muted-foreground" /> Profile
+                  </DropdownMenuItem>
                 )}
                  {userRole === 'Admin' && (
-                  <DropdownMenuItem onClick={() => router.push(`/admin/settings`)}>Settings</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push(`/admin/settings`)}>
+                     <SettingsIcon className="mr-2 h-4 w-4 text-muted-foreground" /> Settings
+                  </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => router.push(`/hall-of-fame`)}>
-                  <Award className="mr-2 h-4 w-4" /> Hall of Fame
+                  <Award className="mr-2 h-4 w-4 text-muted-foreground" /> Hall of Fame
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout
                 </DropdownMenuItem>
@@ -309,10 +320,24 @@ export default function ProtectedLayout({
             </DropdownMenu>
           )}
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-background overflow-auto">
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-8 bg-background rounded-tl-lg md:rounded-none overflow-auto shadow-inner-top-left">
           {!isLoading && canRenderChildren && children}
         </main>
       </div>
     </div>
   );
 }
+
+// Custom style for inner shadow on main content (optional, can be done via Tailwind if preferred)
+const GlobalStyles = () => (
+  <style jsx global>{`
+    .shadow-inner-top-left {
+      box-shadow: inset 2px 2px 5px rgba(0,0,0,0.03);
+    }
+    @media (max-width: 767px) {
+      .shadow-inner-top-left {
+        box-shadow: none;
+      }
+    }
+  `}</style>
+);

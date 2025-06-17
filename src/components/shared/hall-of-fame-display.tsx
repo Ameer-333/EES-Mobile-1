@@ -4,7 +4,7 @@
 import type { HallOfFameItem, UserRole } from '@/types';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Award, Briefcase, Building, Edit, Crown, Loader2 } from 'lucide-react';
+import { Award, Briefcase, Building, Edit, Crown, Loader2, Star } from 'lucide-react';
 import { Button } from '../ui/button';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
@@ -18,14 +18,18 @@ interface HallOfFameDisplayProps {
   currentRole?: UserRole | null;
 }
 
-const categoryIcons: Record<HallOfFameItem['category'] | 'Founders & Visionaries', React.ElementType> = {
+const categoryIcons: Record<HallOfFameItem['category'] | 'Founders & Visionaries' | 'Leadership' | 'School Accolades' | 'Founder Accolades' | 'Student Achievements', React.ElementType> = {
   'founder': Briefcase,
   'co-founder': Briefcase,
-  'principal': Briefcase,
+  'principal': Users, // Using Users for Leadership
   'school-award': Award,
-  'founder-award': Award,
+  'founder-award': Star, // Using Star for Founder Accolades
   'student-achievement': Crown,
   'Founders & Visionaries': Briefcase,
+  'Leadership': Users,
+  'School Accolades': Award,
+  'Founder Accolades': Star,
+  'Student Achievements': Crown,
 };
 
 const categoryTitles: Record<HallOfFameItem['category'], string> = {
@@ -44,7 +48,7 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
 
   useEffect(() => {
     setIsLoading(true);
-    const q = query(collection(firestore, HALL_OF_FAME_COLLECTION), orderBy("name")); // Basic ordering
+    const q = query(collection(firestore, HALL_OF_FAME_COLLECTION), orderBy("name")); 
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const fetchedItems: HallOfFameItem[] = [];
@@ -70,34 +74,41 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
   const otherItems = mainFounder ? items.filter(item => item.id !== mainFounder.id) : items;
 
   const groupedOtherItems = otherItems.reduce((acc, item) => {
-    const key = item.category;
-    if (!acc[key]) {
-      acc[key] = [];
+    const displayKey = categoryTitles[item.category] || item.category;
+    if (!acc[displayKey]) {
+      acc[displayKey] = [];
     }
-    acc[key].push(item);
+    acc[displayKey].push(item);
     return acc;
-  }, {} as Record<HallOfFameItem['category'], HallOfFameItem[]>);
+  }, {} as Record<string, HallOfFameItem[]>);
+  
+  const displayOrder: string[] = [
+    'Founders & Visionaries', 
+    'Leadership', 
+    'School Accolades', 
+    'Founder Accolades', 
+    'Student Achievements'
+  ];
 
-  const orderedCategories: HallOfFameItem['category'][] = ['founder', 'co-founder', 'principal', 'school-award', 'founder-award', 'student-achievement'];
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground">Loading Hall of Fame...</p>
+      <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-4">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="text-lg text-muted-foreground">Loading Hall of Fame...</p>
       </div>
     );
   }
 
   if (!isLoading && items.length === 0) {
      return (
-      <div className="text-center py-10">
-        <Building className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-        <h1 className="text-2xl font-semibold text-primary mb-2">Hall of Fame is Empty</h1>
-        <p className="text-muted-foreground mb-6">No entries have been added to the Hall of Fame yet.</p>
+      <div className="text-center py-16">
+        <Building className="mx-auto h-20 w-20 text-muted-foreground/70 mb-6" />
+        <h1 className="text-3xl font-semibold text-primary mb-3">Hall of Fame is Empty</h1>
+        <p className="text-lg text-muted-foreground mb-8 max-w-md mx-auto">No entries have been added yet. Check back soon to celebrate our school's legacy!</p>
         {currentRole === 'Admin' && (
-            <Button asChild>
-                <Link href="/admin/hall-of-fame-management"><Edit className="mr-2 h-4 w-4"/>Manage Hall of Fame</Link>
+            <Button asChild size="lg">
+                <Link href="/admin/hall-of-fame-management"><Edit className="mr-2 h-5 w-5"/>Manage Hall of Fame</Link>
             </Button>
         )}
       </div>
@@ -105,43 +116,46 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
   }
 
   return (
-    <div className="space-y-12">
-      <div className="text-center mb-12 pt-4">
-        <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary flex items-center justify-center">
-          <Building className="mr-3 h-10 w-10 md:h-12 md:w-12" /> EES Excellent Hall of Fame
+    <div className="space-y-12 md:space-y-16 py-8">
+      <div className="text-center mb-12 md:mb-16">
+        <Building className="mx-auto text-primary h-16 w-16 md:h-20 md:w-20 mb-4" />
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-headline font-extrabold text-foreground tracking-tight">
+          EES Excellent Hall of Fame
         </h1>
-        <p className="text-lg text-muted-foreground mt-2">Celebrating our legacy and achievements.</p>
+        <p className="text-lg md:text-xl text-muted-foreground mt-3 max-w-2xl mx-auto">
+          Celebrating the remarkable individuals, achievements, and milestones that define our legacy.
+        </p>
         {currentRole === 'Admin' && (
-            <Button asChild className="mt-6">
-                <Link href="/admin/hall-of-fame-management"><Edit className="mr-2 h-4 w-4"/>Manage Hall of Fame</Link>
+            <Button asChild size="lg" className="mt-8">
+                <Link href="/admin/hall-of-fame-management"><Edit className="mr-2 h-5 w-5"/>Manage Hall of Fame</Link>
             </Button>
         )}
       </div>
 
       {mainFounder && (
-        <section className="mb-16 p-6 md:p-10 bg-gradient-to-br from-primary/5 via-background to-accent/10 rounded-xl shadow-2xl border border-primary/20">
+        <section className="mb-16 md:mb-20 p-6 md:p-10 bg-gradient-to-br from-primary/5 via-background to-accent/10 rounded-xl shadow-2xl border border-primary/10">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
-            <div className="flex-shrink-0 w-full max-w-xs lg:max-w-sm lg:w-2/5 mx-auto">
-              <div className="relative aspect-square rounded-lg overflow-hidden shadow-xl border-4 border-primary/30">
+            <div className="flex-shrink-0 w-full max-w-sm lg:max-w-md lg:w-2/5 mx-auto">
+              <div className="relative aspect-square rounded-lg overflow-hidden shadow-xl border-4 border-primary/20 transform transition-transform duration-500 hover:scale-105">
                 <Image
                   src={mainFounder.imageUrl}
                   alt={mainFounder.name}
-                  fill // Use fill for responsive images with aspect ratio
+                  fill
                   sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  className="object-cover transform transition-transform duration-500 hover:scale-105"
+                  className="object-cover"
                   data-ai-hint={mainFounder.dataAiHint || "founder portrait"}
-                  priority // Prioritize loading for LCP element
+                  priority 
                 />
               </div>
             </div>
             <div className="lg:w-3/5 text-center lg:text-left">
-              <h2 className="text-4xl md:text-5xl font-headline font-extrabold text-primary mb-3 tracking-tight">
+              <h2 className="text-4xl md:text-5xl font-headline font-bold text-primary mb-3 tracking-tight">
                 {mainFounder.name}
               </h2>
               <p className="text-xl font-semibold text-muted-foreground mb-6">
                 {mainFounder.title || 'Founder & Visionary Leader'}
               </p>
-              <blockquote className="text-lg text-foreground/80 leading-relaxed border-l-4 border-accent pl-6 italic">
+              <blockquote className="text-lg text-foreground/90 leading-relaxed border-l-4 border-accent pl-6 italic">
                 {mainFounder.description && mainFounder.description.length > 50 ? mainFounder.description :
                 "With unwavering dedication and a pioneering spirit, " + mainFounder.name + " laid the foundation for EES Education, transforming a bold vision into a beacon of knowledge and excellence. Their tireless efforts continue to inspire generations, shaping futures and fostering a community where every student can achieve their highest potential."}
               </blockquote>
@@ -149,45 +163,21 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
           </div>
         </section>
       )}
+      
+      {displayOrder.map(groupTitle => {
+        const itemsInGroup = groupedOtherItems[groupTitle] || [];
+        if (itemsInGroup.length === 0) return null;
 
-      {orderedCategories.map(categoryKey => {
-        let itemsToDisplayThisCategory: HallOfFameItem[] = [];
-        let currentDisplayTitle = "";
-        let IconToUse: React.ElementType = Award;
-        let sectionKey = categoryKey;
-
-        if (categoryKey === 'founder') {
-          const otherFoundersList = groupedOtherItems['founder'] || [];
-          const coFoundersList = groupedOtherItems['co-founder'] || [];
-          itemsToDisplayThisCategory = [...otherFoundersList, ...coFoundersList];
-          currentDisplayTitle = "Founders & Visionaries";
-          IconToUse = categoryIcons['Founders & Visionaries'];
-          sectionKey = 'founders-visionaries';
-          if (itemsToDisplayThisCategory.length === 0) return null;
-        } else if (categoryKey === 'co-founder') {
-          if (groupedOtherItems['founder'] && groupedOtherItems['founder'].length > 0) {
-            return null;
-          }
-          itemsToDisplayThisCategory = groupedOtherItems['co-founder'] || [];
-          currentDisplayTitle = "Founders & Visionaries";
-          IconToUse = categoryIcons['Founders & Visionaries'];
-          sectionKey = 'co-founders-standalone';
-          if (itemsToDisplayThisCategory.length === 0) return null;
-        } else {
-          itemsToDisplayThisCategory = groupedOtherItems[categoryKey] || [];
-          currentDisplayTitle = categoryTitles[categoryKey] || categoryKey;
-          IconToUse = categoryIcons[categoryKey] || Award;
-          if (itemsToDisplayThisCategory.length === 0) return null;
-        }
+        const IconToUse = categoryIcons[groupTitle as keyof typeof categoryIcons] || Star;
 
         return (
-            <section key={sectionKey} className="mb-12">
-                <h2 className="text-3xl font-semibold text-primary mb-8 flex items-center border-b-2 border-primary/20 pb-3">
-                    {IconToUse && <IconToUse className="mr-3 h-7 w-7"/>} {currentDisplayTitle}
+            <section key={groupTitle} className="mb-12 md:mb-16">
+                <h2 className="text-3xl md:text-4xl font-semibold text-foreground mb-8 flex items-center border-b-2 border-primary/20 pb-4">
+                    <IconToUse className="mr-3 h-7 w-7 md:h-8 md:w-8 text-primary"/> {groupTitle}
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
-                    {itemsToDisplayThisCategory.map(item => (
-                        <Card key={item.id} className="overflow-hidden shadow-xl hover:shadow-2xl transition-shadow duration-300 ease-in-out flex flex-col group bg-card rounded-lg border border-border/50 hover:border-primary/30">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8 xl:gap-x-8 xl:gap-y-10">
+                    {itemsInGroup.map(item => (
+                        <Card key={item.id} className="card-hover-effect overflow-hidden flex flex-col group bg-card rounded-xl border border-border/60">
                             <div className="relative w-full h-60 md:h-64">
                                 <Image
                                     src={item.imageUrl}
@@ -197,15 +187,15 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
                                     className="object-cover transform transition-transform duration-300 group-hover:scale-105"
                                     data-ai-hint={item.dataAiHint || 'hall of fame image'}
                                 />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                             </div>
-                            <CardHeader className="flex-grow pb-2 pt-4 px-4">
-                                <CardTitle className="text-xl text-primary group-hover:text-primary/90 transition-colors">{item.name}</CardTitle>
+                            <CardHeader className="flex-grow pb-2 pt-5 px-5">
+                                <CardTitle className="text-xl font-bold text-primary group-hover:text-primary/90 transition-colors">{item.name}</CardTitle>
                                 {item.title && <CardDescription className="text-md text-muted-foreground">{item.title}</CardDescription>}
-                                {item.year && <CardDescription className="text-sm text-muted-foreground">Year: {item.year}</CardDescription>}
+                                {item.year && <CardDescription className="text-sm text-muted-foreground mt-1">Year: {item.year}</CardDescription>}
                             </CardHeader>
-                            <CardContent className="px-4 pb-4">
-                                <p className="text-sm text-foreground/80 line-clamp-3 group-hover:line-clamp-none transition-all">{item.description}</p>
+                            <CardContent className="px-5 pb-5">
+                                <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3 group-hover:line-clamp-none transition-all">{item.description}</p>
                             </CardContent>
                         </Card>
                     ))}

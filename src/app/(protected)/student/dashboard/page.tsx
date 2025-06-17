@@ -2,18 +2,16 @@
 'use client';
 
 import { StudentProfileCard } from '@/components/student/student-profile-card';
-// StudentRecords component is now focused on Marks, so its name is still appropriate here.
 import { StudentRecords } from '@/components/student/student-records';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Home, LogIn, BarChartHorizontalBig, CalendarCheck, Award as AwardIcon, CalendarClock } from 'lucide-react';
+import { Home, LogIn, BarChartHorizontalBig, CalendarCheck, Award as AwardIcon, CalendarClock, BookOpen, Edit3, Users, MessageSquareHeart } from 'lucide-react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
 import type { Student, StudentRemark, Scholarship, ReligionType, SubjectName } from '@/types';
+import { Separator } from '@/components/ui/separator';
 
-// Mock data - in a real app, this would be fetched from a central service or context
-// Updated mock data to include fields expected by the enhanced StudentProfileCard
 const mockStudentData: Student = {
   id: 'S12345',
   name: 'Ravi Kumar Sharma',
@@ -43,108 +41,104 @@ const mockStudentData: Student = {
   backgroundInfo: "Ravi comes from a supportive family background. His father is an engineer and his mother is a homemaker. He has one younger sibling. Ravi enjoys playing cricket and is an active member of the school's science club. He aspires to become a software developer."
 };
 
+interface ActionCardProps {
+  title: string;
+  description: string;
+  href: string;
+  icon: React.ElementType;
+}
+
+function ActionCard({ title, description, href, icon: Icon }: ActionCardProps) {
+  return (
+    <Card className="card-hover-effect flex flex-col group">
+      <CardHeader className="pb-3">
+        <div className="flex items-center space-x-3 mb-2">
+          <div className="p-2 bg-primary/10 text-primary rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <Icon className="h-6 w-6" />
+          </div>
+          <CardTitle className="text-lg font-semibold text-primary group-hover:text-primary/90">{title}</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="flex-grow">
+        <CardDescription className="text-sm leading-relaxed">{description}</CardDescription>
+      </CardContent>
+      <CardFooter>
+        <Button asChild variant="outline" className="w-full group-hover:border-primary group-hover:text-primary transition-colors">
+          <Link href={href}>View {title}</Link>
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
 
 export default function StudentDashboardPage() {
   const student = mockStudentData;
 
   return (
-    <div className="container mx-auto p-0 md:p-4 space-y-8">
-       <div className="flex justify-between items-center">
-         <h1 className="text-3xl font-headline font-bold">My Dashboard & Activities</h1>
+    <div className="container mx-auto p-0 md:p-2 space-y-8">
+       <div className="mb-8">
+         <h1 className="text-3xl md:text-4xl font-headline font-extrabold text-foreground tracking-tight">My Dashboard</h1>
+         <p className="text-lg text-muted-foreground">Overview of your academic journey and activities.</p>
        </div>
 
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-6">
-            {/* Simplified profile card for dashboard, full details on profile page */}
             <StudentProfileCard student={student} isFullPage={false} /> 
         </div>
-        <div className="lg:col-span-2 space-y-6">
-            <Card className="shadow-lg border-primary/10">
-                <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
-                        <CalendarCheck className="mr-2 h-6 w-6" /> Upcoming Events
-                    </CardTitle>
-                    <CardDescription>Discover school activities, holidays, and important dates.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Stay updated with all school events. Check the "Upcoming Events" section in the sidebar for details.
-                    </p>
-                    <Button asChild>
-                        <Link href="/student/events">
-                            Go to Upcoming Events
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
-             <Card className="shadow-lg border-primary/10">
-                <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
-                        <BarChartHorizontalBig className="mr-2 h-6 w-6" /> My Remarks
-                    </CardTitle>
-                    <CardDescription>View detailed feedback from your teachers.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Check the "My Remarks" section in the sidebar to see your progress and feedback.
-                    </p>
-                    <Button asChild>
-                        <Link href="/student/remarks">
-                            Go to My Remarks
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
-             <Card className="shadow-lg border-primary/10">
-                <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
-                        <CalendarClock className="mr-2 h-6 w-6" /> My Attendance
-                    </CardTitle>
-                    <CardDescription>Review your attendance records for all subjects.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Monitor your attendance in the "My Attendance" section.
-                    </p>
-                    <Button asChild>
-                        <Link href="/student/attendance">
-                            Go to My Attendance
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
-             <Card className="shadow-lg border-primary/10">
-                <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
-                        <AwardIcon className="mr-2 h-6 w-6" /> My Scholarships
-                    </CardTitle>
-                    <CardDescription>View details of scholarships you have received.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Explore your scholarship achievements in the dedicated "My Scholarships" section.
-                    </p>
-                    <Button asChild>
-                        <Link href="/student/scholarships">
-                            Go to My Scholarships
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
+        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <ActionCard 
+              title="Academic Records" 
+              description="View your exam marks and overall performance." 
+              href="/student/records" 
+              icon={BookOpen} 
+            />
+            <ActionCard 
+              title="My Attendance" 
+              description="Review your attendance records for all subjects." 
+              href="/student/attendance" 
+              icon={CalendarClock} 
+            />
+            <ActionCard 
+              title="My Remarks" 
+              description="View detailed feedback and remarks from your teachers." 
+              href="/student/remarks" 
+              icon={MessageSquareHeart} // Changed icon
+            />
+            <ActionCard 
+              title="Upcoming Events" 
+              description="Discover school activities, holidays, and important dates." 
+              href="/student/events" 
+              icon={CalendarCheck} 
+            />
+            <ActionCard 
+              title="My Scholarships" 
+              description="View details of scholarships you have received." 
+              href="/student/scholarships" 
+              icon={AwardIcon} 
+            />
         </div>
        </div>
+      
+      {student.backgroundInfo && (
+        <Card className="shadow-lg border-border/70 mt-8">
+           <CardHeader>
+                <CardTitle className="text-xl font-semibold text-primary">Student Background</CardTitle>
+           </CardHeader>
+           <CardContent>
+             <StudentBackgroundDisplay backgroundInfo={student.backgroundInfo} />
+           </CardContent>
+        </Card>
+      )}
 
-      <StudentRecords /> 
-      {student.backgroundInfo && <StudentBackgroundDisplay backgroundInfo={student.backgroundInfo} />}
 
-      <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-        <Button asChild variant="outline">
+      <div className="mt-10 pt-8 border-t border-border/70 flex flex-col sm:flex-row gap-4 justify-center">
+        <Button asChild variant="outline" className="hover:border-primary hover:text-primary">
           <Link href="/">
             <Home className="mr-2 h-4 w-4" />
             Back to Home
           </Link>
         </Button>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" className="hover:border-primary hover:text-primary">
           <Link href="/login/student">
             <LogIn className="mr-2 h-4 w-4" />
             Back to Login Page

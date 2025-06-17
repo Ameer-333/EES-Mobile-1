@@ -1,88 +1,88 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'PT Sans', Arial, Helvetica, sans-serif;
+  @apply antialiased;
 }
 
 @layer base {
   :root {
-    --background: 0 0% 100%; /* White (#FFFFFF) */
-    --foreground: 0 0% 3.9%; /* Default dark gray/black */
+    --background: 0 0% 100%; /* White */
+    --foreground: 240 10% 3.9%; /* Dark Gray */
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 240 10% 3.9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
+    --popover-foreground: 240 10% 3.9%;
 
-    --primary: 300 100% 25%; /* Medium purple (#800080) */
-    --primary-foreground: 0 0% 98%; /* Light color for contrast with primary */
+    --primary: 260 70% 50%; /* Refined Purple - slightly desaturated and modern */
+    --primary-foreground: 0 0% 98%; /* Light color for contrast */
 
-    --secondary: 240 4.8% 95.9%; /* Default light gray */
-    --secondary-foreground: 0 0% 9%; /* Default dark gray */
+    --secondary: 240 4.8% 95.9%; /* Light Gray */
+    --secondary-foreground: 240 5% 10%; /* Darker Gray */
 
     --muted: 240 4.8% 95.9%;
-    --muted-foreground: 0 0% 45.1%;
+    --muted-foreground: 240 3.8% 46.1%; /* Softer muted text */
 
-    --accent: 240 67% 94%; /* Lavender (#E6E6FA) */
-    --accent-foreground: 300 100% 25%; /* Medium purple for contrast with accent */
+    --accent: 260 70% 95%; /* Lighter, softer Lavender for accents */
+    --accent-foreground: 260 70% 45%; /* Primary color for text on accent */
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72.2% 50.6%; /* More vibrant red for destructive actions */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 300 100% 25%; /* Medium purple for rings */
+    --border: 240 5.9% 90%; /* Softer border */
+    --input: 240 5.9% 90%;
+    --ring: 260 70% 55%; /* Primary color for rings, slightly brighter for focus */
 
-    --radius: 0.5rem;
+    --radius: 0.6rem; /* Slightly increased radius for a softer look */
 
     /* Standard Chart Colors */
-    --chart-1: 12 76% 61%; /* Orange-Red */
-    --chart-2: 173 58% 39%; /* Green */
-    --chart-3: 197 37% 24%; /* Dark Blue */
-    --chart-4: 43 74% 66%; /* Yellow-Orange */
-    --chart-5: 27 87% 67%; /* Orange */
+    --chart-1: 12 76% 61%; 
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%; 
+    --chart-4: 43 74% 66%; 
+    --chart-5: 27 87% 67%; 
 
     /* Eye-catching Sentiment Colors for Donut Chart */
-    --chart-sentiment-good: 130 60% 50%; /* Vibrant Green */
-    --chart-sentiment-bad: 0 75% 58%;   /* Clear Red */
-    --chart-sentiment-neutral: 210 70% 60%; /* Distinct Blue */
+    --chart-sentiment-good: 130 60% 50%; 
+    --chart-sentiment-bad: 0 75% 58%;   
+    --chart-sentiment-neutral: 210 70% 60%;
 
-
-    /* Sidebar colors using defaults for structure, can be customized further if needed */
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 300 100% 25%; /* Active item color (Medium Purple) */
-    --sidebar-primary-foreground: 0 0% 98%; /* Text color for active item if background changes */
-    --sidebar-accent: 240 67% 94%; /* Hover item background (Lavender) */
-    --sidebar-accent-foreground: 300 100% 25%; /* Hover item text color (Medium Purple) */
-    --sidebar-border: 0 0% 89.8%;
-    --sidebar-ring: 300 100% 25%;
+    /* Sidebar colors */
+    --sidebar-background: 0 0% 98.5%; /* Slightly off-white */
+    --sidebar-foreground: 240 5% 25%;
+    --sidebar-primary: 260 70% 50%; 
+    --sidebar-primary-foreground: 0 0% 98%; 
+    --sidebar-accent: 260 70% 94%; 
+    --sidebar-accent-foreground: 260 70% 45%;
+    --sidebar-border: 240 5.9% 88%;
+    --sidebar-ring: 260 70% 55%;
   }
 
   .dark {
-    /* Define dark theme colors if necessary, for now, focusing on light theme */
-    --background: 0 0% 3.9%;
+    --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+    --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 300 100% 35%; /* Adjusted primary for dark mode */
+    --primary: 260 70% 55%; /* Brighter primary for dark mode */
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 14.9%;
+    --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 240 50% 80%; /* Adjusted accent for dark mode */
-    --accent-foreground: 300 100% 35%;
-    --destructive: 0 62.8% 30.6%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 260 70% 20%; /* Darker accent for dark mode */
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 40.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 300 100% 35%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 260 70% 60%;
     
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
@@ -90,19 +90,18 @@ body {
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
-    /* Eye-catching Sentiment Colors for Donut Chart - Dark Theme */
     --chart-sentiment-good: 130 55% 60%; 
     --chart-sentiment-bad: 0 70% 65%;   
     --chart-sentiment-neutral: 210 65% 70%;
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 300 100% 35%;
+    --sidebar-background: 240 4% 8%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 260 70% 55%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 50% 70%;
-    --sidebar-accent-foreground: 300 100% 35%;
+    --sidebar-accent: 260 70% 25%;
+    --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 300 100% 35%;
+    --sidebar-ring: 260 70% 60%;
   }
 }
 
@@ -112,5 +111,17 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::selection {
+    background-color: hsl(var(--primary) / 0.7);
+    color: hsl(var(--primary-foreground));
+  }
+}
+
+@layer components {
+  .card-hover-effect {
+    @apply transition-all duration-300 ease-in-out hover:shadow-xl hover:border-primary/30 hover:-translate-y-1;
   }
 }
