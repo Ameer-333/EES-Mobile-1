@@ -81,15 +81,19 @@ const mockExamRecordsInitial: ExamRecord[] = examNamesArray.map(examName => ({
 // Ensure SA2 has a specific scenario for testing "Detained"
 const sa2Index = mockExamRecordsInitial.findIndex(e => e.examName === 'SA2');
 if (sa2Index !== -1) {
-    mockExamRecordsInitial[sa2Index].subjectMarks = subjectNamesArray.map(subjectName => {
-        const maxMarks = 100;
-        let marks;
-        if (subjectName === 'Maths') marks = 30; // Fail
-        else if (subjectName === 'Science') marks = 34; // Fail
-        else if (subjectName === 'English') marks = 70; // Pass
-        else marks = Math.floor(Math.random() * 30) + 50; // Pass (50-79)
-        return { subjectName, marks, maxMarks };
-    });
+    // Check if all subjects are already passing (or at least >35) to avoid overwriting a good scenario
+    const sa2InitialCalc = calculateGradeAndOverallPercentage(mockExamRecordsInitial[sa2Index].subjectMarks);
+    if (sa2InitialCalc.failingSubjects.length < 2) { // Only modify if it's not already a clear fail in multiple subjects
+        mockExamRecordsInitial[sa2Index].subjectMarks = subjectNamesArray.map(subjectName => {
+            const maxMarks = 100;
+            let marks;
+            if (subjectName === 'Maths') marks = 30; // Fail
+            else if (subjectName === 'Science') marks = 34; // Fail
+            else if (subjectName === 'English') marks = 70; // Pass
+            else marks = Math.floor(Math.random() * 30) + 50; // Pass (50-79)
+            return { subjectName, marks, maxMarks };
+        });
+    }
 }
 
 
@@ -322,3 +326,5 @@ export function StudentRecords({ examRecords = mockExamRecordsInitial }: Student
   );
 }
       
+
+    
