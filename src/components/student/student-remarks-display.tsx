@@ -5,9 +5,9 @@ import type { StudentRemark } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquareText, Smile, Frown, Meh, BookOpen, CalendarDays, BarChart3, Info } from 'lucide-react';
+import { MessageSquareText, Smile, Frown, Meh, BookOpen, CalendarDays, BarChart3, Info, PieChartIcon } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, LabelList } from "recharts";
 import { useMemo } from 'react';
 
 // Mock data for demonstration - in a real app, this would be fetched
@@ -25,9 +25,9 @@ interface StudentRemarksDisplayProps {
 }
 
 const sentimentDetails = {
-  good: { icon: Smile, color: 'text-green-500', fill: 'hsl(var(--chart-2))', label: 'Good' },
-  bad: { icon: Frown, color: 'text-red-500', fill: 'hsl(var(--chart-1))', label: 'Needs Improvement' },
-  neutral: { icon: Meh, color: 'text-yellow-500', fill: 'hsl(var(--chart-3))', label: 'Neutral' },
+  good: { icon: Smile, color: 'text-green-500', fill: 'hsl(var(--chart-sentiment-good))', label: 'Good' },
+  bad: { icon: Frown, color: 'text-red-500', fill: 'hsl(var(--chart-sentiment-bad))', label: 'Needs Improvement' },
+  neutral: { icon: Meh, color: 'text-yellow-500', fill: 'hsl(var(--chart-sentiment-neutral))', label: 'Neutral' },
 };
 
 const chartConfig = {
@@ -39,22 +39,19 @@ const chartConfig = {
 
 export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksDisplayProps) {
 
-  const remarksChartData = useMemo(() => {
+  const remarksSentimentData = useMemo(() => {
     if (!remarks || remarks.length === 0) return [];
     
-    const remarksByMonth: Record<string, { good: number; bad: number; neutral: number }> = {};
-
+    const sentimentCounts = { good: 0, bad: 0, neutral: 0 };
     remarks.forEach(remark => {
-      const monthYear = remark.date.substring(0, 7); // YYYY-MM
-      if (!remarksByMonth[monthYear]) {
-        remarksByMonth[monthYear] = { good: 0, bad: 0, neutral: 0 };
-      }
-      remarksByMonth[monthYear][remark.sentiment]++;
+      sentimentCounts[remark.sentiment]++;
     });
 
-    return Object.entries(remarksByMonth)
-      .map(([month, counts]) => ({ month, ...counts }))
-      .sort((a, b) => a.month.localeCompare(b.month));
+    return Object.entries(sentimentCounts).map(([key, value]) => ({
+      name: key as 'good' | 'bad' | 'neutral',
+      value: value,
+      fill: sentimentDetails[key as 'good' | 'bad' | 'neutral'].fill,
+    })).filter(item => item.value > 0); // Only include sentiments with actual remarks
   }, [remarks]);
 
 
@@ -75,63 +72,67 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
       </Card>
     );
   }
+  
+  const totalRemarks = remarksSentimentData.reduce((acc, curr) => acc + curr.value, 0);
 
   return (
     <div className="space-y-8">
       <Card className="shadow-xl border-primary/10 rounded-lg">
         <CardHeader>
           <CardTitle className="text-2xl font-headline text-primary flex items-center">
-            <BarChart3 className="mr-3 h-7 w-7" /> Remarks Sentiment Trend
+            <PieChartIcon className="mr-3 h-7 w-7" /> Remarks Sentiment Overview
           </CardTitle>
-          <CardDescription>Monthly breakdown of feedback sentiment.</CardDescription>
+          <CardDescription>Overall distribution of feedback sentiment.</CardDescription>
         </CardHeader>
         <CardContent>
-          {remarksChartData.length > 0 ? (
-            <ChartContainer config={chartConfig} className="h-[350px] w-full">
+          {remarksSentimentData.length > 0 ? (
+            <ChartContainer config={chartConfig} className="h-[350px] w-full aspect-square max-w-md mx-auto">
               <ResponsiveContainer width="100%" height="100%">
-                <RechartsBarChart 
-                  data={remarksChartData} 
-                  margin={{ top: 20, right: 20, left: -10, bottom: 5 }}
-                  barGap={4} // Space between bars of different categories (good, bad, neutral) for the same month
-                  barCategoryGap="20%" // Space between groups of bars (each month)
-                >
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="month" 
-                    tickLine={false} 
-                    axisLine={false} 
-                    tickMargin={10}
-                    tickFormatter={(value) => {
-                      const date = new Date(value + "-02"); 
-                      return date.toLocaleString('default', { month: 'short', year: '2-digit' });
-                    }}
-                  />
-                  <YAxis tickLine={false} axisLine={false} allowDecimals={false} width={30}/>
-                  <ChartTooltip 
-                    cursor={{fill: 'hsl(var(--accent))', radius: 4}}
+                <RechartsPieChart>
+                  <ChartTooltip
+                    cursor={{ fill: 'hsl(var(--accent))', radius: 4 }}
                     content={<ChartTooltipContent 
-                        formatter={(value, name, props) => {
-                             if (value === 0) return null; 
-                             return (
-                                <div className="flex items-center">
-                                   <span className="mr-2 h-2.5 w-2.5 rounded-full" style={{backgroundColor: chartConfig[name as keyof typeof chartConfig]?.color}} />
-                                   {chartConfig[name as keyof typeof chartConfig]?.label}: {value}
-                                </div>
-                             );
-                        }}
-                    />} 
+                        nameKey="name" 
+                        formatter={(value, name) => (
+                            <div className="flex items-center">
+                               <span className="mr-2 h-2.5 w-2.5 rounded-full" style={{backgroundColor: chartConfig[name as keyof typeof chartConfig]?.color}} />
+                               {chartConfig[name as keyof typeof chartConfig]?.label}: {value} ({( (value / totalRemarks) * 100 ).toFixed(1)}%)
+                            </div>
+                        )}
+                    />}
                   />
-                  <ChartLegend content={<ChartLegendContent />} />
-                  <Bar dataKey="good" fill="var(--color-good)" radius={[4, 4, 0, 0]} barSize={20}>
-                    <LabelList dataKey="good" position="top" offset={5} fontSize={10} formatter={(value: number) => value > 0 ? value : ''} />
-                  </Bar>
-                  <Bar dataKey="bad" fill="var(--color-bad)" radius={[4, 4, 0, 0]} barSize={20}>
-                    <LabelList dataKey="bad" position="top" offset={5} fontSize={10} formatter={(value: number) => value > 0 ? value : ''} />
-                  </Bar>
-                  <Bar dataKey="neutral" fill="var(--color-neutral)" radius={[4, 4, 0, 0]} barSize={20}>
-                    <LabelList dataKey="neutral" position="top" offset={5} fontSize={10} formatter={(value: number) => value > 0 ? value : ''} />
-                  </Bar>
-                </RechartsBarChart>
+                  <Pie
+                    data={remarksSentimentData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={120}
+                    innerRadius={70} // This makes it a Donut chart
+                    paddingAngle={2}
+                    labelLine={false}
+                  >
+                    {remarksSentimentData.map((entry) => (
+                      <Cell key={`cell-${entry.name}`} fill={entry.fill} stroke={entry.fill} />
+                    ))}
+                     <LabelList
+                        dataKey="value"
+                        position="outside"
+                        offset={15}
+                        formatter={(value: number, entry: any) => {
+                           const percentage = ((value / totalRemarks) * 100).toFixed(0);
+                           if (parseInt(percentage) < 5) return null; // Hide small percentage labels to avoid clutter
+                           return `${chartConfig[entry.payload.name as keyof typeof chartConfig]?.label}: ${percentage}%`;
+                        }}
+                        className="fill-foreground text-xs"
+                        stroke="none"
+                     />
+                  </Pie>
+                  <ChartLegend 
+                    content={<ChartLegendContent nameKey="name" className="mt-4" />} 
+                    wrapperStyle={{paddingTop: '20px'}}
+                  />
+                </RechartsPieChart>
               </ResponsiveContainer>
             </ChartContainer>
           ) : (
