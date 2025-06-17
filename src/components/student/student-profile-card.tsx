@@ -1,6 +1,7 @@
+
 import type { Student } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { User, MapPin, BookUser, Users, Landmark, Church } from 'lucide-react'; // Added more icons
+import { User, MapPin, BookUser, Users, Landmark, Church } from 'lucide-react'; 
 import { cn } from '@/lib/utils';
 
 interface StudentProfileCardProps {
@@ -15,7 +16,7 @@ const mockStudent: Student = {
   class: '10th Grade',
   section: 'A',
   caste: 'General',
-  religion: 'Hinduism',
+  religion: 'Hindu', // Updated mock data
   address: '123 Main Street, Bangalore, Karnataka',
 };
 

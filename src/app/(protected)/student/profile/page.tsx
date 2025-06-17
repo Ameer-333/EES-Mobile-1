@@ -6,7 +6,7 @@ import { StudentRemarksDisplay } from '@/components/student/student-remarks-disp
 import { UpcomingEventsDisplay } from '@/components/student/upcoming-events-display';
 import { ScholarshipInfoDisplay } from '@/components/student/scholarship-info-display';
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
-import type { Student, StudentRemark, UpcomingEvent, Scholarship } from '@/types';
+import type { Student, StudentRemark, UpcomingEvent, Scholarship, ReligionType } from '@/types';
 
 // Mock data - in a real app, this would be fetched
 const mockStudentData: Student = {
@@ -16,9 +16,9 @@ const mockStudentData: Student = {
   class: '10th Grade',
   section: 'A',
   caste: 'General',
-  religion: 'Hinduism',
+  religion: 'Hindu' as ReligionType,
   address: '123 Main Street, Bangalore, Karnataka',
-  profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RK', // Added mock URL
+  profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RK', 
   remarks: [
     { id: 'r1', source: 'teacher', authorName: 'Ms. Priya Sharma', remark: 'Ravi has shown excellent improvement in English grammar this term. Keep up the great work!', date: '2024-05-15' },
     { id: 'r2', source: 'parent', authorName: 'Mr. Kumar (Parent)', remark: 'We are very happy with Ravi\'s progress. He is enjoying his science projects.', date: '2024-05-20' },

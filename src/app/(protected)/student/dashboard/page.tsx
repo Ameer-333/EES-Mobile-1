@@ -12,7 +12,7 @@ import { StudentRemarksDisplay } from '@/components/student/student-remarks-disp
 import { UpcomingEventsDisplay } from '@/components/student/upcoming-events-display';
 import { ScholarshipInfoDisplay } from '@/components/student/scholarship-info-display';
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
-import type { Student, StudentRemark, UpcomingEvent, Scholarship } from '@/types';
+import type { Student, StudentRemark, UpcomingEvent, Scholarship, ReligionType } from '@/types';
 
 // Mock data - in a real app, this would be fetched from a central service or context
 const mockStudentData: Student = {
@@ -22,7 +22,7 @@ const mockStudentData: Student = {
   class: '10th Grade',
   section: 'A',
   caste: 'General',
-  religion: 'Hinduism',
+  religion: 'Hindu' as ReligionType,
   address: '123 Main Street, Bangalore, Karnataka',
   profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RK',
   remarks: [

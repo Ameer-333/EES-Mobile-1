@@ -25,6 +25,9 @@ export interface Scholarship {
   details?: string;
 }
 
+export type ReligionType = 'Hindu' | 'Muslim' | 'Christian' | 'Other';
+export const religionOptions: ReligionType[] = ['Hindu', 'Muslim', 'Christian', 'Other'];
+
 export interface Student {
   id: string; // This will often be the Firestore document ID
   name: string;
@@ -32,9 +35,9 @@ export interface Student {
   class: string;
   section: string;
   caste: string;
-  religion: string;
+  religion: ReligionType;
   address: string;
-  profilePictureUrl?: string | null; // Explicitly allow null
+  profilePictureUrl?: string | null;
   remarks?: StudentRemark[];
   scholarships?: Scholarship[];
   backgroundInfo?: string;
@@ -82,7 +85,7 @@ export interface StudentFormData {
   class: string;
   section: string;
   caste: string;
-  religion: string;
+  religion: ReligionType;
   address: string;
   profilePictureUrl?: string;
   authUid?: string; // Added here as well if linking during creation
@@ -107,7 +110,7 @@ export interface Teacher {
   yearOfJoining: number;
   totalYearsWorked?: number;
   subjectsTaught: SubjectName[];
-  profilePictureUrl?: string | null; // Explicitly allow null
+  profilePictureUrl?: string | null;
   salaryHistory?: TeacherSalaryRecord[];
   daysPresentThisMonth?: number;
   daysAbsentThisMonth?: number;

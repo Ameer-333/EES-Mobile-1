@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Student, StudentFormData } from '@/types';
+import type { Student, ReligionType } from '@/types';
+import { religionOptions } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,10 +27,11 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { firestore } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore'; // Changed updateDoc to setDoc for merge behavior
+import { doc, setDoc } from 'firebase/firestore'; 
 
 const STUDENTS_COLLECTION = 'students';
 
@@ -39,7 +41,7 @@ const editStudentSchema = z.object({
   class: z.string().min(1, { message: 'Class is required.' }),
   section: z.string().min(1, { message: 'Section is required (e.g., A, B).' }).max(2),
   caste: z.string().min(1, { message: 'Caste is required.' }),
-  religion: z.string().min(1, { message: 'Religion is required.' }),
+  religion: z.custom<ReligionType>(val => religionOptions.includes(val as ReligionType), 'Religion is required.'),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
   profilePictureUrl: z.string().url({ message: "Invalid URL format. Please enter a full URL (e.g., https://example.com/image.png)" }).optional().or(z.literal('')),
 });
@@ -49,7 +51,7 @@ type EditStudentFormValues = z.infer<typeof editStudentSchema>;
 interface EditStudentDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onStudentEdited: (editedStudent: Student) => void; // Kept for dialog closure
+  onStudentEdited: (editedStudent: Student) => void; 
   studentToEdit: Student | null;
 }
 
@@ -85,17 +87,15 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
       
       const studentDataToUpdate: Partial<Student> = {
         ...values,
-        profilePictureUrl: values.profilePictureUrl || null, // Save null if empty string
+        profilePictureUrl: values.profilePictureUrl || null,
       };
 
       await setDoc(studentDocRef, studentDataToUpdate, { merge: true });
       
-      // Construct a representation of the edited student for the callback
-      // This ensures that the parent component gets data consistent with what was saved
       const updatedStudentForCallback: Student = {
-        ...studentToEdit, // Start with existing data
-        ...studentDataToUpdate, // Override with updated fields
-        profilePictureUrl: studentDataToUpdate.profilePictureUrl ?? undefined, // Ensure type consistency
+        ...studentToEdit, 
+        ...studentDataToUpdate, 
+        profilePictureUrl: studentDataToUpdate.profilePictureUrl ?? undefined, 
       };
       onStudentEdited(updatedStudentForCallback);
 
@@ -205,9 +205,18 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Religion</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Hinduism" {...field} disabled={isSubmitting} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select religion" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {religionOptions.map(option => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

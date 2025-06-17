@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Student } from '@/types';
+import type { Student, ReligionType } from '@/types';
+import { religionOptions } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,22 +27,22 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Info } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { firestore, auth as firebaseAuth } from '@/lib/firebase'; // Import firebaseAuth
+import { firestore, auth as firebaseAuth } from '@/lib/firebase'; 
 import { collection, addDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth'; // Import createUserWithEmailAndPassword
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 const STUDENTS_COLLECTION = 'students';
 
-// Schema no longer includes authUid as it's auto-generated
 const addStudentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   satsNumber: z.string().min(3, { message: 'SATS number must be at least 3 characters.' }).regex(/^[a-zA-Z0-9]+$/, "SATS number should be alphanumeric."),
   class: z.string().min(1, { message: 'Class is required.' }),
   section: z.string().min(1, { message: 'Section is required (e.g., A, B).' }).max(2),
   caste: z.string().min(1, { message: 'Caste is required.' }),
-  religion: z.string().min(1, { message: 'Religion is required.' }),
+  religion: z.custom<ReligionType>(val => religionOptions.includes(val as ReligionType), 'Religion is required.'),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
   profilePictureUrl: z.string().url({ message: "Invalid URL format. Please enter a full URL (e.g., https://example.com/image.png)" }).optional().or(z.literal('')),
 });
@@ -67,7 +68,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       class: '',
       section: '',
       caste: '',
-      religion: '',
+      religion: 'Hindu', // Default to one of the options
       address: '',
       profilePictureUrl: '',
     },
@@ -78,14 +79,12 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     setGeneratedCredentials(null);
 
     const generatedEmail = `${values.satsNumber.toUpperCase()}@ees-student.com`;
-    const generatedPassword = `${values.satsNumber.toUpperCase()}Default@123`; // Not secure for production
+    const generatedPassword = `${values.satsNumber.toUpperCase()}Default@123`; 
 
     try {
-      // 1. Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, generatedEmail, generatedPassword);
       const authUid = userCredential.user.uid;
-
-      // 2. Prepare student data for Firestore, including the new authUid
+      
       const studentDataToSave: Omit<Student, 'id' | 'remarks' | 'scholarships' | 'backgroundInfo'> & { profilePictureUrl: string | null, authUid: string } = {
         name: values.name,
         satsNumber: values.satsNumber,
@@ -95,7 +94,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
         religion: values.religion,
         address: values.address,
         profilePictureUrl: values.profilePictureUrl || null,
-        authUid: authUid, // Add the authUid
+        authUid: authUid,
       };
 
       const fullStudentDataForFirestore: Omit<Student, 'id'> = {
@@ -105,7 +104,6 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
         backgroundInfo: "", 
       };
       
-      // 3. Add student profile to Firestore
       const docRef = await addDoc(collection(firestore, STUDENTS_COLLECTION), fullStudentDataForFirestore);
       
       const newStudentForCallback: Student = {
@@ -126,10 +124,9 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
               <p className="text-xs mt-1 text-destructive">Note: Advise student to change password on first login.</p>
             </div>
           ),
-          duration: 15000, // Longer duration to see credentials
+          duration: 15000, 
       });
       form.reset();
-      // onOpenChange(false); // Keep dialog open to show credentials if desired, or close
     } catch (error: any) {
       console.error("Error adding student or creating auth user:", error);
       let errorMessage = "Could not add student. Please check console for details.";
@@ -154,7 +151,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     <Dialog open={isOpen} onOpenChange={(open) => {
         if (!open) {
           form.reset();
-          setGeneratedCredentials(null); // Reset credentials when dialog closes
+          setGeneratedCredentials(null); 
         }
         onOpenChange(open);
     }}>
@@ -234,15 +231,24 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                 </FormItem>
               )}
             />
-            <FormField
+             <FormField
               control={form.control}
               name="religion"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Religion</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Hinduism" {...field} disabled={isSubmitting} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select religion" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {religionOptions.map(option => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
