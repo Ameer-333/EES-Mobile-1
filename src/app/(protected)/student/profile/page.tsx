@@ -3,28 +3,35 @@
 
 import { StudentProfileCard } from '@/components/student/student-profile-card';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import Image from 'next/image';
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
 import type { Student, Scholarship, ReligionType, SubjectName } from '@/types';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { BarChartHorizontalBig, CalendarCheck, Award as AwardIcon, CalendarClock } from 'lucide-react';
+import { BarChartHorizontalBig, CalendarCheck, Award as AwardIcon, CalendarClock, UserCircle2 } from 'lucide-react';
 
-// Mock data - in a real app, this would be fetched
+// Mock data - updated with new fields
 const mockStudentData: Student = {
   id: 'S12345',
-  name: 'Ravi Kumar',
+  name: 'Ravi Kumar Sharma',
   satsNumber: 'SAT00123',
   class: '10th Grade',
   section: 'A',
-  caste: 'General',
+  dateOfBirth: '2008-07-15',
+  fatherName: 'Rajesh Kumar Sharma',
+  motherName: 'Sunita Sharma',
+  fatherOccupation: 'Software Engineer',
+  motherOccupation: 'Teacher',
+  parentsAnnualIncome: 1200000,
+  parentContactNumber: '+91 9876543210',
+  email: 'ravi.sharma.student@ees.ac.in',
+  caste: 'Brahmin',
   religion: 'Hindu' as ReligionType,
-  address: '123 Main Street, Bangalore, Karnataka',
-  profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RK', 
+  address: '123, Vidyanagar, Silicon City, Bangalore, Karnataka - 560001',
+  siblingReference: 'Sister: Priya Sharma, Class 8B',
+  profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RS', 
   remarks: [
     { id: 'r1', teacherName: 'Ms. Priya Sharma', teacherSubject: 'English' as SubjectName, remark: 'Ravi has shown excellent improvement in English grammar this term. Keep up the great work!', date: '2024-05-15', sentiment: 'good' },
     { id: 'r2', teacherName: 'Mr. Anand Singh', teacherSubject: 'Maths' as SubjectName, remark: 'Needs to focus more during math class to grasp complex concepts.', date: '2024-05-10', sentiment: 'bad' },
-    { id: 'r3', teacherName: 'Ms. Kavita Rao', teacherSubject: 'Science' as SubjectName, remark: 'Submitted a well-researched project on renewable energy.', date: '2024-04-20', sentiment: 'good' },
   ],
   scholarships: [
     { id: 's1', organisationName: 'National Talent Search Examination (NTSE)', amount: 1250, yearReceived: 2023, details: 'Awarded for academic excellence at the national level.' },
@@ -38,43 +45,34 @@ export default function StudentProfilePage() {
 
   return (
     <div className="container mx-auto p-0 md:p-4 space-y-8">
-       <div className="flex justify-between items-center">
-         <h1 className="text-3xl font-headline font-bold">My Profile & Activities</h1>
-       </div>
+       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-primary/20 pb-4">
+        <h1 className="text-3xl md:text-4xl font-headline font-bold text-primary flex items-center">
+          <UserCircle2 className="mr-3 h-8 w-8 md:h-10 md:w-10" /> My Complete Profile
+        </h1>
+        <p className="text-muted-foreground mt-2 sm:mt-0 text-sm sm:text-base">
+          Your comprehensive student information.
+        </p>
+      </div>
 
-       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 space-y-6">
-            <Card className="shadow-lg border-primary/10">
-                <CardHeader className="items-center text-center p-4 bg-primary/5 rounded-t-lg">
-                    <Image 
-                        src={student.profilePictureUrl || `https://placehold.co/150x150.png?text=${student.name.charAt(0)}`} 
-                        alt={`${student.name}'s Profile Picture`}
-                        width={120} 
-                        height={120} 
-                        className="rounded-full border-4 border-primary/50 shadow-md"
-                        data-ai-hint="student portrait" 
-                    />
-                </CardHeader>
-                <CardContent className="text-center p-4">
-                    <CardTitle className="text-xl font-headline text-primary mt-2">{student.name}</CardTitle>
-                    <p className="text-muted-foreground">{student.class} - Section {student.section}</p>
-                </CardContent>
-            </Card>
-            <StudentProfileCard student={student} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Profile Card - takes up more space on larger screens */}
+        <div className="lg:col-span-2">
+            <StudentProfileCard student={student} isFullPage={true} />
         </div>
-        <div className="lg:col-span-2 space-y-6">
+
+        {/* Sidebar for other links */}
+        <div className="lg:col-span-1 space-y-6">
             <Card className="shadow-lg border-primary/10">
                 <CardHeader>
                     <CardTitle className="text-xl font-semibold text-primary flex items-center">
                         <CalendarCheck className="mr-2 h-6 w-6" /> View Upcoming Events
                     </CardTitle>
-                    <CardDescription>Explore all school events, holidays, and important dates.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-muted-foreground mb-4">
-                        For a detailed view of all upcoming school activities, please visit the dedicated "Upcoming Events" page from the sidebar.
+                        Explore all school events, holidays, and important dates.
                     </p>
-                    <Button asChild>
+                    <Button asChild className="w-full">
                         <Link href="/student/events">
                             Go to Upcoming Events
                         </Link>
@@ -86,13 +84,12 @@ export default function StudentProfilePage() {
                     <CardTitle className="text-xl font-semibold text-primary flex items-center">
                         <BarChartHorizontalBig className="mr-2 h-6 w-6" /> View My Remarks
                     </CardTitle>
-                    <CardDescription>Access all feedback and observations from your teachers.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-muted-foreground mb-4">
-                        For a detailed view of your remarks, please visit the dedicated "My Remarks" page from the sidebar.
+                        Access all feedback and observations from your teachers.
                     </p>
-                    <Button asChild>
+                    <Button asChild className="w-full">
                         <Link href="/student/remarks">
                             Go to My Remarks
                         </Link>
@@ -104,13 +101,12 @@ export default function StudentProfilePage() {
                     <CardTitle className="text-xl font-semibold text-primary flex items-center">
                         <CalendarClock className="mr-2 h-6 w-6" /> View My Attendance
                     </CardTitle>
-                    <CardDescription>Review your attendance records for all subjects.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-muted-foreground mb-4">
-                        For a detailed breakdown of your attendance, please visit the "My Attendance" page.
+                        Review your attendance records for all subjects.
                     </p>
-                    <Button asChild>
+                    <Button asChild className="w-full">
                         <Link href="/student/attendance">
                             Go to My Attendance
                         </Link>
@@ -122,13 +118,12 @@ export default function StudentProfilePage() {
                     <CardTitle className="text-xl font-semibold text-primary flex items-center">
                         <AwardIcon className="mr-2 h-6 w-6" /> View My Scholarships
                     </CardTitle>
-                    <CardDescription>Review all scholarships you have been awarded.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-muted-foreground mb-4">
-                        For a detailed list of your scholarships, please visit the dedicated "My Scholarships" page from the sidebar.
+                        Review all scholarships you have been awarded.
                     </p>
-                    <Button asChild>
+                    <Button asChild className="w-full">
                         <Link href="/student/scholarships">
                             Go to My Scholarships
                         </Link>
@@ -137,7 +132,7 @@ export default function StudentProfilePage() {
             </Card>
         </div>
        </div>
-      <StudentBackgroundDisplay backgroundInfo={student.backgroundInfo} />
+      {student.backgroundInfo && <StudentBackgroundDisplay backgroundInfo={student.backgroundInfo} />}
     </div>
   );
 }

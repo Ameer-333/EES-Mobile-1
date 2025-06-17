@@ -13,16 +13,26 @@ import { StudentBackgroundDisplay } from '@/components/student/student-backgroun
 import type { Student, StudentRemark, Scholarship, ReligionType, SubjectName } from '@/types';
 
 // Mock data - in a real app, this would be fetched from a central service or context
+// Updated mock data to include fields expected by the enhanced StudentProfileCard
 const mockStudentData: Student = {
   id: 'S12345',
-  name: 'Ravi Kumar',
+  name: 'Ravi Kumar Sharma',
   satsNumber: 'SAT00123',
   class: '10th Grade',
   section: 'A',
-  caste: 'General',
+  dateOfBirth: '2008-07-15',
+  fatherName: 'Rajesh Kumar Sharma',
+  motherName: 'Sunita Sharma',
+  fatherOccupation: 'Software Engineer',
+  motherOccupation: 'Teacher',
+  parentsAnnualIncome: 1200000,
+  parentContactNumber: '+91 9876543210',
+  email: 'ravi.sharma.student@ees.ac.in',
+  caste: 'Brahmin',
   religion: 'Hindu' as ReligionType,
-  address: '123 Main Street, Bangalore, Karnataka',
-  profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RK',
+  address: '123, Vidyanagar, Silicon City, Bangalore, Karnataka - 560001',
+  siblingReference: 'Sister: Priya Sharma, Class 8B',
+  profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RS',
   remarks: [ 
     { id: 'r1', teacherName: 'Ms. Priya Sharma', teacherSubject: 'English' as SubjectName, remark: 'Ravi has shown excellent improvement in English grammar this term. Keep up the great work!', date: '2024-05-15', sentiment: 'good' },
     { id: 'r2', teacherName: 'Mr. Anand Singh', teacherSubject: 'Maths' as SubjectName, remark: 'Needs to focus more during math class to grasp complex concepts.', date: '2024-05-10', sentiment: 'bad' },
@@ -45,23 +55,8 @@ export default function StudentDashboardPage() {
 
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-6">
-            <Card className="shadow-lg border-primary/10">
-                <CardHeader className="items-center text-center p-4 bg-primary/5 rounded-t-lg">
-                    <Image 
-                        src={student.profilePictureUrl || `https://placehold.co/150x150.png?text=${student.name ? student.name.charAt(0) : 'S'}`} 
-                        alt={`${student.name || 'Student'}'s Profile Picture`}
-                        width={120} 
-                        height={120} 
-                        className="rounded-full border-4 border-primary/50 shadow-md"
-                        data-ai-hint="student portrait" 
-                    />
-                </CardHeader>
-                <CardContent className="text-center p-4">
-                    <CardTitle className="text-xl font-headline text-primary mt-2">{student.name}</CardTitle>
-                    <p className="text-muted-foreground">{student.class} - Section {student.section}</p>
-                </CardContent>
-            </Card>
-            <StudentProfileCard student={student} /> 
+            {/* Simplified profile card for dashboard, full details on profile page */}
+            <StudentProfileCard student={student} isFullPage={false} /> 
         </div>
         <div className="lg:col-span-2 space-y-6">
             <Card className="shadow-lg border-primary/10">
@@ -140,7 +135,7 @@ export default function StudentDashboardPage() {
        </div>
 
       <StudentRecords /> 
-      <StudentBackgroundDisplay backgroundInfo={student.backgroundInfo} />
+      {student.backgroundInfo && <StudentBackgroundDisplay backgroundInfo={student.backgroundInfo} />}
 
       <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
         <Button asChild variant="outline">

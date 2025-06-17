@@ -28,8 +28,8 @@ export interface Scholarship {
   details?: string;
 }
 
-export type ReligionType = 'Hindu' | 'Muslim' | 'Christian' | 'Other';
-export const religionOptions: ReligionType[] = ['Hindu', 'Muslim', 'Christian', 'Other'];
+export type ReligionType = 'Hindu' | 'Muslim' | 'Christian' | 'Sikh' | 'Jain' | 'Buddhist' | 'Other';
+export const religionOptions: ReligionType[] = ['Hindu', 'Muslim', 'Christian', 'Sikh', 'Jain', 'Buddhist', 'Other'];
 
 export interface Student {
   id: string; 
@@ -37,9 +37,18 @@ export interface Student {
   satsNumber: string;
   class: string;
   section: string;
+  dateOfBirth?: string; // YYYY-MM-DD
+  fatherName?: string;
+  motherName?: string;
+  fatherOccupation?: string;
+  motherOccupation?: string;
+  parentsAnnualIncome?: number; // Store as number, format for display
+  parentContactNumber?: string;
+  email?: string;
   caste: string;
   religion: ReligionType;
   address: string;
+  siblingReference?: string; // e.g., "Sister: Ananya, Class 8B"
   profilePictureUrl?: string | null;
   remarks?: StudentRemark[];
   scholarships?: Scholarship[];
@@ -99,6 +108,16 @@ export interface StudentFormData {
   address: string;
   profilePictureUrl?: string;
   authUid?: string; 
+  // Add new fields for data entry if needed
+  dateOfBirth?: string;
+  fatherName?: string;
+  motherName?: string;
+  fatherOccupation?: string;
+  motherOccupation?: string;
+  parentsAnnualIncome?: number;
+  parentContactNumber?: string;
+  email?: string;
+  siblingReference?: string;
 }
 
 export interface TeacherSalaryRecord {
