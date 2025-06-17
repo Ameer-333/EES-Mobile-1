@@ -221,4 +221,3 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
     </div>
   );
 }
-
