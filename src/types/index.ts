@@ -1,10 +1,11 @@
 
 export interface StudentRemark {
   id: string;
-  source: 'teacher' | 'parent';
-  authorName: string; // e.g., "Ms. Priya Sharma" or "Mr. Anand Kumar (Parent)"
+  teacherName: string; // Renamed from authorName for clarity
+  teacherSubject: SubjectName;
   remark: string;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (can be extended to ISO string if time is critical)
+  sentiment: 'good' | 'bad' | 'neutral';
 }
 
 export interface UpcomingEvent {

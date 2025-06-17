@@ -6,7 +6,7 @@ import { StudentRemarksDisplay } from '@/components/student/student-remarks-disp
 import { UpcomingEventsDisplay } from '@/components/student/upcoming-events-display';
 import { ScholarshipInfoDisplay } from '@/components/student/scholarship-info-display';
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
-import type { Student, StudentRemark, UpcomingEvent, Scholarship, ReligionType } from '@/types';
+import type { Student, StudentRemark, UpcomingEvent, Scholarship, ReligionType, SubjectName } from '@/types';
 
 // Mock data - in a real app, this would be fetched
 const mockStudentData: Student = {
@@ -20,8 +20,9 @@ const mockStudentData: Student = {
   address: '123 Main Street, Bangalore, Karnataka',
   profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RK', 
   remarks: [
-    { id: 'r1', source: 'teacher', authorName: 'Ms. Priya Sharma', remark: 'Ravi has shown excellent improvement in English grammar this term. Keep up the great work!', date: '2024-05-15' },
-    { id: 'r2', source: 'parent', authorName: 'Mr. Kumar (Parent)', remark: 'We are very happy with Ravi\'s progress. He is enjoying his science projects.', date: '2024-05-20' },
+    { id: 'r1', teacherName: 'Ms. Priya Sharma', teacherSubject: 'English' as SubjectName, remark: 'Ravi has shown excellent improvement in English grammar this term. Keep up the great work!', date: '2024-05-15', sentiment: 'good' },
+    { id: 'r2', teacherName: 'Mr. Anand Singh', teacherSubject: 'Maths' as SubjectName, remark: 'Needs to focus more during math class to grasp complex concepts.', date: '2024-05-10', sentiment: 'bad' },
+    { id: 'r3', teacherName: 'Ms. Kavita Rao', teacherSubject: 'Science' as SubjectName, remark: 'Submitted a well-researched project on renewable energy.', date: '2024-04-20', sentiment: 'good' },
   ],
   scholarships: [
     { id: 's1', organisationName: 'National Talent Search Examination (NTSE)', amount: 1250, yearReceived: 2023, details: 'Awarded for academic excellence at the national level.' },
@@ -48,18 +49,18 @@ export default function StudentProfilePage() {
 
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-6">
-            <Card className="shadow-lg">
-                <CardHeader className="items-center text-center">
+            <Card className="shadow-lg border-primary/10">
+                <CardHeader className="items-center text-center p-4 bg-primary/5 rounded-t-lg">
                     <Image 
                         src={student.profilePictureUrl || `https://placehold.co/150x150.png?text=${student.name.charAt(0)}`} 
                         alt={`${student.name}'s Profile Picture`}
-                        width={150} 
-                        height={150} 
-                        className="rounded-full border-4 border-primary shadow-md"
+                        width={120} 
+                        height={120} 
+                        className="rounded-full border-4 border-primary/50 shadow-md"
                         data-ai-hint="student portrait" 
                     />
                 </CardHeader>
-                <CardContent className="text-center">
+                <CardContent className="text-center p-4">
                     <CardTitle className="text-xl font-headline text-primary mt-2">{student.name}</CardTitle>
                     <p className="text-muted-foreground">{student.class} - Section {student.section}</p>
                 </CardContent>
