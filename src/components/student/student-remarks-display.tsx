@@ -119,10 +119,11 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
                         dataKey="value"
                         position="outside"
                         offset={15}
-                        formatter={(value: number, entry: any) => {
+                        formatter={(value: number, entry: any) => { // 'entry' here is the data object from remarksSentimentData
+                           if (!entry || !entry.name) return null; // Defensive check
                            const percentage = ((value / totalRemarks) * 100).toFixed(0);
                            if (parseInt(percentage) < 5) return null; // Hide small percentage labels to avoid clutter
-                           return `${chartConfig[entry.payload.name as keyof typeof chartConfig]?.label}: ${percentage}%`;
+                           return `${chartConfig[entry.name as keyof typeof chartConfig]?.label}: ${percentage}%`;
                         }}
                         className="fill-foreground text-xs"
                         stroke="none"
