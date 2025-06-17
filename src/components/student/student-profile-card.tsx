@@ -1,7 +1,7 @@
 
 import type { Student } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { User, MapPin, BookUser, Users, Landmark, Church, Cake, Briefcase, భారతీయ రూపాయిల గుర్తు, Phone, Mail, UsersRound, Edit3 } from 'lucide-react'; 
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { User, MapPin, BookUser, Users, Landmark, Church, Cake, Briefcase, Phone, Mail, UsersRound, Edit3, Banknote } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 
@@ -41,7 +41,7 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
     if (amount === undefined || amount === null) return 'N/A';
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(amount);
   };
-  
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     try {
@@ -83,7 +83,7 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent className="p-6 space-y-6">
         {/* Personal Details */}
         <Section title="Personal Details" icon={User} isFullPage={isFullPage}>
@@ -99,7 +99,7 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
           <ProfileItem icon={Briefcase} label="Father's Occupation" value={student.fatherOccupation} />
           <ProfileItem icon={User} label="Mother's Name" value={student.motherName} />
           <ProfileItem icon={Briefcase} label="Mother's Occupation" value={student.motherOccupation} />
-          {isFullPage && <ProfileItem icon={Landmark} label="Parents' Annual Income" value={formatCurrency(student.parentsAnnualIncome)} className="md:col-span-2" />}
+          {isFullPage && <ProfileItem icon={Banknote} label="Parents' Annual Income" value={formatCurrency(student.parentsAnnualIncome)} className="md:col-span-2" />}
         </Section>
 
         {/* Contact Details */}
@@ -107,13 +107,13 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
           {isFullPage && student.parentContactNumber && <ProfileItem icon={Phone} label="Parent's Contact" value={student.parentContactNumber}/>}
           <ProfileItem icon={MapPin} label="Address" value={student.address} className="md:col-span-2" />
         </Section>
-        
+
         {isFullPage && student.siblingReference && (
             <Section title="School Reference" icon={BookUser} isFullPage={isFullPage}>
                 <ProfileItem icon={Users} label="Sibling in School" value={student.siblingReference} className="md:col-span-2"/>
             </Section>
         )}
-        
+
         {!isFullPage && ( // Show minimal info for dashboard
             <div className="mt-4 pt-4 border-t border-muted/30">
                  <ProfileItem icon={MapPin} label="Address" value={student.address} className="text-sm"/>
@@ -139,7 +139,7 @@ interface SectionProps {
 
 function Section({ title, icon: Icon, children, isFullPage }: SectionProps) {
   if (!isFullPage && (title === "Family Information" || title === "School Reference")) return null;
-  
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-primary/90 flex items-center border-b border-primary/10 pb-2 mb-3">
@@ -181,20 +181,4 @@ const Button = ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonEle
     )}>
         {children}
     </button>
-);
-
-// Indian Rupee icon (if Lucide doesn't have one suitable)
-const LandmarkRupeeIcon = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("lucide lucide-landmark", className)}>
-    <line x1="3" x2="21" y1="22" y2="22" />
-    <line x1="6" x2="6" y1="18" y2="11" />
-    <line x1="10" x2="10" y1="18" y2="11" />
-    <line x1="14" x2="14" y1="18" y2="11" />
-    <line x1="18" x2="18" y1="18" y2="11" />
-    <polygon points="12 2 20 7 4 7" />
-    {/* Rupee part - simplified */}
-    <path d="M6 10c0-1.1.9-2 2-2h1.5c1.93 0 3.5 1.57 3.5 3.5S11.43 15 9.5 15H6Z" />
-    <path d="M7 12h2.5" />
-    <path d="M7 12L11 8" />
-  </svg>
 );
