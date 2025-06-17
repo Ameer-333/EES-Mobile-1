@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BookCheck, BarChart3, TrendingUp, Layers, Percent, CheckCircle, XCircle, Award, TrendingDown, CircleSlash } from 'lucide-react';
+import { BookCheck, BarChart3, TrendingUp, Layers, Percent, CheckCircle, XCircle, Award, TrendingDown, CircleSlash, ChevronsRight, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
@@ -16,13 +16,26 @@ import { cn } from "@/lib/utils";
 const generateExamMarks = (examName: ExamName): ExamRecord => {
   const marks: SubjectMarks[] = subjectNamesArray.map(subject => ({
     subjectName: subject,
-    marks: Math.floor(Math.random() * (95 - 25 + 1)) + 25, // Random marks between 25 and 95 for variety
+    marks: Math.floor(Math.random() * (95 - (examName === 'SA2' ? 20 : 25) + 1)) + (examName === 'SA2' ? 20 : 25), // Random marks, ensure SA2 can fail
     maxMarks: 100,
   }));
   return { examName, subjectMarks: marks };
 };
 
 const mockExamRecords: ExamRecord[] = examNamesArray.map(examName => generateExamMarks(examName));
+// Ensure at least one student fails SA2 for testing "Detained"
+if (mockExamRecords.find(e => e.examName === 'SA2')) {
+  const sa2Index = mockExamRecords.findIndex(e => e.examName === 'SA2');
+  if (sa2Index !== -1 && mockExamRecords[sa2Index].subjectMarks.length > 0) {
+     // Forcing a fail in one subject for SA2 for demonstration if all subjects are passing by chance
+    let sa2Record = mockExamRecords[sa2Index];
+    const { grade } = calculateGradeAndOverallPercentage(sa2Record.subjectMarks);
+    if (grade !== 'Not Completed') { // if SA2 is not already failing, force one subject to fail
+        sa2Record.subjectMarks[0].marks = 20; // Fail the first subject
+    }
+  }
+}
+
 
 const chartConfig = {
   marks: { label: "Marks Obtained", color: "hsl(var(--chart-1))" },
@@ -42,21 +55,25 @@ export const calculateGradeAndOverallPercentage = (subjectMarks: SubjectMarks[])
     }
   }
 
-  if (failingSubjects.length > 0) {
-    return { grade: 'Not Completed', overallPercentage: totalMaxMarks > 0 ? (totalMarksObtained / totalMaxMarks) * 100 : 0, failingSubjects };
+  if (totalMaxMarks === 0 && subjectMarks.length > 0) { // If there are subjects but no max marks, it's problematic
+    return { grade: 'Not Completed', overallPercentage: 0, failingSubjects: subjectMarks.map(s => s.subjectName) };
+  }
+  if (totalMaxMarks === 0) { // No subjects or no max marks for any subject
+    return { grade: 'Not Completed', overallPercentage: 0, failingSubjects };
   }
 
-  if (totalMaxMarks === 0) {
-    return { grade: 'Not Completed', overallPercentage: 0, failingSubjects }; // Or some other appropriate grade for no marks
-  }
 
   const overallPercentage = (totalMarksObtained / totalMaxMarks) * 100;
+
+  if (failingSubjects.length > 0) {
+    return { grade: 'Not Completed', overallPercentage, failingSubjects };
+  }
 
   if (overallPercentage >= 85) return { grade: 'Distinction', overallPercentage, failingSubjects };
   if (overallPercentage >= 60) return { grade: 'First Class', overallPercentage, failingSubjects };
   if (overallPercentage >= 50) return { grade: 'Second Class', overallPercentage, failingSubjects };
   if (overallPercentage >= 35) return { grade: 'Pass Class', overallPercentage, failingSubjects };
-  return { grade: 'Not Completed', overallPercentage, failingSubjects };
+  return { grade: 'Not Completed', overallPercentage, failingSubjects }; // Should be caught by failingSubjects check
 };
 
 const gradeStyles: Record<GradeType, { color: string; icon: React.ElementType; badgeVariant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -95,6 +112,29 @@ export function StudentRecords({ examRecords = mockExamRecords }: StudentRecords
   }
   
   const overallAverageChartData = overallAverageMarks.map(s => ({ name: s.subjectName, averageMarks: s.averageMarks }));
+
+  const sa2Record = examRecords.find(er => er.examName === 'SA2');
+  let sa2Grade: GradeType | null = null;
+  let sa2FailingSubjects: SubjectName[] = [];
+  let promotionStatus: "Promoted to Next Class" | "Detained" | "Pending SA2 Results" = "Pending SA2 Results";
+  let promotionStatusIcon: React.ElementType = ShieldAlert;
+  let promotionStatusColor = "text-yellow-600";
+
+  if (sa2Record) {
+    const { grade, failingSubjects } = calculateGradeAndOverallPercentage(sa2Record.subjectMarks);
+    sa2Grade = grade;
+    sa2FailingSubjects = failingSubjects;
+    if (grade === 'Not Completed') {
+      promotionStatus = "Detained";
+      promotionStatusIcon = ShieldAlert;
+      promotionStatusColor = "text-red-600";
+    } else {
+      promotionStatus = "Promoted to Next Class";
+      promotionStatusIcon = ShieldCheck;
+      promotionStatusColor = "text-green-600";
+    }
+  }
+
 
   if (!examRecords || examRecords.length === 0) {
     return (
@@ -171,6 +211,35 @@ export function StudentRecords({ examRecords = mockExamRecords }: StudentRecords
           </Card>
         );
       })}
+
+      {sa2Record && sa2Grade && (
+        <Card className="w-full shadow-2xl rounded-lg border-primary/20 bg-gradient-to-br from-accent/10 via-background to-background">
+           <CardHeader className="rounded-t-lg">
+            <CardTitle className="text-2xl font-headline text-primary flex items-center">
+              <ChevronsRight className="mr-3 h-7 w-7" /> Final Result & Promotion Status (Based on SA2)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 text-center space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">SA2 Exam Grade:</p>
+               <Badge variant={gradeStyles[sa2Grade].badgeVariant} className={cn("text-xl px-4 py-2", gradeStyles[sa2Grade].color.replace('text-','bg-').replace('-600', '-100').replace('-400', '-900/20'), gradeStyles[sa2Grade].color )}>
+                  <gradeStyles[sa2Grade].icon className="mr-2 h-6 w-6" /> {sa2Grade}
+               </Badge>
+            </div>
+             {sa2Grade === 'Not Completed' && sa2FailingSubjects.length > 0 && (
+                <p className="text-sm text-destructive">
+                  Reason for "Not Completed" in SA2: Failed in {sa2FailingSubjects.join(', ')}.
+                </p>
+            )}
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Promotion Status:</p>
+              <div className={cn("text-2xl font-bold flex items-center justify-center", promotionStatusColor)}>
+                <promotionStatusIcon className="mr-2 h-7 w-7" /> {promotionStatus}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {overallAverageMarks.length > 0 && (
         <Card className="w-full shadow-2xl rounded-lg border-primary/20 bg-gradient-to-br from-primary/10 via-background to-accent/5">
@@ -264,3 +333,4 @@ function MarksTable({ marks, examName, failingSubjects }: MarksTableProps) {
     </div>
   );
 }
+
