@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart, MessageSquarePlus, Mail, Award, MessageCircle, Building } from 'lucide-react';
+import { Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart, MessageSquarePlus, Mail, Award, MessageCircle, Building, BarChartHorizontalBig } from 'lucide-react';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -20,6 +20,7 @@ const navItems: NavItem[] = [
   { href: '/student/dashboard', label: 'Dashboard', icon: Home, roles: ['Student'] },
   { href: '/student/profile', label: 'Profile & Activities', icon: User, roles: ['Student'] },
   { href: '/student/records', label: 'Academic Records', icon: BookOpen, roles: ['Student'] },
+  { href: '/student/remarks', label: 'My Remarks', icon: BarChartHorizontalBig, roles: ['Student'] },
   { href: '/hall-of-fame', label: 'Hall of Fame', icon: Award, roles: ['Student'] },
   
   // Teacher
@@ -28,7 +29,6 @@ const navItems: NavItem[] = [
   { href: '/teacher/data-entry', label: 'Student Data Entry', icon: Edit, roles: ['Teacher'] },
   { href: '/teacher/give-remark', label: 'Give Student Remarks', icon: MessageSquarePlus, roles: ['Teacher'] },
   { href: '/teacher/messaging', label: 'Send Messages', icon: Mail, roles: ['Teacher'] },
-  // { href: '/teacher/feedback', label: 'AI Feedback Gen', icon: MessageCircle, roles: ['Teacher']}, // Removed
   { href: '/teacher/profile', label: 'My Profile & Salary', icon: User, roles: ['Teacher'] },
   { href: '/hall-of-fame', label: 'Hall of Fame', icon: Award, roles: ['Teacher'] },
 
@@ -124,4 +124,3 @@ export function SidebarNav_Corrected() {
     </nav>
   );
 }
-

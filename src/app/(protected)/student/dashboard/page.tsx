@@ -5,10 +5,10 @@ import { StudentProfileCard } from '@/components/student/student-profile-card';
 import { StudentRecords } from '@/components/student/student-records';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Home, LogIn } from 'lucide-react';
+import { Home, LogIn, BarChartHorizontalBig } from 'lucide-react';
 import Image from 'next/image';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StudentRemarksDisplay } from '@/components/student/student-remarks-display';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+// import { StudentRemarksDisplay } from '@/components/student/student-remarks-display'; // Removed direct display
 import { UpcomingEventsDisplay } from '@/components/student/upcoming-events-display';
 import { ScholarshipInfoDisplay } from '@/components/student/scholarship-info-display';
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
@@ -25,11 +25,9 @@ const mockStudentData: Student = {
   religion: 'Hindu' as ReligionType,
   address: '123 Main Street, Bangalore, Karnataka',
   profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RK',
-  remarks: [
+  remarks: [ // Remarks data is still here for other components that might need it, but not displayed directly
     { id: 'r1', teacherName: 'Ms. Priya Sharma', teacherSubject: 'English' as SubjectName, remark: 'Ravi has shown excellent improvement in English grammar this term. Keep up the great work!', date: '2024-05-15', sentiment: 'good' },
     { id: 'r2', teacherName: 'Mr. Anand Singh', teacherSubject: 'Maths' as SubjectName, remark: 'Needs to focus more during math class to grasp complex concepts.', date: '2024-05-10', sentiment: 'bad' },
-    { id: 'r3', teacherName: 'Ms. Kavita Rao', teacherSubject: 'Science' as SubjectName, remark: 'Submitted a well-researched project on renewable energy.', date: '2024-04-20', sentiment: 'good' },
-    { id: 'r4', teacherName: 'Ms. Priya Sharma', teacherSubject: 'English' as SubjectName, remark: 'Participation in class discussions is satisfactory.', date: '2024-04-25', sentiment: 'neutral' },
   ],
   scholarships: [
     { id: 's1', organisationName: 'National Talent Search Examination (NTSE)', amount: 1250, yearReceived: 2023, details: 'Awarded for academic excellence at the national level.' },
@@ -44,7 +42,6 @@ const mockUpcomingEventsData: UpcomingEvent[] = [
 
 
 export default function StudentDashboardPage() {
-  // In a real app, student data and events would be fetched here or from context
   const student = mockStudentData;
   const upcomingEvents = mockUpcomingEventsData;
 
@@ -75,8 +72,26 @@ export default function StudentDashboardPage() {
             <StudentProfileCard student={student} /> 
         </div>
         <div className="lg:col-span-2 space-y-6">
-            <StudentRemarksDisplay remarks={student.remarks} />
+            {/* StudentRemarksDisplay removed from here */}
             <UpcomingEventsDisplay events={upcomingEvents} />
+             <Card className="shadow-lg border-primary/10">
+                <CardHeader>
+                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
+                        <BarChartHorizontalBig className="mr-2 h-6 w-6" /> My Remarks
+                    </CardTitle>
+                    <CardDescription>View detailed feedback from your teachers.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Check the "My Remarks" section in the sidebar to see your progress and feedback.
+                    </p>
+                    <Button asChild>
+                        <Link href="/student/remarks">
+                            Go to My Remarks
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
         </div>
        </div>
 

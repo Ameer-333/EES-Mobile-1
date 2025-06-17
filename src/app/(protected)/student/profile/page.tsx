@@ -1,12 +1,17 @@
 
+'use client';
+
 import { StudentProfileCard } from '@/components/student/student-profile-card';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Image from 'next/image';
-import { StudentRemarksDisplay } from '@/components/student/student-remarks-display';
+// import { StudentRemarksDisplay } from '@/components/student/student-remarks-display'; // Removed
 import { UpcomingEventsDisplay } from '@/components/student/upcoming-events-display';
 import { ScholarshipInfoDisplay } from '@/components/student/scholarship-info-display';
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
 import type { Student, StudentRemark, UpcomingEvent, Scholarship, ReligionType, SubjectName } from '@/types';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { BarChartHorizontalBig } from 'lucide-react';
 
 // Mock data - in a real app, this would be fetched
 const mockStudentData: Student = {
@@ -37,7 +42,6 @@ const mockUpcomingEventsData: UpcomingEvent[] = [
 
 
 export default function StudentProfilePage() {
-  // In a real app, student data and events would be fetched here
   const student = mockStudentData;
   const upcomingEvents = mockUpcomingEventsData;
 
@@ -68,8 +72,26 @@ export default function StudentProfilePage() {
             <StudentProfileCard student={student} />
         </div>
         <div className="lg:col-span-2 space-y-6">
-            <StudentRemarksDisplay remarks={student.remarks} />
+            {/* StudentRemarksDisplay removed from here */}
             <UpcomingEventsDisplay events={upcomingEvents} />
+             <Card className="shadow-lg border-primary/10">
+                <CardHeader>
+                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
+                        <BarChartHorizontalBig className="mr-2 h-6 w-6" /> View My Remarks
+                    </CardTitle>
+                    <CardDescription>Access all feedback and observations from your teachers.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        For a detailed view of your remarks, please visit the dedicated "My Remarks" page from the sidebar.
+                    </p>
+                    <Button asChild>
+                        <Link href="/student/remarks">
+                            Go to My Remarks
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
         </div>
        </div>
 
