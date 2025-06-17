@@ -10,18 +10,13 @@ service cloud.firestore {
     }
 
     function getUserRole(userId) {
-      // Path to the user's document in the 'users' collection.
-      // Using (default) explicitly for the database ID.
-      // Ensure userId is valid before path construction.
       if (userId == null || userId == "") {
         return null;
       }
-      let userDocumentPath = /databases/(default)/documents/users/$(userId);
-      let userDocument = get(userDocumentPath);
-
-      // Check if the document exists and has a 'role' field.
-      if (userDocument.data == null || !('role' in userDocument.data)) {
-        return null; // Role cannot be determined
+      // Explicitly use '(default)' for the database ID
+      let userDocument = get(/databases/(default)/documents/users/$(userId));
+      if (userDocument == null || userDocument.data == null || !('role' in userDocument.data)) {
+        return null;
       }
       return userDocument.data.role;
     }
@@ -41,51 +36,53 @@ service cloud.firestore {
       return role != null && role == 'Student';
     }
 
-    // Rule for accessing student's own data based on 'authUid' field in student document
-    function isOwnerOfStudentData(studentId) {
-      let studentDoc = get(/databases/(default)/documents/students/$(studentId));
-      return studentDoc.data != null && studentDoc.data.authUid == request.auth.uid;
+    // Rule to check if the requester is the owner of a student document
+    // (assuming student document has an 'authUid' field storing the student's Firebase Auth UID)
+    function isOwnerOfStudentData(studentDocId) {
+      let studentDoc = get(/databases/(default)/documents/students/$(studentDocId));
+      return studentDoc != null && studentDoc.data != null && ('authUid'in studentDoc.data) && studentDoc.data.authUid == request.auth.uid;
     }
 
-    // Rule for accessing teacher's own data (document ID is auth UID)
-    function isOwnerOfTeacherData(teacherId) {
-      return request.auth.uid == teacherId;
+     // Rule to check if the requester is the owner of a teacher document
+    function isOwnerOfTeacherData(teacherDocId) {
+        // Teachers manage their own profile, so check their own UID against the document ID
+        return request.auth.uid == teacherDocId;
     }
 
-    // App Settings Collection
-    match /app_settings/{settingId} {
-      allow read: if true; // Publicly readable app settings (e.g., app name, logo)
-      allow write: if isAuthenticated() && isAdmin(request.auth.uid); // Only admins can change settings
-    }
-
-    // Users Collection (for managing user roles, status by Admins)
+    // Users Collection
     match /users/{userId} {
-      allow read: if isAuthenticated() && (isAdmin(request.auth.uid) || request.auth.uid == userId); // Admins can read any user, users can read their own profile
-      allow create: if isAuthenticated() && isAdmin(request.auth.uid); // Only admins can create user role documents
-      allow update: if isAuthenticated() && isAdmin(request.auth.uid); // Only admins can update user role documents
-      allow delete: if isAuthenticated() && isAdmin(request.auth.uid); // Only admins can delete user role documents
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin(request.auth.uid) || isTeacher(request.auth.uid));
+      allow create: if isAuthenticated() && isAdmin(request.auth.uid); // Only Admins can create new user role documents
+      allow update: if isAuthenticated() && (isAdmin(request.auth.uid) || (request.auth.uid == userId)); // Admins or the user themselves can update
+      allow delete: if isAuthenticated() && isAdmin(request.auth.uid); // Only Admins can delete user role documents
     }
 
     // Students Collection
     match /students/{studentId} {
-      allow read: if isAuthenticated() && (isAdmin(request.auth.uid) || isTeacher(request.auth.uid) || (isStudent(request.auth.uid) && isOwnerOfStudentData(studentId)) );
+      allow read: if isAuthenticated() && (isAdmin(request.auth.uid) || isTeacher(request.auth.uid) || (isStudent(request.auth.uid) && isOwnerOfStudentData(studentId)));
       allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
       allow update: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-      allow delete: if isAuthenticated() && isAdmin(request.auth.uid); // Or more restrictive if needed
+      allow delete: if isAuthenticated() && isAdmin(request.auth.uid);
     }
 
     // Teachers Collection
     match /teachers/{teacherId} {
-      allow read: if isAuthenticated() && (isAdmin(request.auth.uid) || (isTeacher(request.auth.uid) && isOwnerOfTeacherData(teacherId)) );
-      allow create: if isAuthenticated() && isAdmin(request.auth.uid); // Only admins can create teacher profiles directly
-      allow update: if isAuthenticated() && isAdmin(request.auth.uid); // Or teacher can update their own
+      allow read: if isAuthenticated() && (isAdmin(request.auth.uid) || isTeacher(request.auth.uid)); // Admins and all teachers can read teacher profiles
+      allow create: if isAuthenticated() && isAdmin(request.auth.uid); // Only Admins can create new teacher profiles directly in this collection
+      allow update: if isAuthenticated() && (isAdmin(request.auth.uid) || (isTeacher(request.auth.uid) && isOwnerOfTeacherData(teacherId))); // Admins or the teacher themselves
       allow delete: if isAuthenticated() && isAdmin(request.auth.uid);
     }
-    
+
     // Hall of Fame Items Collection
     match /hall_of_fame_items/{itemId} {
-      allow read: if true; // Hall of Fame is publicly viewable
-      allow create, update, delete: if isAuthenticated() && isAdmin(request.auth.uid); // Only admins can manage Hall of Fame
+      allow read: if true; // Everyone can read Hall of Fame
+      allow write: if isAuthenticated() && isAdmin(request.auth.uid); // Only Admins can create, update, delete
+    }
+
+    // App Settings Collection
+    match /app_settings/{settingId} {
+      allow read: if true; // Everyone can read app settings (like app name, logo)
+      allow write: if isAuthenticated() && isAdmin(request.auth.uid); // Only Admins can change app settings
     }
   }
 }
