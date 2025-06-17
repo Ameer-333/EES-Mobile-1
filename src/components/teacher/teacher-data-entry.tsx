@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarIcon, CheckSquare, Edit3, UploadCloud } from 'lucide-react';
+import { CalendarIcon, CheckSquare, Edit3, UploadCloud, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -19,12 +19,10 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { firestore } from '@/lib/firebase';
+import { collection, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
 
-const mockStudents: Pick<Student, 'id' | 'name'>[] = [
-  { id: 'S001', name: 'Aarav Sharma' },
-  { id: 'S002', name: 'Bhavna Singh' },
-  { id: 'S003', name: 'Chetan Reddy' },
-];
+const STUDENTS_COLLECTION = 'students';
 
 const subjectNames: SubjectName[] = ['English', 'Kannada', 'Hindi', 'Science', 'Maths', 'Social Science'];
 
@@ -44,10 +42,32 @@ const attendanceSchema = z.object({
 export function TeacherDataEntry() {
   const { toast } = useToast();
   const [hasMounted, setHasMounted] = useState(false);
+  const [students, setStudents] = useState<Pick<Student, 'id' | 'name'>[]>([]);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(true);
 
   useEffect(() => {
     setHasMounted(true);
-  }, []);
+    const studentsCollectionRef = collection(firestore, STUDENTS_COLLECTION);
+    
+    const unsubscribe = onSnapshot(studentsCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
+      const fetchedStudents = snapshot.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name || 'Unnamed Student', // Provide a fallback name
+      } as Pick<Student, 'id' | 'name'>));
+      setStudents(fetchedStudents);
+      setIsLoadingStudents(false);
+    }, (error) => {
+      console.error("Error fetching students for data entry:", error);
+      toast({
+        title: "Error Loading Students",
+        description: "Could not fetch student list for data entry.",
+        variant: "destructive",
+      });
+      setIsLoadingStudents(false);
+    });
+
+    return () => unsubscribe();
+  }, [toast]);
 
   const marksForm = useForm<z.infer<typeof marksSchema>>({
     resolver: zodResolver(marksSchema),
@@ -62,16 +82,16 @@ export function TeacherDataEntry() {
   function onMarksSubmit(values: z.infer<typeof marksSchema>) {
     console.log('Marks submitted:', values);
     toast({ title: 'Marks Submitted', description: `Marks for ${values.subjectName} recorded for student ID ${values.studentId}.` });
-    marksForm.reset();
+    marksForm.reset({ studentId: '', marks: 0, subjectName: values.subjectName }); // Keep subject for easier multi-entry
   }
 
   function onAttendanceSubmit(values: z.infer<typeof attendanceSchema>) {
     console.log('Attendance submitted:', values);
     toast({ title: 'Attendance Submitted', description: `Attendance for ${values.subjectName} on ${format(values.date, "PPP")} recorded for student ID ${values.studentId}.` });
-    attendanceForm.reset();
+    attendanceForm.reset({ studentId: '', status: 'Present', subjectName: values.subjectName, date: values.date }); // Keep subject and date
   }
 
-  if (!hasMounted) {
+  if (!hasMounted || isLoadingStudents) {
     return (
       <Card className="w-full shadow-lg rounded-lg">
         <CardHeader>
@@ -84,8 +104,10 @@ export function TeacherDataEntry() {
             <Skeleton className="h-10 w-full" />
           </div>
           <div className="space-y-6">
-            <Skeleton className="h-4 w-1/4 mb-1" />
-            <Skeleton className="h-10 w-full" />
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-3 text-muted-foreground">Loading student list...</p>
+            </div>
             <Skeleton className="h-4 w-1/4 mb-1" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-4 w-1/4 mb-1" />
@@ -101,7 +123,7 @@ export function TeacherDataEntry() {
     <Card className="w-full shadow-lg rounded-lg">
       <CardHeader>
         <CardTitle className="text-2xl font-headline text-primary">Data Entry</CardTitle>
-        <CardDescription>Upload student marks and attendance records.</CardDescription>
+        <CardDescription>Upload student marks and attendance records. Students are loaded from Firestore.</CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="marksEntry" className="w-full">
@@ -119,12 +141,14 @@ export function TeacherDataEntry() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Select Student</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={students.length === 0}>
                         <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select a student" /></SelectTrigger>
+                          <SelectTrigger>
+                            <SelectValue placeholder={students.length === 0 ? "No students found" : "Select a student"} />
+                            </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {mockStudents.map(student => (
+                          {students.map(student => (
                             <SelectItem key={student.id} value={student.id}>{student.name} ({student.id})</SelectItem>
                           ))}
                         </SelectContent>
@@ -164,7 +188,7 @@ export function TeacherDataEntry() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full md:w-auto">
+                <Button type="submit" className="w-full md:w-auto" disabled={students.length === 0}>
                   <UploadCloud className="mr-2 h-4 w-4" /> Submit Marks
                 </Button>
               </form>
@@ -180,12 +204,14 @@ export function TeacherDataEntry() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Select Student</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={students.length === 0}>
                         <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select a student" /></SelectTrigger>
+                          <SelectTrigger>
+                            <SelectValue placeholder={students.length === 0 ? "No students found" : "Select a student"} />
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {mockStudents.map(student => (
+                          {students.map(student => (
                             <SelectItem key={student.id} value={student.id}>{student.name} ({student.id})</SelectItem>
                           ))}
                         </SelectContent>
@@ -245,7 +271,7 @@ export function TeacherDataEntry() {
                             selected={field.value}
                             onSelect={field.onChange}
                             disabled={(date) =>
-                              date > new Date() || date < new Date("1900-01-01")
+                              date > new Date() || date < new Date("2000-01-01") // Adjusted min date
                             }
                             initialFocus
                           />
@@ -274,7 +300,7 @@ export function TeacherDataEntry() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full md:w-auto">
+                <Button type="submit" className="w-full md:w-auto" disabled={students.length === 0}>
                    <UploadCloud className="mr-2 h-4 w-4" /> Submit Attendance
                 </Button>
               </form>
@@ -285,4 +311,3 @@ export function TeacherDataEntry() {
     </Card>
   );
 }
-
