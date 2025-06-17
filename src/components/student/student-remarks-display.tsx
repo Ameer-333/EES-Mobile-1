@@ -5,12 +5,12 @@ import type { StudentRemark } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquareText, Smile, Frown, Meh, BookOpen, CalendarDays, BarChart3, Info, PieChartIcon } from 'lucide-react';
+import { MessageSquareText, Smile, Frown, Meh, BookOpen, CalendarDays, Info, PieChartIcon } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
-import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip, LabelList } from "recharts";
+import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, LabelList } from "recharts";
 import { useMemo } from 'react';
+import Image from 'next/image';
 
-// Mock data for demonstration - in a real app, this would be fetched
 const mockRemarks: StudentRemark[] = [
   { id: 'r1', teacherName: 'Ms. Priya Sharma', teacherSubject: 'English', remark: 'Ravi has shown excellent improvement in English grammar this term. Keep up the great work!', date: '2024-05-15', sentiment: 'good' },
   { id: 'r2', teacherName: 'Mr. Anand Singh', teacherSubject: 'Maths', remark: 'Needs to focus more during math class to grasp complex concepts.', date: '2024-05-10', sentiment: 'bad' },
@@ -22,6 +22,8 @@ const mockRemarks: StudentRemark[] = [
 
 interface StudentRemarksDisplayProps {
   remarks?: StudentRemark[];
+  profilePictureUrl?: string | null;
+  studentName?: string;
 }
 
 const sentimentDetails = {
@@ -37,7 +39,7 @@ const chartConfig = {
 };
 
 
-export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksDisplayProps) {
+export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl, studentName = "Student" }: StudentRemarksDisplayProps) {
 
   const remarksSentimentData = useMemo(() => {
     if (!remarks || remarks.length === 0) return [];
@@ -51,7 +53,7 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
       name: key as 'good' | 'bad' | 'neutral',
       value: value,
       fill: sentimentDetails[key as 'good' | 'bad' | 'neutral'].fill,
-    })).filter(item => item.value > 0); // Only include sentiments with actual remarks
+    })).filter(item => item.value > 0);
   }, [remarks]);
 
 
@@ -60,7 +62,7 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
       <Card className="shadow-lg border-primary/10">
         <CardHeader>
           <CardTitle className="text-xl font-semibold text-primary flex items-center">
-            <MessageSquareText className="mr-2 h-6 w-6" /> Student Remarks
+            <MessageSquareText className="mr-2 h-6 w-6" /> {studentName}'s Remarks
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -74,6 +76,8 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
   }
   
   const totalRemarks = remarksSentimentData.reduce((acc, curr) => acc + curr.value, 0);
+  const donutInnerRadius = 80; // Increased for more space for image
+  const imageSize = donutInnerRadius * 1.2; // Image slightly smaller than the hole
 
   return (
     <div className="space-y-8">
@@ -82,60 +86,77 @@ export function StudentRemarksDisplay({ remarks = mockRemarks }: StudentRemarksD
           <CardTitle className="text-2xl font-headline text-primary flex items-center">
             <PieChartIcon className="mr-3 h-7 w-7" /> Remarks Sentiment Overview
           </CardTitle>
-          <CardDescription>Overall distribution of feedback sentiment.</CardDescription>
+          <CardDescription>Overall distribution of feedback sentiment for {studentName}.</CardDescription>
         </CardHeader>
         <CardContent>
           {remarksSentimentData.length > 0 ? (
-            <ChartContainer config={chartConfig} className="h-[350px] w-full aspect-square max-w-md mx-auto">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPieChart>
-                  <ChartTooltip
-                    cursor={{ fill: 'hsl(var(--accent))', radius: 4 }}
-                    content={<ChartTooltipContent 
-                        nameKey="name" 
-                        formatter={(value, name) => (
-                            <div className="flex items-center">
-                               <span className="mr-2 h-2.5 w-2.5 rounded-full" style={{backgroundColor: chartConfig[name as keyof typeof chartConfig]?.color}} />
-                               {chartConfig[name as keyof typeof chartConfig]?.label}: {value} ({( (value / totalRemarks) * 100 ).toFixed(1)}%)
-                            </div>
-                        )}
-                    />}
+            <div className="relative h-[350px] w-full max-w-md mx-auto">
+               {profilePictureUrl && (
+                <div 
+                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full overflow-hidden border-4 border-background shadow-lg z-10"
+                  style={{ width: imageSize, height: imageSize }}
+                >
+                  <Image
+                    src={profilePictureUrl}
+                    alt={`${studentName}'s profile picture`}
+                    width={imageSize}
+                    height={imageSize}
+                    className="object-cover"
+                    data-ai-hint="student portrait"
                   />
-                  <Pie
-                    data={remarksSentimentData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={120}
-                    innerRadius={70} // This makes it a Donut chart
-                    paddingAngle={2}
-                    labelLine={false}
-                  >
-                    {remarksSentimentData.map((entry) => (
-                      <Cell key={`cell-${entry.name}`} fill={entry.fill} stroke={entry.fill} />
-                    ))}
-                     <LabelList
-                        dataKey="value"
-                        position="outside"
-                        offset={15}
-                        formatter={(value: number, entry: any) => { // 'entry' here is the data object from remarksSentimentData
-                           if (!entry || !entry.name) return null; // Defensive check
-                           const percentage = ((value / totalRemarks) * 100).toFixed(0);
-                           if (parseInt(percentage) < 5) return null; // Hide small percentage labels to avoid clutter
-                           return `${chartConfig[entry.name as keyof typeof chartConfig]?.label}: ${percentage}%`;
-                        }}
-                        className="fill-foreground text-xs"
-                        stroke="none"
-                     />
-                  </Pie>
-                  <ChartLegend 
-                    content={<ChartLegendContent nameKey="name" className="mt-4" />} 
-                    wrapperStyle={{paddingTop: '20px'}}
-                  />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+                </div>
+              )}
+              <ChartContainer config={chartConfig} className="h-full w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <ChartTooltip
+                      cursor={{ fill: 'hsl(var(--accent))', radius: 4 }}
+                      content={<ChartTooltipContent 
+                          nameKey="name" 
+                          formatter={(value, name) => (
+                              <div className="flex items-center">
+                                 <span className="mr-2 h-2.5 w-2.5 rounded-full" style={{backgroundColor: chartConfig[name as keyof typeof chartConfig]?.color}} />
+                                 {chartConfig[name as keyof typeof chartConfig]?.label}: {value} ({( (value / totalRemarks) * 100 ).toFixed(1)}%)
+                              </div>
+                          )}
+                      />}
+                    />
+                    <Pie
+                      data={remarksSentimentData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={130} // Slightly larger outer radius
+                      innerRadius={donutInnerRadius} 
+                      paddingAngle={2}
+                      labelLine={false}
+                    >
+                      {remarksSentimentData.map((entry) => (
+                        <Cell key={`cell-${entry.name}`} fill={entry.fill} stroke={entry.fill} />
+                      ))}
+                       <LabelList
+                          dataKey="value"
+                          position="outside"
+                          offset={15}
+                          formatter={(value: number, entry: any) => {
+                             if (!entry || !entry.name) return null;
+                             const percentage = ((value / totalRemarks) * 100).toFixed(0);
+                             if (parseInt(percentage) < 8) return null; 
+                             return `${chartConfig[entry.name as keyof typeof chartConfig]?.label}: ${percentage}%`;
+                          }}
+                          className="fill-foreground text-xs"
+                          stroke="none"
+                       />
+                    </Pie>
+                    <ChartLegend 
+                      content={<ChartLegendContent nameKey="name" className="mt-4" />} 
+                      wrapperStyle={{paddingTop: '20px'}}
+                    />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
                 <Info className="h-10 w-10 mb-3" />

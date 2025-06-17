@@ -30,14 +30,16 @@ const mockStudentData: Student = {
 };
 
 export default function StudentRemarksPage() {
-  // In a real app, student data (especially remarks) would be fetched here
+  // In a real app, student data (especially remarks and profilePictureUrl) would be fetched here
   const student = mockStudentData;
 
   return (
     <div className="container mx-auto p-0 md:p-4 space-y-6">
-      {/* Header for the page could be added in ProtectedLayout or here if specific */}
-      {/* <h1 className="text-3xl font-headline font-bold">My Remarks</h1> */}
-      <StudentRemarksDisplay remarks={student.remarks} />
+      <StudentRemarksDisplay 
+        remarks={student.remarks} 
+        profilePictureUrl={student.profilePictureUrl}
+        studentName={student.name}
+      />
     </div>
   );
 }
