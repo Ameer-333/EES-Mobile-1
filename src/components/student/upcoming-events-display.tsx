@@ -2,16 +2,16 @@
 'use client';
 
 import type { UpcomingEvent } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { CalendarClock, MapPin } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CalendarDays, Clock, MapPin, Info, Image as ImageIcon } from 'lucide-react';
+import NextImage from 'next/image'; // Renamed to avoid conflict
 
-// Mock data for demonstration
+// Mock data updated with imageUrl and note
 const mockEvents: UpcomingEvent[] = [
-  { id: 'e1', name: 'Annual Sports Day', date: '2024-08-15', time: '09:00 AM', day: 'Thursday', description: 'Track and field events, team games.', location: 'School Ground' },
-  { id: 'e2', name: 'Science Exhibition', date: '2024-09-05', time: '10:00 AM - 04:00 PM', day: 'Thursday', description: 'Student projects showcase.', location: 'School Auditorium' },
-  { id: 'e3', name: 'Parent-Teacher Meeting (Classes 9-10)', date: '2024-09-21', time: '02:00 PM - 05:00 PM', day: 'Saturday', location: 'Respective Classrooms' },
-  { id: 'e4', name: 'Cultural Fest Rehearsals', date: '2024-10-01', time: '04:00 PM', day: 'Tuesday', description: 'Dance and Drama practice.', location: 'Activity Hall' },
+  { id: 'e1', name: 'Annual Sports Day Extravaganza', date: '2024-08-15', time: '09:00 AM', day: 'Thursday', note: 'Join us for a day full of exciting track and field events, team games, and friendly competition. Refreshments will be available. Don\'t forget your sports gear!', location: 'Main School Ground', imageUrl: 'https://placehold.co/600x400.png', dataAiHint: 'sports day' },
+  { id: 'e2', name: 'Innovations: Annual Science Exhibition', date: '2024-09-05', time: '10:00 AM - 04:00 PM', day: 'Thursday', note: 'Explore amazing student projects and scientific discoveries. Interactive exhibits and guest speakers. A day of learning and fun for all!', location: 'School Auditorium & Science Labs', imageUrl: 'https://placehold.co/600x400.png', dataAiHint: 'science exhibition' },
+  { id: 'e3', name: 'Parent-Teacher Connect (Classes 9-10)', date: '2024-09-21', time: '02:00 PM - 05:00 PM', day: 'Saturday', note: 'An opportunity to discuss your child\'s progress with their teachers. Please book your slots in advance via the school portal.', location: 'Respective Classrooms', imageUrl: 'https://placehold.co/600x400.png', dataAiHint: 'meeting classroom' },
+  { id: 'e4', name: 'Cultural Fest Rehearsals Kick-off', date: '2024-10-01', time: '04:00 PM onwards', day: 'Tuesday', note: 'First rehearsal for all participants in the upcoming Cultural Fest. Dance, drama, music, and more! Bring your enthusiasm.', location: 'Activity Hall & Music Room', imageUrl: 'https://placehold.co/600x400.png', dataAiHint: 'cultural event' },
 ];
 
 interface UpcomingEventsDisplayProps {
@@ -21,41 +21,68 @@ interface UpcomingEventsDisplayProps {
 export function UpcomingEventsDisplay({ events = mockEvents }: UpcomingEventsDisplayProps) {
   if (!events || events.length === 0) {
     return (
-      <Card className="shadow-lg">
+      <Card className="shadow-lg col-span-full">
         <CardHeader>
-          <CardTitle className="text-xl font-semibold text-primary flex items-center">
-            <CalendarClock className="mr-2 h-6 w-6" /> Upcoming Events
+          <CardTitle className="text-2xl font-headline text-primary flex items-center">
+            <CalendarDays className="mr-3 h-7 w-7" /> No Upcoming Events
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">No upcoming events scheduled at the moment.</p>
+          <p className="text-muted-foreground text-lg">Check back soon for new events and activities!</p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-xl font-semibold text-primary flex items-center">
-          <CalendarClock className="mr-2 h-6 w-6" /> Upcoming Events
-        </CardTitle>
-        <CardDescription>Stay updated with school activities.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-[250px] pr-4">
-          <div className="space-y-4">
-            {events.map((event) => (
-              <div key={event.id} className="p-4 border rounded-lg shadow-sm bg-card hover:shadow-md transition-shadow">
-                <h3 className="font-semibold text-foreground">{event.name}</h3>
-                <p className="text-sm text-primary">{event.day}, {new Date(event.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} @ {event.time}</p>
-                {event.location && <p className="text-xs text-muted-foreground flex items-center mt-1"><MapPin className="h-3 w-3 mr-1"/>{event.location}</p>}
-                {event.description && <p className="text-sm text-muted-foreground mt-1">{event.description}</p>}
-              </div>
-            ))}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+      {events.map((event) => (
+        <Card key={event.id} className="overflow-hidden shadow-xl hover:shadow-2xl transition-shadow duration-300 ease-in-out flex flex-col group bg-card rounded-lg border border-border/50 hover:border-primary/30">
+          <div className="relative w-full h-56 md:h-60 bg-muted/30">
+            <NextImage
+              src={event.imageUrl || 'https://placehold.co/600x400.png'}
+              alt={event.name}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="object-cover transform transition-transform duration-300 group-hover:scale-105"
+              data-ai-hint={event.dataAiHint || 'event image'}
+            />
+             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+          <CardHeader className="pb-3 pt-4 px-5">
+            <CardTitle className="text-xl lg:text-2xl font-bold text-primary group-hover:text-primary/90 transition-colors leading-tight">
+              {event.name}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5 flex-grow flex flex-col justify-between">
+            <div>
+              <div className="flex items-center text-sm text-muted-foreground mb-1.5">
+                <CalendarDays className="h-4 w-4 mr-2 text-primary/80" />
+                <span>{event.day}, {new Date(event.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+              </div>
+              <div className="flex items-center text-sm text-muted-foreground mb-1.5">
+                <Clock className="h-4 w-4 mr-2 text-primary/80" />
+                <span>{event.time}</span>
+              </div>
+              {event.location && (
+                <div className="flex items-center text-sm text-muted-foreground mb-3">
+                  <MapPin className="h-4 w-4 mr-2 text-primary/80" />
+                  <span>{event.location}</span>
+                </div>
+              )}
+              {event.note && (
+                <p className="text-sm text-foreground/80 mt-2 leading-relaxed line-clamp-3 group-hover:line-clamp-none transition-all">
+                  {event.note}
+                </p>
+              )}
+            </div>
+            <Button variant="outline" size="sm" className="mt-4 w-full group-hover:bg-accent group-hover:text-accent-foreground transition-colors">
+                View Details
+                <Info className="ml-2 h-4 w-4 opacity-70 group-hover:opacity-100"/>
+            </Button>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }

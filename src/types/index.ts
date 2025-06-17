@@ -1,10 +1,10 @@
 
 export interface StudentRemark {
   id: string;
-  teacherName: string; // Renamed from authorName for clarity
+  teacherName: string; 
   teacherSubject: SubjectName;
   remark: string;
-  date: string; // YYYY-MM-DD (can be extended to ISO string if time is critical)
+  date: string; 
   sentiment: 'good' | 'bad' | 'neutral';
 }
 
@@ -14,8 +14,10 @@ export interface UpcomingEvent {
   date: string; // YYYY-MM-DD
   time: string; // e.g., "10:00 AM"
   day: string; // e.g., "Monday"
-  description?: string;
+  note?: string; // Renamed from description
   location?: string;
+  imageUrl?: string; // Added for event image
+  dataAiHint?: string; // Added for image AI hint
 }
 
 export interface Scholarship {
@@ -30,7 +32,7 @@ export type ReligionType = 'Hindu' | 'Muslim' | 'Christian' | 'Other';
 export const religionOptions: ReligionType[] = ['Hindu', 'Muslim', 'Christian', 'Other'];
 
 export interface Student {
-  id: string; // This will often be the Firestore document ID
+  id: string; 
   name: string;
   satsNumber: string;
   class: string;
@@ -42,7 +44,7 @@ export interface Student {
   remarks?: StudentRemark[];
   scholarships?: Scholarship[];
   backgroundInfo?: string;
-  authUid?: string; // Firebase Authentication User ID, for linking student profile to their login
+  authUid?: string; 
 }
 
 export type SubjectName = 'English' | 'Kannada' | 'Hindi' | 'Science' | 'Maths' | 'Social Science';
@@ -70,16 +72,15 @@ export interface StudentSubjectAttendance {
 export type UserRole = 'Admin' | 'Teacher' | 'Student';
 
 export interface ManagedUser {
-  id: string; // This will be the Firestore document ID (and likely Firebase Auth UID)
+  id: string; 
   name: string;
   email: string;
   role: UserRole;
   status: 'Active' | 'Inactive' | 'Pending';
-  lastLogin: string; // Should be a date string, or N/A
-  studentProfileId?: string; // Optional: if student document in 'students' collection has a different ID
+  lastLogin: string; 
+  studentProfileId?: string; 
 }
 
-// Fields for Add/Edit Student forms by Teacher
 export interface StudentFormData {
   name: string;
   satsNumber: string;
@@ -89,12 +90,12 @@ export interface StudentFormData {
   religion: ReligionType;
   address: string;
   profilePictureUrl?: string;
-  authUid?: string; // Added here as well if linking during creation
+  authUid?: string; 
 }
 
 export interface TeacherSalaryRecord {
   id: string;
-  monthYear: string; // e.g., "July 2024"
+  monthYear: string; 
   dateIssued: string; // YYYY-MM-DD
   amountIssued: number;
   amountDeducted: number;
@@ -103,7 +104,7 @@ export interface TeacherSalaryRecord {
 }
 
 export interface Teacher {
-  id: string; // This will often be the Firestore document ID (and likely Firebase Auth UID)
+  id: string; 
   name: string;
   email: string;
   phoneNumber: string;
@@ -117,7 +118,6 @@ export interface Teacher {
   daysAbsentThisMonth?: number;
 }
 
-// For the teacher profile form
 export interface TeacherFormData {
   name: string;
   email: string;
@@ -142,7 +142,7 @@ export interface AppMessage {
 }
 
 export interface HallOfFameItem {
-  id: string; // This will often be the Firestore document ID
+  id: string; 
   category: 'founder' | 'co-founder' | 'principal' | 'school-award' | 'founder-award' | 'student-achievement';
   name: string;
   title?: string;

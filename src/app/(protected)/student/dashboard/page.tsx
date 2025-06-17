@@ -5,14 +5,13 @@ import { StudentProfileCard } from '@/components/student/student-profile-card';
 import { StudentRecords } from '@/components/student/student-records';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Home, LogIn, BarChartHorizontalBig } from 'lucide-react';
+import { Home, LogIn, BarChartHorizontalBig, CalendarCheck } from 'lucide-react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-// import { StudentRemarksDisplay } from '@/components/student/student-remarks-display'; // Removed direct display
-import { UpcomingEventsDisplay } from '@/components/student/upcoming-events-display';
+// UpcomingEventsDisplay removed from here
 import { ScholarshipInfoDisplay } from '@/components/student/scholarship-info-display';
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
-import type { Student, StudentRemark, UpcomingEvent, Scholarship, ReligionType, SubjectName } from '@/types';
+import type { Student, StudentRemark, Scholarship, ReligionType, SubjectName } from '@/types';
 
 // Mock data - in a real app, this would be fetched from a central service or context
 const mockStudentData: Student = {
@@ -25,7 +24,7 @@ const mockStudentData: Student = {
   religion: 'Hindu' as ReligionType,
   address: '123 Main Street, Bangalore, Karnataka',
   profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RK',
-  remarks: [ // Remarks data is still here for other components that might need it, but not displayed directly
+  remarks: [ 
     { id: 'r1', teacherName: 'Ms. Priya Sharma', teacherSubject: 'English' as SubjectName, remark: 'Ravi has shown excellent improvement in English grammar this term. Keep up the great work!', date: '2024-05-15', sentiment: 'good' },
     { id: 'r2', teacherName: 'Mr. Anand Singh', teacherSubject: 'Maths' as SubjectName, remark: 'Needs to focus more during math class to grasp complex concepts.', date: '2024-05-10', sentiment: 'bad' },
   ],
@@ -35,15 +34,9 @@ const mockStudentData: Student = {
   backgroundInfo: "Ravi comes from a supportive family background. His father is an engineer and his mother is a homemaker. He has one younger sibling. Ravi enjoys playing cricket and is an active member of the school's science club. He aspires to become a software developer."
 };
 
-const mockUpcomingEventsData: UpcomingEvent[] = [
-  { id: 'e1', name: 'Annual Sports Day', date: '2024-08-15', time: '09:00 AM', day: 'Thursday', description: 'Track and field events, team games.', location: 'School Ground' },
-  { id: 'e2', name: 'Science Exhibition', date: '2024-09-05', time: '10:00 AM - 04:00 PM', day: 'Thursday', description: 'Student projects showcase.', location: 'School Auditorium' },
-];
-
 
 export default function StudentDashboardPage() {
   const student = mockStudentData;
-  const upcomingEvents = mockUpcomingEventsData;
 
   return (
     <div className="container mx-auto p-0 md:p-4 space-y-8">
@@ -72,8 +65,24 @@ export default function StudentDashboardPage() {
             <StudentProfileCard student={student} /> 
         </div>
         <div className="lg:col-span-2 space-y-6">
-            {/* StudentRemarksDisplay removed from here */}
-            <UpcomingEventsDisplay events={upcomingEvents} />
+            <Card className="shadow-lg border-primary/10">
+                <CardHeader>
+                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
+                        <CalendarCheck className="mr-2 h-6 w-6" /> Upcoming Events
+                    </CardTitle>
+                    <CardDescription>Discover school activities, holidays, and important dates.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Stay updated with all school events. Check the "Upcoming Events" section in the sidebar for details.
+                    </p>
+                    <Button asChild>
+                        <Link href="/student/events">
+                            Go to Upcoming Events
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
              <Card className="shadow-lg border-primary/10">
                 <CardHeader>
                     <CardTitle className="text-xl font-semibold text-primary flex items-center">

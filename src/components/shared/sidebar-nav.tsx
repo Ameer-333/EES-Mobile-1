@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart, MessageSquarePlus, Mail, Award, MessageCircle, Building, BarChartHorizontalBig } from 'lucide-react';
+import { Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart, MessageSquarePlus, Mail, Award, MessageCircle, Building, BarChartHorizontalBig, CalendarCheck } from 'lucide-react';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -21,6 +21,7 @@ const navItems: NavItem[] = [
   { href: '/student/profile', label: 'Profile & Activities', icon: User, roles: ['Student'] },
   { href: '/student/records', label: 'Academic Records', icon: BookOpen, roles: ['Student'] },
   { href: '/student/remarks', label: 'My Remarks', icon: BarChartHorizontalBig, roles: ['Student'] },
+  { href: '/student/events', label: 'Upcoming Events', icon: CalendarCheck, roles: ['Student'] },
   { href: '/hall-of-fame', label: 'Hall of Fame', icon: Award, roles: ['Student'] },
   
   // Teacher

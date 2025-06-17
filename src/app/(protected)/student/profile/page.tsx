@@ -4,14 +4,13 @@
 import { StudentProfileCard } from '@/components/student/student-profile-card';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Image from 'next/image';
-// import { StudentRemarksDisplay } from '@/components/student/student-remarks-display'; // Removed
-import { UpcomingEventsDisplay } from '@/components/student/upcoming-events-display';
+// UpcomingEventsDisplay removed
 import { ScholarshipInfoDisplay } from '@/components/student/scholarship-info-display';
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
-import type { Student, StudentRemark, UpcomingEvent, Scholarship, ReligionType, SubjectName } from '@/types';
+import type { Student, Scholarship, ReligionType, SubjectName } from '@/types';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { BarChartHorizontalBig } from 'lucide-react';
+import { BarChartHorizontalBig, CalendarCheck } from 'lucide-react';
 
 // Mock data - in a real app, this would be fetched
 const mockStudentData: Student = {
@@ -35,15 +34,9 @@ const mockStudentData: Student = {
   backgroundInfo: "Ravi comes from a supportive family background. His father is an engineer and his mother is a homemaker. He has one younger sibling. Ravi enjoys playing cricket and is an active member of the school's science club. He aspires to become a software developer."
 };
 
-const mockUpcomingEventsData: UpcomingEvent[] = [
-  { id: 'e1', name: 'Annual Sports Day', date: '2024-08-15', time: '09:00 AM', day: 'Thursday', description: 'Track and field events, team games.', location: 'School Ground' },
-  { id: 'e2', name: 'Science Exhibition', date: '2024-09-05', time: '10:00 AM - 04:00 PM', day: 'Thursday', description: 'Student projects showcase.', location: 'School Auditorium' },
-];
-
 
 export default function StudentProfilePage() {
   const student = mockStudentData;
-  const upcomingEvents = mockUpcomingEventsData;
 
   return (
     <div className="container mx-auto p-0 md:p-4 space-y-8">
@@ -72,8 +65,24 @@ export default function StudentProfilePage() {
             <StudentProfileCard student={student} />
         </div>
         <div className="lg:col-span-2 space-y-6">
-            {/* StudentRemarksDisplay removed from here */}
-            <UpcomingEventsDisplay events={upcomingEvents} />
+            <Card className="shadow-lg border-primary/10">
+                <CardHeader>
+                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
+                        <CalendarCheck className="mr-2 h-6 w-6" /> View Upcoming Events
+                    </CardTitle>
+                    <CardDescription>Explore all school events, holidays, and important dates.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        For a detailed view of all upcoming school activities, please visit the dedicated "Upcoming Events" page from the sidebar.
+                    </p>
+                    <Button asChild>
+                        <Link href="/student/events">
+                            Go to Upcoming Events
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
              <Card className="shadow-lg border-primary/10">
                 <CardHeader>
                     <CardTitle className="text-xl font-semibold text-primary flex items-center">
