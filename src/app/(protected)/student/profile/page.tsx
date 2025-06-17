@@ -4,13 +4,12 @@
 import { StudentProfileCard } from '@/components/student/student-profile-card';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Image from 'next/image';
-// UpcomingEventsDisplay removed
-import { ScholarshipInfoDisplay } from '@/components/student/scholarship-info-display';
+// ScholarshipInfoDisplay removed
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
 import type { Student, Scholarship, ReligionType, SubjectName } from '@/types';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { BarChartHorizontalBig, CalendarCheck } from 'lucide-react';
+import { BarChartHorizontalBig, CalendarCheck, Award as AwardIcon } from 'lucide-react'; // Added AwardIcon
 
 // Mock data - in a real app, this would be fetched
 const mockStudentData: Student = {
@@ -101,13 +100,27 @@ export default function StudentProfilePage() {
                     </Button>
                 </CardContent>
             </Card>
+             <Card className="shadow-lg border-primary/10">
+                <CardHeader>
+                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
+                        <AwardIcon className="mr-2 h-6 w-6" /> View My Scholarships
+                    </CardTitle>
+                    <CardDescription>Review all scholarships you have been awarded.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        For a detailed list of your scholarships, please visit the dedicated "My Scholarships" page from the sidebar.
+                    </p>
+                    <Button asChild>
+                        <Link href="/student/scholarships">
+                            Go to My Scholarships
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
         </div>
        </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <ScholarshipInfoDisplay scholarships={student.scholarships} studentName={student.name} />
-        <StudentBackgroundDisplay backgroundInfo={student.backgroundInfo} />
-      </div>
+      <StudentBackgroundDisplay backgroundInfo={student.backgroundInfo} />
     </div>
   );
 }

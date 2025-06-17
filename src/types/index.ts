@@ -14,10 +14,10 @@ export interface UpcomingEvent {
   date: string; // YYYY-MM-DD
   time: string; // e.g., "10:00 AM"
   day: string; // e.g., "Monday"
-  note?: string; // Renamed from description
+  note?: string; 
   location?: string;
-  imageUrl?: string; // Added for event image
-  dataAiHint?: string; // Added for image AI hint
+  imageUrl?: string; 
+  dataAiHint?: string; 
 }
 
 export interface Scholarship {
@@ -151,3 +151,4 @@ export interface HallOfFameItem {
   year?: string | number;
   dataAiHint?: string;
 }
+

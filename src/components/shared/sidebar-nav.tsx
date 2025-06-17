@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart, MessageSquarePlus, Mail, Award, MessageCircle, Building, BarChartHorizontalBig, CalendarCheck } from 'lucide-react';
+import { Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart, MessageSquarePlus, Mail, Award, MessageCircle, Building, BarChartHorizontalBig, CalendarCheck, DollarSign } from 'lucide-react';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -22,7 +22,8 @@ const navItems: NavItem[] = [
   { href: '/student/records', label: 'Academic Records', icon: BookOpen, roles: ['Student'] },
   { href: '/student/remarks', label: 'My Remarks', icon: BarChartHorizontalBig, roles: ['Student'] },
   { href: '/student/events', label: 'Upcoming Events', icon: CalendarCheck, roles: ['Student'] },
-  { href: '/hall-of-fame', label: 'Hall of Fame', icon: Award, roles: ['Student'] },
+  { href: '/student/scholarships', label: 'My Scholarships', icon: Award, roles: ['Student'] },
+  { href: '/hall-of-fame', label: 'Hall of Fame', icon: Building, roles: ['Student'] },
   
   // Teacher
   { href: '/teacher/dashboard', label: 'Dashboard', icon: Home, roles: ['Teacher'] },
@@ -31,7 +32,7 @@ const navItems: NavItem[] = [
   { href: '/teacher/give-remark', label: 'Give Student Remarks', icon: MessageSquarePlus, roles: ['Teacher'] },
   { href: '/teacher/messaging', label: 'Send Messages', icon: Mail, roles: ['Teacher'] },
   { href: '/teacher/profile', label: 'My Profile & Salary', icon: User, roles: ['Teacher'] },
-  { href: '/hall-of-fame', label: 'Hall of Fame', icon: Award, roles: ['Teacher'] },
+  { href: '/hall-of-fame', label: 'Hall of Fame', icon: Building, roles: ['Teacher'] },
 
   // Admin
   { href: '/admin/dashboard', label: 'Dashboard', icon: Shield, roles: ['Admin'] },
@@ -40,7 +41,7 @@ const navItems: NavItem[] = [
   { href: '/admin/hall-of-fame-management', label: 'Manage Hall of Fame', icon: Building, roles: ['Admin'] },
   { href: '/admin/analytics', label: 'Analytics', icon: LineChart, roles: ['Admin'] },
   { href: '/admin/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
-  { href: '/hall-of-fame', label: 'View Hall of Fame', icon: Award, roles: ['Admin'] },
+  { href: '/hall-of-fame', label: 'View Hall of Fame', icon: Building, roles: ['Admin'] },
 ];
 
 function getCurrentRole(pathname: string): UserRole | null {
@@ -65,13 +66,19 @@ export function SidebarNav() {
 
   const filteredNavItems = navItems.filter(item => {
     if (effectiveRole) return item.roles.includes(effectiveRole);
-    return item.roles.includes('Student') || item.roles.includes('Teacher') || item.roles.includes('Admin'); 
+    // If no specific role context (e.g. viewing /hall-of-fame directly), 
+    // this part might need adjustment based on desired behavior for generic paths.
+    // For now, if there's no effective role, no items will be shown by this logic.
+    // The SidebarNav_Corrected logic seems more robust for determining items based on path.
+    return false; 
   });
   
   return (
     <nav className="flex flex-col space-y-1">
       {navItems.filter(item => {
         if (currentRole && item.roles.includes(currentRole)) return true;
+        // Special case for /hall-of-fame to show for any role if they are on that page.
+        if (item.href === '/hall-of-fame' && pathname.startsWith('/hall-of-fame') && currentRole) return true;
         return false; 
       }).map((item) => (
         <Button
@@ -79,8 +86,8 @@ export function SidebarNav() {
           asChild
           variant={pathname.startsWith(item.href) ? 'secondary' : 'ghost'}
           className={cn(
-            'w-full justify-start text-sm',
-            pathname.startsWith(item.href) && 'bg-accent text-accent-foreground hover:bg-accent/90'
+            'w-full justify-start text-sm h-9',
+            pathname.startsWith(item.href) && 'bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/90'
           )}
         >
           <Link href={item.href}>
@@ -96,32 +103,61 @@ export function SidebarNav() {
 
 export function SidebarNav_Corrected() {
   const pathname = usePathname();
-  const role = usePathname().split('/')[1] as UserRole | undefined; 
+  const rolePathSegment = usePathname().split('/')[1] as UserRole | undefined; 
 
-  if (!role || !['student', 'teacher', 'admin'].includes(role)) {
-    return null; 
+  // Determine current actual role based on the path segment
+  let currentActualRole: UserRole | null = null;
+  if (rolePathSegment && ['student', 'teacher', 'admin'].includes(rolePathSegment)) {
+    currentActualRole = rolePathSegment.charAt(0).toUpperCase() + rolePathSegment.slice(1) as UserRole;
+  } else if (pathname.startsWith('/hall-of-fame')) {
+    // If we are on hall-of-fame, but not under a role prefix, we need to check auth context.
+    // For prototype simplicity, let's assume if not under student/teacher/admin and on hall-of-fame,
+    // we don't know the role for *sidebar display*, so we might not show role-specific items.
+    // The layout.tsx handles actual access. This component just decides what links to show.
+    // A better approach would be to get the actual logged-in user's role from context.
+    // For now, if not under /student, /teacher, /admin, no role-specific sidebar items are shown
+    // unless it's the hall of fame link itself.
   }
-  const currentActualRole = role.charAt(0).toUpperCase() + role.slice(1) as UserRole;
 
 
   return (
     <nav className="flex flex-col space-y-1">
-      {navItems.filter(item => item.roles.includes(currentActualRole)).map((item) => (
-        <Button
-          key={item.href + item.label} 
-          asChild
-          variant={pathname === item.href || (item.href !== `/${role}/dashboard` && pathname.startsWith(item.href)) ? 'secondary' : 'ghost'}
-          className={cn(
-            'w-full justify-start text-sm h-9', 
-            (pathname === item.href || (item.href !== `/${role}/dashboard` && pathname.startsWith(item.href))) && 'bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/90'
-          )}
-        >
-          <Link href={item.href}>
-            <item.icon className="mr-2 h-4 w-4" />
-            {item.label}
-          </Link>
-        </Button>
-      ))}
+      {navItems.filter(item => {
+        if (currentActualRole && item.roles.includes(currentActualRole)) {
+            // If the item is /hall-of-fame, it should be active if the path is /hall-of-fame,
+            // not /<role>/hall-of-fame
+            if (item.href === '/hall-of-fame') return true;
+            // For other role-specific items
+            return item.href.startsWith(`/${currentActualRole.toLowerCase()}`) || item.href === '/hall-of-fame';
+        }
+        // If on /hall-of-fame without a role prefix, only show the /hall-of-fame link
+        if (pathname.startsWith('/hall-of-fame') && item.href === '/hall-of-fame') {
+           return true; // Show "Hall of Fame" if user is on that page, regardless of prefix.
+        }
+        return false;
+      }).map((item) => {
+          const isActive = item.href === '/hall-of-fame' 
+                            ? pathname === item.href // Exact match for /hall-of-fame
+                            : pathname.startsWith(item.href); // Prefix match for role-specific pages
+
+          return (
+            <Button
+              key={item.href + item.label + (currentActualRole || '')} 
+              asChild
+              variant={isActive ? 'secondary' : 'ghost'}
+              className={cn(
+                'w-full justify-start text-sm h-9', 
+                isActive && 'bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/90'
+              )}
+            >
+              <Link href={item.href}>
+                <item.icon className="mr-2 h-4 w-4" />
+                {item.label}
+              </Link>
+            </Button>
+          );
+        })}
     </nav>
   );
 }
+

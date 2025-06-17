@@ -5,11 +5,10 @@ import { StudentProfileCard } from '@/components/student/student-profile-card';
 import { StudentRecords } from '@/components/student/student-records';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Home, LogIn, BarChartHorizontalBig, CalendarCheck } from 'lucide-react';
+import { Home, LogIn, BarChartHorizontalBig, CalendarCheck, Award as AwardIcon } from 'lucide-react'; // Added AwardIcon
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-// UpcomingEventsDisplay removed from here
-import { ScholarshipInfoDisplay } from '@/components/student/scholarship-info-display';
+// ScholarshipInfoDisplay removed from here
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
 import type { Student, StudentRemark, Scholarship, ReligionType, SubjectName } from '@/types';
 
@@ -101,15 +100,29 @@ export default function StudentDashboardPage() {
                     </Button>
                 </CardContent>
             </Card>
+             <Card className="shadow-lg border-primary/10">
+                <CardHeader>
+                    <CardTitle className="text-xl font-semibold text-primary flex items-center">
+                        <AwardIcon className="mr-2 h-6 w-6" /> My Scholarships
+                    </CardTitle>
+                    <CardDescription>View details of scholarships you have received.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Explore your scholarship achievements in the dedicated "My Scholarships" section.
+                    </p>
+                    <Button asChild>
+                        <Link href="/student/scholarships">
+                            Go to My Scholarships
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
         </div>
        </div>
 
       <StudentRecords /> 
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <ScholarshipInfoDisplay scholarships={student.scholarships} studentName={student.name} />
-        <StudentBackgroundDisplay backgroundInfo={student.backgroundInfo} />
-      </div>
+      <StudentBackgroundDisplay backgroundInfo={student.backgroundInfo} />
 
       <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
         <Button asChild variant="outline">
