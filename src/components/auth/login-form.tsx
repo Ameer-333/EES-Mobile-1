@@ -53,6 +53,7 @@ export function LoginForm({ role }: LoginFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
+    console.log('Email being sent to Firebase:', values.email); // Added for debugging
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       
@@ -77,17 +78,20 @@ export function LoginForm({ role }: LoginFormProps) {
         switch (error.code) {
           case 'auth/user-not-found':
           case 'auth/wrong-password':
-          case 'auth/invalid-credential':
+          case 'auth/invalid-credential': // This can also be triggered by malformed email/password before server check
             errorMessage = 'Invalid email or password.';
             break;
           case 'auth/invalid-email':
-            errorMessage = 'Invalid email address format.';
+            errorMessage = 'Invalid email address format. Please check for typos or extra spaces.';
             break;
           case 'auth/too-many-requests':
             errorMessage = 'Too many login attempts. Please try again later.';
             break;
           case 'auth/network-request-failed':
             errorMessage = 'Network error. Please check your internet connection.';
+            break;
+          case 'auth/configuration-not-found': // Could indicate issues with Firebase project setup
+            errorMessage = 'Firebase configuration error. Please contact support.';
             break;
           default:
             errorMessage = `Login failed: ${error.message} (Code: ${error.code})`;
