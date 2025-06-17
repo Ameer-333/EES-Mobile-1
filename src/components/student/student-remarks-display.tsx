@@ -76,8 +76,8 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
   }
   
   const totalRemarks = remarksSentimentData.reduce((acc, curr) => acc + curr.value, 0);
-  const donutInnerRadius = 80; // Increased for more space for image
-  const imageSize = donutInnerRadius * 1.2; // Image slightly smaller than the hole
+  const donutInnerRadius = 80; 
+  const imageSize = donutInnerRadius * 1.2; 
 
   return (
     <div className="space-y-8">
@@ -99,9 +99,9 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
                   <Image
                     src={profilePictureUrl}
                     alt={`${studentName}'s profile picture`}
-                    width={imageSize}
+                    width={imageSize} 
                     height={imageSize}
-                    className="object-cover"
+                    className="object-cover rounded-full" 
                     data-ai-hint="student portrait"
                   />
                 </div>
@@ -127,7 +127,7 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
                       nameKey="name"
                       cx="50%"
                       cy="50%"
-                      outerRadius={130} // Slightly larger outer radius
+                      outerRadius={130} 
                       innerRadius={donutInnerRadius} 
                       paddingAngle={2}
                       labelLine={false}
