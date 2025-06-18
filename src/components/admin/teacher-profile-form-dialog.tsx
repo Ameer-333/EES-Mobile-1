@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Teacher, TeacherFormData, SubjectName, TeacherAssignment, TeacherAssignmentType, ManagedUser } from '@/types';
-import { allSubjectNamesArray, standardSubjectNamesArray, niosSubjectNamesArray, nclpAllSubjects as nclpSubjectNamesArray, assignmentTypeLabels } from '@/types'; // Updated imports
+import type { Teacher, TeacherFormData, SubjectName, TeacherAssignment, TeacherAssignmentType, ManagedUser, NIOSSubjectName, NCLPSubjectName } from '@/types';
+import { allSubjectNamesArray, standardSubjectNamesArray, niosSubjectNamesArray, nclpSubjectNamesArray, assignmentTypeLabels, motherTeacherCoreSubjects, nclpGroupBSubjectsNoHindi } from '@/types'; // Removed unused niosSubjectsForAssignment
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -36,18 +36,23 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader as UICardHeader, CardContent as UICardContent, CardTitle as UICardTitle, CardDescription as UICardDescription } from '@/components/ui/card';
 import { getUsersCollectionPath, getTeacherDocPath } from '@/lib/firestore-paths';
-import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs for assignments
+import { v4 as uuidv4 } from 'uuid';
 
-const currentYear = new Date().getFullYear();
+// Moved getSubjectOptions outside the component
+function getSubjectOptions(assignmentType?: TeacherAssignmentType): SubjectName[] {
+  if (assignmentType === 'nios_teacher') return niosSubjectNamesArray as SubjectName[];
+  if (assignmentType === 'nclp_teacher') return nclpSubjectNamesArray as SubjectName[];
+  return standardSubjectNamesArray as SubjectName[];
+}
 
 const teacherAssignmentItemSchema = z.object({
-  id: z.string().default(() => uuidv4()), // Auto-generate ID for new assignments
+  id: z.string().default(() => uuidv4()),
   type: z.custom<TeacherAssignmentType>(val => Object.keys(assignmentTypeLabels).includes(val as TeacherAssignmentType), 'Assignment type is required.'),
   classId: z.string().min(1, 'Class ID or Program ID is required (e.g., LKG, 9, NIOS_A, NCLP_B).'),
-  className: z.string().optional().or(z.literal('')), // Display name for the class/group
+  className: z.string().optional().or(z.literal('')), 
   sectionId: z.string().optional().or(z.literal('')),
   subjectId: z.custom<SubjectName>(val => allSubjectNamesArray.includes(val as SubjectName)).optional(),
-  groupId: z.string().optional().or(z.literal('')), // For NIOS/NCLP sub-groups if classId is generic like "NIOS"
+  groupId: z.string().optional().or(z.literal('')),
 }).refine(data => {
   if (data.type === 'subject_teacher' && !data.subjectId) {
     return false;
@@ -63,7 +68,7 @@ const teacherProfileSchema = z.object({
   email: z.string().email({ message: "Invalid contact email address." }),
   phoneNumber: z.string().min(10, { message: "Phone number must be at least 10 digits." }).max(15, "Phone number too long."),
   address: z.string().min(5, { message: "Address must be at least 5 characters." }),
-  yearOfJoining: z.coerce.number().min(1980, "Year too early.").max(currentYear, `Year cannot be in the future.`),
+  yearOfJoining: z.coerce.number().min(1980, "Year too early.").max(new Date().getFullYear(), `Year cannot be in the future.`),
   subjectsTaught: z.array(z.custom<SubjectName>((val) => allSubjectNamesArray.includes(val as SubjectName)))
     .min(1, { message: "At least one general subject qualification must be selected." }),
   profilePictureUrl: z.string().url({ message: "Invalid URL format for profile picture." }).optional().or(z.literal('')),
@@ -86,10 +91,11 @@ export function TeacherProfileFormDialog({
   teacherToEdit,
 }: TeacherProfileFormDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(false); // Can be used if fetching assignments separately
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState<{email: string, password: string} | null>(null);
   const { toast } = useToast();
   const isEditing = !!teacherToEdit;
+  const currentYear = new Date().getFullYear();
 
   const form = useForm<TeacherProfileFormValues>({
     resolver: zodResolver(teacherProfileSchema),
@@ -110,7 +116,6 @@ export function TeacherProfileFormDialog({
     const loadTeacherData = async () => {
       if (teacherToEdit && isOpen) {
         setIsLoadingAssignments(true);
-        // Fetch full ManagedUser data to get existing assignments
         const userDocRef = doc(firestore, getUsersCollectionPath(), teacherToEdit.authUid);
         const userDocSnap = await getDoc(userDocRef);
         const existingAssignments = userDocSnap.exists() ? (userDocSnap.data() as ManagedUser).assignments || [] : [];
@@ -123,7 +128,7 @@ export function TeacherProfileFormDialog({
           yearOfJoining: teacherToEdit.yearOfJoining,
           subjectsTaught: teacherToEdit.subjectsTaught || [],
           profilePictureUrl: teacherToEdit.profilePictureUrl || '',
-          assignments: existingAssignments.map(a => ({...a, id: a.id || uuidv4()})), // ensure assignments have IDs
+          assignments: existingAssignments.map(a => ({...a, id: a.id || uuidv4()})),
         });
         setIsLoadingAssignments(false);
       } else if (!isEditing && isOpen) {
@@ -135,7 +140,7 @@ export function TeacherProfileFormDialog({
       }
     };
     loadTeacherData();
-  }, [teacherToEdit, isOpen, form, isEditing]);
+  }, [teacherToEdit, isOpen, form, isEditing, currentYear]);
 
   async function onSubmit(values: TeacherProfileFormValues) {
     setIsSubmitting(true);
@@ -144,7 +149,7 @@ export function TeacherProfileFormDialog({
 
     try {
       let authUid = teacherToEdit?.authUid;
-      let finalAuthEmail = values.email; // Use contact email for auth email
+      let finalAuthEmail = values.email;
 
       if (!isEditing) { 
         const defaultPassword = `${values.name.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/gi, '')}@EES${new Date().getFullYear().toString().slice(-2)}`;
@@ -170,24 +175,24 @@ export function TeacherProfileFormDialog({
 
       const userProfileData: Partial<ManagedUser> = {
         name: values.name,
-        email: finalAuthEmail, // Auth email
+        email: finalAuthEmail,
         role: "Teacher",
         status: "Active",
-        assignments: values.assignments.map(a => ({...a, subjectId: a.subjectId || undefined})) || [], // Ensure subjectId is undefined if not set
+        assignments: values.assignments.map(a => ({...a, subjectId: a.subjectId || undefined})) || [],
       };
       await setDoc(doc(firestore, getUsersCollectionPath(), authUid), userProfileData, { merge: true });
 
       const teacherHRData: Omit<Teacher, 'id'> = {
         authUid: authUid, 
         name: values.name,
-        email: values.email, // Contact email from form
+        email: values.email,
         phoneNumber: values.phoneNumber,
         address: values.address,
         yearOfJoining: values.yearOfJoining,
         totalYearsWorked: totalYearsWorked >= 0 ? totalYearsWorked : 0,
-        subjectsTaught: values.subjectsTaught, // General qualifications
+        subjectsTaught: values.subjectsTaught,
         profilePictureUrl: values.profilePictureUrl || null,
-        salaryHistory: teacherToEdit?.salaryHistory || [], // Preserve existing salary history
+        salaryHistory: teacherToEdit?.salaryHistory || [],
       };
       await setDoc(doc(firestore, getTeacherDocPath(authUid)), teacherHRData, { merge: true });
       
@@ -208,12 +213,6 @@ export function TeacherProfileFormDialog({
     }
   }
   
-  const getSubjectOptions = (assignmentType?: TeacherAssignmentType): SubjectName[] => {
-    if (assignmentType === 'nios_teacher') return niosSubjectNamesArray as SubjectName[];
-    if (assignmentType === 'nclp_teacher') return nclpSubjectNamesArray as SubjectName[];
-    return standardSubjectNamesArray as SubjectName[];
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) { 
@@ -383,3 +382,4 @@ export function TeacherProfileFormDialog({
   );
 }
 
+    
