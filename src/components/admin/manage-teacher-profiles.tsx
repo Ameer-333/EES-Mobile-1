@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Teacher } from '@/types';
+import type { Teacher, ManagedUser } from '@/types';
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -27,6 +27,7 @@ import { firestore } from '@/lib/firebase';
 import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData } from 'firebase/firestore';
 
 const TEACHERS_COLLECTION = 'teachers';
+const USERS_COLLECTION = 'users'; // For deleting corresponding user record
 
 export function ManageTeacherProfiles() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -38,11 +39,13 @@ export function ManageTeacherProfiles() {
 
   useEffect(() => {
     setIsLoading(true);
+    // Listen to 'teachers' collection (HR profiles)
+    // Document IDs in 'teachers' should ideally be the authUid
     const teachersCollectionRef = collection(firestore, TEACHERS_COLLECTION);
     
     const unsubscribe = onSnapshot(teachersCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
-      const fetchedTeachers = snapshot.docs.map(docSnapshot => ({ // Renamed doc to docSnapshot to avoid conflict
-        id: docSnapshot.id,
+      const fetchedTeachers = snapshot.docs.map(docSnapshot => ({
+        id: docSnapshot.id, // This ID should be the authUid
         ...docSnapshot.data(),
       } as Teacher));
       setTeachers(fetchedTeachers);
@@ -66,7 +69,7 @@ export function ManageTeacherProfiles() {
       (teacher) =>
         teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        teacher.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        teacher.id.toLowerCase().includes(searchTerm.toLowerCase()) || // id is authUid
         (teacher.subjectsTaught && teacher.subjectsTaught.some(s => s.toLowerCase().includes(searchTerm.toLowerCase())))
     );
   }, [teachers, searchTerm]);
@@ -77,29 +80,34 @@ export function ManageTeacherProfiles() {
   };
 
   const handleEditTeacher = (teacher: Teacher) => {
-    setTeacherToEdit(teacher);
+    setTeacherToEdit(teacher); // teacher.id here is expected to be the authUid
     setIsFormOpen(true);
   };
 
   const handleDeleteTeacher = async (teacherId: string, teacherName: string) => {
+    // teacherId is the authUid
     try {
+      // 1. Delete from 'teachers' (HR profiles) collection
       const teacherDocRef = doc(firestore, TEACHERS_COLLECTION, teacherId);
       await deleteDoc(teacherDocRef);
-      // onSnapshot will update the list. Toast here provides immediate feedback.
-      toast({ title: "Teacher Deleted", description: `Teacher profile for ${teacherName} has been removed from Firestore.` });
+
+      // 2. Delete from 'users' (auth supplemental data, roles, assignments) collection
+      const userDocRef = doc(firestore, USERS_COLLECTION, teacherId);
+      await deleteDoc(userDocRef);
+      
+      // Note: Deleting Firebase Auth user needs Admin SDK or Cloud Function, not done client-side.
+      toast({ title: "Teacher Records Deleted", description: `HR profile and user data for ${teacherName} removed from Firestore. Auth account needs manual deletion if required.` });
     } catch (error) {
-      console.error("Error deleting teacher from Firestore:", error);
+      console.error("Error deleting teacher records from Firestore:", error);
       toast({
         title: "Deletion Failed",
-        description: `Could not delete teacher ${teacherName} from Firestore.`,
+        description: `Could not delete records for teacher ${teacherName} from Firestore.`,
         variant: "destructive",
       });
     }
   };
 
   const handleTeacherSaved = (savedTeacher: Teacher, isEditing: boolean) => {
-    // Firestore listener will update the state. This callback primarily closes the dialog.
-    // Toast is handled within TeacherProfileFormDialog.
     setIsFormOpen(false);
   };
   
@@ -152,8 +160,8 @@ export function ManageTeacherProfiles() {
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <CardTitle className="text-2xl font-headline text-primary">Teacher Profiles</CardTitle>
-              <CardDescription>Manage teacher information, contact details, and subjects from Firestore.</CardDescription>
+              <CardTitle className="text-2xl font-headline text-primary">Teacher HR Profiles & Assignments</CardTitle>
+              <CardDescription>Manage teacher information, contact details, and class/subject assignments. Auth accounts are created/managed here.</CardDescription>
             </div>
             <Button onClick={handleAddTeacher} className="bg-primary hover:bg-primary/90">
               <UserPlus className="mr-2 h-4 w-4" /> Add New Teacher
@@ -163,7 +171,7 @@ export function ManageTeacherProfiles() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Search by ID, name, email, or subject..."
+                placeholder="Search by Auth ID, name, email, or subject..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 w-full md:w-1/2"
@@ -177,10 +185,10 @@ export function ManageTeacherProfiles() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[80px]">Avatar</TableHead>
-                  <TableHead>ID</TableHead>
+                  <TableHead>Auth ID</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Subjects</TableHead>
+                  <TableHead>Contact Email</TableHead>
+                  <TableHead>Subjects Qualified</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -197,7 +205,7 @@ export function ManageTeacherProfiles() {
                         data-ai-hint="teacher avatar"
                       />
                     </TableCell>
-                    <TableCell className="font-medium truncate max-w-[100px]">{teacher.id}</TableCell>
+                    <TableCell className="font-medium truncate max-w-[100px]">{teacher.id}</TableCell> {/* Displaying Auth UID as ID */}
                     <TableCell>{teacher.name}</TableCell>
                     <TableCell className="text-muted-foreground">{teacher.email}</TableCell>
                     <TableCell>
@@ -221,13 +229,13 @@ export function ManageTeacherProfiles() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the profile for <strong>{teacher.name}</strong> from Firestore.
+                              This action cannot be undone. This will permanently delete the HR profile and user data (assignments, role) for <strong>{teacher.name}</strong> from Firestore. The Firebase Authentication account will need to be deleted manually from the Firebase console if required.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}>
-                              Yes, delete profile
+                              Yes, delete records
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -261,5 +269,3 @@ export function ManageTeacherProfiles() {
     </>
   );
 }
-
-    

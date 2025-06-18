@@ -14,18 +14,16 @@ export type TeacherAssignmentType = 'mother_teacher' | 'class_teacher' | 'subjec
 
 export interface TeacherAssignment {
   type: TeacherAssignmentType;
-  // For LKG-10th: classId (e.g., "LKG", "1", "10") and sectionId (e.g., "A", "B")
-  // For NIOS/NCLP: classId (e.g., "NIOS", "NCLP") and potentially groupId if further division is needed.
   classId: string; 
   sectionId?: string;
-  subjectId?: SubjectName; // Only for 'subject_teacher'
-  groupId?: string; // For NIOS/NCLP specific groups if not covered by classId/sectionId
+  subjectId?: SubjectName; 
+  groupId?: string; 
 }
 
 export interface StudentRemark {
   id: string;
   teacherName: string; 
-  teacherSubject: SubjectName; // This was correct
+  teacherSubject: SubjectName;
   remark: string;
   date: string; 
   sentiment: 'good' | 'bad' | 'neutral';
@@ -35,8 +33,8 @@ export interface UpcomingEvent {
   id: string;
   name: string;
   date: string; // YYYY-MM-DD
-  time: string; // e.g., "10:00 AM"
-  day: string; // e.g., "Monday"
+  time: string; 
+  day: string; 
   note?: string; 
   location?: string;
   imageUrl?: string; 
@@ -73,16 +71,15 @@ export interface Student {
   name: string;
   satsNumber: string;
   
-  className: string; // For display, e.g., "10th Grade", "LKG", "NIOS Group Alpha"
-  classId: string;   // For matching logic, e.g., "10", "LKG", "NIOS"
-  sectionId?: string; // For matching logic, e.g., "A", "B"
-  groupId?: string;   // For NIOS/NCLP further grouping, e.g., "Alpha", "Batch1"
+  className: string; 
+  classId: string;   
+  sectionId?: string; 
+  groupId?: string;  
 
-  // Keeping old fields for compatibility during transition, but new logic will prefer Id fields
-  class: string; // Old field, to be deprecated. Use className for display.
-  section: string; // Old field, to be deprecated. Use sectionId.
+  class: string; 
+  section: string; 
 
-  dateOfBirth?: string; // YYYY-MM-DD
+  dateOfBirth?: string; 
   fatherName?: string;
   motherName?: string;
   fatherOccupation?: string;
@@ -107,7 +104,7 @@ export interface Student {
 export type GradeType = 'Distinction' | 'First Class' | 'Second Class' | 'Pass Class' | 'Not Completed';
 
 export interface AttendanceRecord {
-  date: string; // YYYY-MM-DD
+  date: string; 
   status: 'Present' | 'Absent';
 }
 
@@ -126,16 +123,16 @@ export interface ManagedUser {
   status: 'Active' | 'Inactive' | 'Pending';
   lastLogin: string; 
   studentProfileId?: string; 
-  assignments?: TeacherAssignment[]; // Added for teachers
+  assignments?: TeacherAssignment[]; 
 }
 
 export interface StudentFormData {
   name: string;
   satsNumber: string;
   
-  className: string; // Display name like "10th Grade"
-  classId: string;   // Stored ID like "10"
-  sectionId?: string; // Stored ID like "A"
+  className: string; 
+  classId: string;   
+  sectionId?: string; 
   groupId?: string;
 
   caste: string;
@@ -158,32 +155,30 @@ export interface StudentFormData {
 export interface TeacherSalaryRecord {
   id: string;
   monthYear: string; 
-  dateIssued: string; // YYYY-MM-DD
+  dateIssued: string; 
   amountIssued: number;
   amountDeducted: number;
   daysAbsent: number;
   reasonForAbsence?: string;
 }
-
-// This Teacher type is for the 'teachers' collection which might store payroll, specific HR data.
-// The 'assignments' are better placed on the 'users' collection document for the teacher for auth rules.
 export interface Teacher {
-  id: string; // Corresponds to a doc ID in 'teachers' collection, might be same as auth UID
+  id: string; 
+  authUid?: string; // To link with Firebase Auth UID and users collection
   name: string;
-  email: string;
+  email: string; // Contact email, may differ from auth email
   phoneNumber: string;
   address: string;
   yearOfJoining: number;
   totalYearsWorked?: number;
-  subjectsTaught: SubjectName[]; // This might be general qualification, specific assignments are separate
+  subjectsTaught: SubjectName[]; // General subjects qualified for
   profilePictureUrl?: string | null;
   salaryHistory?: TeacherSalaryRecord[];
-  daysPresentThisMonth?: number; // Example of attendance tracking for teacher
+  daysPresentThisMonth?: number; 
   daysAbsentThisMonth?: number;
-  // assignments?: TeacherAssignment[]; // Assignments are now primarily on the ManagedUser (users collection)
 }
 
-export interface TeacherFormData { // For forms related to the 'teachers' collection
+// Updated to include assignments
+export interface TeacherFormData { 
   name: string;
   email: string;
   phoneNumber: string;
@@ -191,6 +186,7 @@ export interface TeacherFormData { // For forms related to the 'teachers' collec
   yearOfJoining: number;
   subjectsTaught: SubjectName[];
   profilePictureUrl?: string;
+  assignments?: TeacherAssignment[]; // Added assignments
 }
 
 
@@ -201,7 +197,7 @@ export interface AppMessage {
   senderRole: UserRole;
   receiverRole: UserRole;
   content: string;
-  timestamp: string; // ISO Date string
+  timestamp: string; 
   read: boolean;
   messageType: 'app';
 }
