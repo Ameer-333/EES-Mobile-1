@@ -27,17 +27,25 @@ import { firestore } from '@/lib/firebase';
 import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData, query, where } from 'firebase/firestore';
 import { useAppContext } from '@/app/(protected)/layout';
 
-// Helper function to generate student collection name
-const getStudentCollectionName = (classId: string): string => {
+const STUDENT_DATA_ROOT_COLLECTION = 'student_data_by_class';
+const PROFILES_SUBCOLLECTION_NAME = 'profiles';
+const USERS_COLLECTION = 'users'; 
+
+// Helper function to get the path to a class's profiles subcollection
+const getStudentProfilesCollectionPath = (classId: string): string => {
   if (!classId) {
-    // This case should ideally not happen if classId is always present
-    console.warn("Attempted to get collection name with undefined classId");
-    return 'students_unknown'; // Fallback, though likely problematic
+    console.warn("Attempted to get student profiles collection path with undefined classId");
+    return `${STUDENT_DATA_ROOT_COLLECTION}/unknown_class/${PROFILES_SUBCOLLECTION_NAME}`; // Fallback
   }
-  return `students_${classId.toLowerCase().replace(/[^a-z0-9_]/gi, '_')}`;
+  return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}`;
 };
 
-const USERS_COLLECTION = 'users'; // To delete the user's link if student is deleted
+// Helper function to get the path to a student's document
+const getStudentDocPath = (classId: string, studentProfileId: string): string => {
+    if (!classId || !studentProfileId) throw new Error("classId and studentProfileId are required to determine student document path");
+    return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}/${studentProfileId}`;
+  };
+
 
 export function TeacherStudentManagement() {
   const { userProfile } = useAppContext();
@@ -60,9 +68,10 @@ export function TeacherStudentManagement() {
 
     setIsLoading(true);
     const unsubscribers: (() => void)[] = [];
-    let allFetchedStudents: Record<string, Student> = {}; // Use an object to handle potential duplicates by ID across snapshots
+    let allFetchedStudentsMap: Map<string, Student> = new Map();
 
-    const uniqueClassIds = Array.from(new Set(teacherAssignments.map(a => a.classId).filter(Boolean)));
+    const uniqueClassIds = Array.from(new Set(teacherAssignments.map(a => a.classId).filter(Boolean as unknown as (value: string | undefined) => value is string)));
+
 
     if (uniqueClassIds.length === 0) {
         setIsLoading(false);
@@ -71,32 +80,28 @@ export function TeacherStudentManagement() {
     }
 
     uniqueClassIds.forEach(classId => {
-      const studentCollectionName = getStudentCollectionName(classId);
-      const studentsCollectionRef = collection(firestore, studentCollectionName);
+      const studentProfilesCollectionPath = getStudentProfilesCollectionPath(classId);
+      const studentsCollectionRef = collection(firestore, studentProfilesCollectionPath);
       
-      // Filter by section/group if applicable for this classId based on assignments
-      // This query part is complex if assignments have different section/group criteria for the same classId.
-      // For simplicity, this example fetches all from the classId collection and filters client-side.
-      // A more optimized approach might involve more specific queries if assignments are granular.
-      const q = studentsCollectionRef; // Potentially add where clauses here based on assignments
-
-      const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
-        snapshot.docs.forEach(docSnapshot => {
-          allFetchedStudents[docSnapshot.id] = {
-            id: docSnapshot.id, // This is the ID from the students_<classId> collection
-            ...docSnapshot.data(),
-          } as Student;
+      const unsubscribe = onSnapshot(studentsCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
+        snapshot.docChanges().forEach((change) => {
+            const studentData = {
+                id: change.doc.id, // This is the studentProfileId
+                ...change.doc.data(),
+              } as Student;
+            if (change.type === "added" || change.type === "modified") {
+                allFetchedStudentsMap.set(studentData.authUid, studentData); // Use authUid as key for global uniqueness
+            } else if (change.type === "removed") {
+                allFetchedStudentsMap.delete(studentData.authUid);
+            }
         });
         
-        // Filter all fetched students based on all assignments
-        const currentlyAssigned = Object.values(allFetchedStudents).filter(student => {
+        const currentlyAssigned = Array.from(allFetchedStudentsMap.values()).filter(student => {
             return teacherAssignments.some(assignment => {
                 if (student.classId !== assignment.classId) return false;
-                // For mother_teacher, class_teacher, subject_teacher - match sectionId if present
                 if (['mother_teacher', 'class_teacher', 'subject_teacher'].includes(assignment.type)) {
                     return assignment.sectionId ? student.sectionId === assignment.sectionId : true;
                 }
-                // For nios_teacher, nclp_teacher - match groupId if present
                 if (['nios_teacher', 'nclp_teacher'].includes(assignment.type)) {
                     return assignment.groupId ? student.groupId === assignment.groupId : true;
                 }
@@ -104,12 +109,12 @@ export function TeacherStudentManagement() {
             });
         });
         setAssignedStudents(currentlyAssigned);
-        setIsLoading(false); // Set loading to false after first successful fetch/merge
+        setIsLoading(false); 
       }, (error) => {
-        console.error(`Error fetching students from ${studentCollectionName}:`, error);
+        console.error(`Error fetching students from ${studentProfilesCollectionPath}:`, error);
         toast({
           title: `Error Loading Students from ${classId}`,
-          description: `Could not fetch student data from ${studentCollectionName}.`,
+          description: `Could not fetch student data from ${studentProfilesCollectionPath}.`,
           variant: "destructive",
         });
         setIsLoading(false);
@@ -128,14 +133,14 @@ export function TeacherStudentManagement() {
     return assignedStudents.filter(
       (student) =>
         (student.name && student.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (student.id && student.id.toLowerCase().includes(searchTerm.toLowerCase())) || // student.id is doc ID in students_<classId>
+        (student.id && student.id.toLowerCase().includes(searchTerm.toLowerCase())) || 
         (student.satsNumber && student.satsNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (student.className && student.className.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [assignedStudents, searchTerm]);
 
   const handleOpenEditDialog = (student: Student) => {
-    setCurrentStudentToEdit(student); // student object here contains its original classId
+    setCurrentStudentToEdit(student); 
     setIsEditStudentDialogOpen(true);
   };
   
@@ -144,17 +149,14 @@ export function TeacherStudentManagement() {
         toast({ title: "Error", description: "Student data is incomplete for deletion.", variant: "destructive" });
         return;
     }
-    const studentCollectionName = getStudentCollectionName(student.classId);
+    const studentDocPath = getStudentDocPath(student.classId, student.id);
     try {
-      // Delete from class-specific student collection
-      const studentDocRef = doc(firestore, studentCollectionName, student.id);
+      const studentDocRef = doc(firestore, studentDocPath);
       await deleteDoc(studentDocRef);
 
-      // Delete from 'users' collection (the link to auth)
       const userDocRef = doc(firestore, USERS_COLLECTION, student.authUid);
       await deleteDoc(userDocRef);
       
-      // Note: Deleting Firebase Auth user itself is not done here.
       toast({ title: "Student Record Deleted", description: `Student ${student.name || 'Unknown'} and their user link have been removed from Firestore.` });
     } catch (error) {
       console.error("Error deleting student from Firestore:", error);
@@ -167,15 +169,11 @@ export function TeacherStudentManagement() {
   };
 
   const handleStudentAdded = (newStudent: Student) => {
-    // Firestore onSnapshot will handle UI updates.
     setIsAddStudentDialogOpen(false);
   };
 
   const handleStudentEdited = (editedStudent: Student) => {
-     // Firestore onSnapshot will handle UI updates.
     setIsEditStudentDialogOpen(false);
-    // If classId changed, the useEffect for fetching students should ideally re-trigger
-    // or we need to manually refetch/resort. For now, rely on existing snapshot behavior.
   };
 
   if (isLoading) {
@@ -246,7 +244,7 @@ export function TeacherStudentManagement() {
             </TableHeader>
             <TableBody>
               {filteredStudentsToDisplay.length > 0 ? filteredStudentsToDisplay.map((student) => (
-                <TableRow key={student.authUid || student.id}> {/* Use authUid if available, else student.id */}
+                <TableRow key={student.authUid || student.id}> 
                   <TableCell>
                     <Image
                       src={student.profilePictureUrl || `https://placehold.co/40x40.png?text=${student.name && student.name.length > 0 ? student.name.charAt(0) : 'S'}`}
@@ -277,7 +275,7 @@ export function TeacherStudentManagement() {
                           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                           <AlertDialogDescription>
                             This action cannot be undone. This will permanently delete the student
-                            record for {student.name || 'this student'} from its class collection ({getStudentCollectionName(student.classId)}) and their user link from Firestore.
+                            record for {student.name || 'this student'} from its class subcollection ({getStudentProfilesCollectionPath(student.classId)}) and their user link from Firestore.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -323,5 +321,7 @@ export function TeacherStudentManagement() {
     </>
   );
 }
+
+    
 
     

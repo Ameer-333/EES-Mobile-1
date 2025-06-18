@@ -4,8 +4,8 @@
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Student, SubjectName, ExamName, ExamRecord, RawAttendanceRecord } from '@/types';
-import { subjectNamesArray, examNamesArray } from '@/types'; // Import examNamesArray
+import type { Student, SubjectName, ExamName, ExamRecord, RawAttendanceRecord, TeacherAssignment } from '@/types';
+import { subjectNamesArray, examNamesArray } from '@/types'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -18,15 +18,35 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { firestore } from '@/lib/firebase';
-import { collection, onSnapshot, QuerySnapshot, DocumentData, doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, QuerySnapshot, DocumentData, doc, getDoc, updateDoc, arrayUnion, DocumentReference } from 'firebase/firestore';
+import { useAppContext } from '@/app/(protected)/layout';
 
-const STUDENTS_COLLECTION = 'students';
+const STUDENT_DATA_ROOT_COLLECTION = 'student_data_by_class';
+const PROFILES_SUBCOLLECTION_NAME = 'profiles';
+
+// Helper function to get the path to a class's profiles subcollection
+const getStudentProfilesCollectionPath = (classId: string): string => {
+  if (!classId) {
+    console.warn("Attempted to get student profiles collection path with undefined classId for data entry");
+    return `${STUDENT_DATA_ROOT_COLLECTION}/unknown_class/${PROFILES_SUBCOLLECTION_NAME}`;
+  }
+  return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}`;
+};
+
+// Helper function to get the path to a student's document
+const getStudentDocRef = (classId: string, studentProfileId: string): DocumentReference => {
+  if (!classId || !studentProfileId) throw new Error("classId and studentProfileId are required to get student document reference");
+  const path = `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}/${studentProfileId}`;
+  return doc(firestore, path);
+};
+
 
 const marksSchema = z.object({
-  studentId: z.string().min(1, 'Student is required.'),
+  studentId: z.string().min(1, 'Student is required.'), // This will be studentProfileId
+  classId: z.string().min(1, 'Class ID for the student is required.'), // Student's classId
   examName: z.custom<ExamName>(val => examNamesArray.includes(val as ExamName), 'Exam Name is required.'),
   subjectName: z.custom<SubjectName>(val => subjectNamesArray.includes(val as SubjectName), 'Subject is required.'),
   marks: z.coerce.number().min(0, 'Marks cannot be negative.').max(100, 'Marks cannot exceed 100.'),
@@ -34,59 +54,145 @@ const marksSchema = z.object({
 });
 
 const attendanceSchema = z.object({
-  studentId: z.string().min(1, 'Student is required.'),
+  studentId: z.string().min(1, 'Student is required.'), // This will be studentProfileId
+  classId: z.string().min(1, 'Class ID for the student is required.'), // Student's classId
   subjectName: z.custom<SubjectName>(val => subjectNamesArray.includes(val as SubjectName), 'Subject is required.'),
   date: z.date({ required_error: "Date is required."}),
   status: z.enum(['Present', 'Absent'], { required_error: "Status is required."}),
 });
 
 export function TeacherDataEntry() {
+  const { userProfile } = useAppContext();
+  const teacherAssignments = userProfile?.role === 'Teacher' ? userProfile.assignments : [];
   const { toast } = useToast();
   const [hasMounted, setHasMounted] = useState(false);
-  const [students, setStudents] = useState<Pick<Student, 'id' | 'name'>[]>([]);
+  
+  const [allAssignedStudents, setAllAssignedStudents] = useState<Student[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
+
   const [isSubmittingMarks, setIsSubmittingMarks] = useState(false);
   const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
 
-
   useEffect(() => {
     setHasMounted(true);
-    const studentsCollectionRef = collection(firestore, STUDENTS_COLLECTION);
-    
-    const unsubscribe = onSnapshot(studentsCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
-      const fetchedStudents = snapshot.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name || 'Unnamed Student', 
-      } as Pick<Student, 'id' | 'name'>));
-      setStudents(fetchedStudents);
+    if (userProfile?.role !== 'Teacher' || !teacherAssignments || teacherAssignments.length === 0) {
       setIsLoadingStudents(false);
-    }, (error) => {
-      console.error("Error fetching students for data entry:", error);
-      toast({
-        title: "Error Loading Students",
-        description: "Could not fetch student list for data entry.",
-        variant: "destructive",
+      setAllAssignedStudents([]);
+      return;
+    }
+
+    setIsLoadingStudents(true);
+    const unsubscribers: (() => void)[] = [];
+    let fetchedStudentsMap: Map<string, Student> = new Map(); // Key: studentProfileId from class/profiles
+
+    const uniqueClassIds = Array.from(new Set(teacherAssignments.map(a => a.classId).filter(Boolean as unknown as (value: string | undefined) => value is string)));
+
+    if (uniqueClassIds.length === 0) {
+      setIsLoadingStudents(false);
+      setAllAssignedStudents([]);
+      return;
+    }
+
+    uniqueClassIds.forEach(classId => {
+      const studentProfilesPath = getStudentProfilesCollectionPath(classId);
+      const q = query(collection(firestore, studentProfilesPath));
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          const studentData = {
+            id: change.doc.id, // studentProfileId in the subcollection
+            ...change.doc.data(),
+          } as Student;
+          
+          if (change.type === "added" || change.type === "modified") {
+            fetchedStudentsMap.set(studentData.id, studentData);
+          } else if (change.type === "removed") {
+            fetchedStudentsMap.delete(studentData.id);
+          }
+        });
+
+        const filteredByAssignment = Array.from(fetchedStudentsMap.values()).filter(student =>
+          teacherAssignments.some(assignment => {
+            if (student.classId !== assignment.classId) return false;
+            if (['mother_teacher', 'class_teacher', 'subject_teacher'].includes(assignment.type)) {
+              return assignment.sectionId ? student.sectionId === assignment.sectionId : true;
+            }
+            if (['nios_teacher', 'nclp_teacher'].includes(assignment.type)) {
+              return assignment.groupId ? student.groupId === assignment.groupId : true;
+            }
+            return false;
+          })
+        );
+        setAllAssignedStudents(filteredByAssignment);
+        setIsLoadingStudents(false);
+      }, (error) => {
+        console.error(`Error fetching students from ${studentProfilesPath}:`, error);
+        setIsLoadingStudents(false);
       });
-      setIsLoadingStudents(false);
+      unsubscribers.push(unsubscribe);
     });
 
-    return () => unsubscribe();
-  }, [toast]);
+    return () => unsubscribers.forEach(unsub => unsub());
+  }, [userProfile, teacherAssignments]);
+
 
   const marksForm = useForm<z.infer<typeof marksSchema>>({
     resolver: zodResolver(marksSchema),
-    defaultValues: { studentId: '', marks: 0, maxMarks: 100 },
+    defaultValues: { studentId: '', classId: '', marks: 0, maxMarks: 100 },
   });
 
   const attendanceForm = useForm<z.infer<typeof attendanceSchema>>({
     resolver: zodResolver(attendanceSchema),
-    defaultValues: { studentId: '', status: 'Present' },
+    defaultValues: { studentId: '', classId: '', status: 'Present' },
   });
+
+  const selectedStudentForMarks = marksForm.watch("studentId");
+  const selectedStudentForAttendance = attendanceForm.watch("studentId");
+
+  useEffect(() => {
+    if (selectedStudentForMarks) {
+      const student = allAssignedStudents.find(s => s.id === selectedStudentForMarks);
+      if (student) marksForm.setValue("classId", student.classId);
+    }
+  }, [selectedStudentForMarks, allAssignedStudents, marksForm]);
+
+  useEffect(() => {
+    if (selectedStudentForAttendance) {
+      const student = allAssignedStudents.find(s => s.id === selectedStudentForAttendance);
+      if (student) attendanceForm.setValue("classId", student.classId);
+    }
+  }, [selectedStudentForAttendance, allAssignedStudents, attendanceForm]);
+
+  // Filter subjects based on teacher's role and assignments for the selected student
+  const availableSubjectsForSelectedStudent = useMemo(() => {
+    const studentId = marksForm.getValues("studentId") || attendanceForm.getValues("studentId");
+    if (!studentId || !teacherAssignments) return subjectNamesArray;
+
+    const student = allAssignedStudents.find(s => s.id === studentId);
+    if (!student) return subjectNamesArray;
+
+    let relevantSubjects: Set<SubjectName> = new Set();
+    teacherAssignments.forEach(assignment => {
+      if (assignment.classId === student.classId && (!assignment.sectionId || assignment.sectionId === student.sectionId)) {
+        if (assignment.type === 'mother_teacher' || assignment.type === 'class_teacher') {
+          subjectNamesArray.forEach(s => relevantSubjects.add(s));
+        } else if (assignment.type === 'subject_teacher' && assignment.subjectId) {
+          relevantSubjects.add(assignment.subjectId);
+        } else if (['nios_teacher', 'nclp_teacher'].includes(assignment.type)) {
+          // For NIOS/NCLP, assume they can teach all subjects or specific ones if defined
+          // This might need refinement based on how NIOS/NCLP subjects are handled
+          subjectNamesArray.forEach(s => relevantSubjects.add(s));
+        }
+      }
+    });
+    return Array.from(relevantSubjects).length > 0 ? Array.from(relevantSubjects) : subjectNamesArray;
+  }, [marksForm, attendanceForm, allAssignedStudents, teacherAssignments]);
+
 
   async function onMarksSubmit(values: z.infer<typeof marksSchema>) {
     setIsSubmittingMarks(true);
     try {
-      const studentDocRef = doc(firestore, STUDENTS_COLLECTION, values.studentId);
+      const studentDocRef = getStudentDocRef(values.classId, values.studentId);
       const studentSnap = await getDoc(studentDocRef);
 
       if (!studentSnap.exists()) {
@@ -128,6 +234,7 @@ export function TeacherDataEntry() {
       toast({ title: 'Marks Submitted', description: `Marks for ${values.subjectName} (${values.examName}) recorded for student ${studentData.name}.` });
       marksForm.reset({ 
         studentId: values.studentId,
+        classId: values.classId,
         examName: values.examName,  
         subjectName: undefined,     
         marks: 0, 
@@ -143,7 +250,7 @@ export function TeacherDataEntry() {
   async function onAttendanceSubmit(values: z.infer<typeof attendanceSchema>) {
     setIsSubmittingAttendance(true);
     try {
-        const studentDocRef = doc(firestore, STUDENTS_COLLECTION, values.studentId);
+        const studentDocRef = getStudentDocRef(values.classId, values.studentId);
         const studentSnap = await getDoc(studentDocRef);
 
         if (!studentSnap.exists()) {
@@ -159,31 +266,26 @@ export function TeacherDataEntry() {
             status: values.status,
         };
         
-        // Check if a record for this student, subject, and date already exists
         const existingRecords = studentData.rawAttendanceRecords || [];
-        const recordExists = existingRecords.some(
+        const recordIndex = existingRecords.findIndex(
           record => record.subjectName === newAttendanceRecord.subjectName && record.date === newAttendanceRecord.date
         );
 
-        if (recordExists) {
-          // Update existing record
-          const updatedRecords = existingRecords.map(record =>
-            (record.subjectName === newAttendanceRecord.subjectName && record.date === newAttendanceRecord.date)
-              ? newAttendanceRecord 
-              : record
-          );
-          await updateDoc(studentDocRef, { rawAttendanceRecords: updatedRecords });
+        let updatedRecords;
+        if (recordIndex > -1) {
+          updatedRecords = [...existingRecords];
+          updatedRecords[recordIndex] = newAttendanceRecord; // Update existing
           toast({ title: 'Attendance Updated', description: `Attendance for ${values.subjectName} on ${format(values.date, "PPP")} updated for ${studentData.name}.` });
         } else {
-          // Add new record
-          await updateDoc(studentDocRef, {
-              rawAttendanceRecords: arrayUnion(newAttendanceRecord)
-          });
+          updatedRecords = [...existingRecords, newAttendanceRecord]; // Add new
           toast({ title: 'Attendance Submitted', description: `Attendance for ${values.subjectName} on ${format(values.date, "PPP")} recorded for ${studentData.name}.` });
         }
         
+        await updateDoc(studentDocRef, { rawAttendanceRecords: updatedRecords });
+        
         attendanceForm.reset({ 
             studentId: values.studentId, 
+            classId: values.classId,
             subjectName: values.subjectName, 
             date: values.date,          
             status: 'Present' 
@@ -211,7 +313,7 @@ export function TeacherDataEntry() {
           <div className="space-y-6">
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="ml-3 text-muted-foreground">Loading student list...</p>
+              <p className="ml-3 text-muted-foreground">Loading assigned students...</p>
             </div>
             <Skeleton className="h-4 w-1/4 mb-1" />
             <Skeleton className="h-10 w-full" />
@@ -228,7 +330,7 @@ export function TeacherDataEntry() {
     <Card className="w-full shadow-lg rounded-lg">
       <CardHeader>
         <CardTitle className="text-2xl font-headline text-primary">Data Entry</CardTitle>
-        <CardDescription>Upload student marks and attendance records. Students are loaded from Firestore.</CardDescription>
+        <CardDescription>Upload student marks and attendance records for your assigned students.</CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="marksEntry" className="w-full">
@@ -246,15 +348,24 @@ export function TeacherDataEntry() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Select Student</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={students.length === 0 || isSubmittingMarks}>
+                      <Select 
+                        onValueChange={(value) => {
+                            field.onChange(value);
+                            const student = allAssignedStudents.find(s => s.id === value);
+                            if (student) marksForm.setValue("classId", student.classId);
+                            marksForm.setValue("subjectName", undefined); // Reset subject on student change
+                        }} 
+                        defaultValue={field.value} 
+                        disabled={allAssignedStudents.length === 0 || isSubmittingMarks}
+                      >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder={students.length === 0 ? "No students found" : "Select a student"} />
+                            <SelectValue placeholder={allAssignedStudents.length === 0 ? "No assigned students found" : "Select a student"} />
                             </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {students.map(student => (
-                            <SelectItem key={student.id} value={student.id}>{student.name} ({student.id})</SelectItem>
+                          {allAssignedStudents.map(student => (
+                            <SelectItem key={student.id} value={student.id}>{student.name} ({student.className} {student.sectionId || ''} - {student.satsNumber})</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -288,12 +399,16 @@ export function TeacherDataEntry() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Select Subject</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value as string} disabled={isSubmittingMarks}>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value || ''} 
+                        disabled={isSubmittingMarks || !marksForm.getValues("studentId")}
+                      >
                         <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select a subject" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder={!marksForm.getValues("studentId") ? "Select student first" : "Select a subject"} /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {subjectNamesArray.map(subject => (
+                          {availableSubjectsForSelectedStudent.map(subject => (
                             <SelectItem key={subject} value={subject}>{subject}</SelectItem>
                           ))}
                         </SelectContent>
@@ -326,7 +441,7 @@ export function TeacherDataEntry() {
                     )}
                   />
                 </div>
-                <Button type="submit" className="w-full md:w-auto" disabled={students.length === 0 || isSubmittingMarks}>
+                <Button type="submit" className="w-full md:w-auto" disabled={allAssignedStudents.length === 0 || isSubmittingMarks}>
                   {isSubmittingMarks ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
                   Submit Marks
                 </Button>
@@ -343,15 +458,24 @@ export function TeacherDataEntry() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Select Student</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={students.length === 0 || isSubmittingAttendance}>
+                      <Select 
+                        onValueChange={(value) => {
+                            field.onChange(value);
+                            const student = allAssignedStudents.find(s => s.id === value);
+                            if (student) attendanceForm.setValue("classId", student.classId);
+                            attendanceForm.setValue("subjectName", undefined); // Reset subject
+                        }} 
+                        defaultValue={field.value} 
+                        disabled={allAssignedStudents.length === 0 || isSubmittingAttendance}
+                      >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder={students.length === 0 ? "No students found" : "Select a student"} />
+                            <SelectValue placeholder={allAssignedStudents.length === 0 ? "No assigned students found" : "Select a student"} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {students.map(student => (
-                            <SelectItem key={student.id} value={student.id}>{student.name} ({student.id})</SelectItem>
+                          {allAssignedStudents.map(student => (
+                           <SelectItem key={student.id} value={student.id}>{student.name} ({student.className} {student.sectionId || ''} - {student.satsNumber})</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -365,12 +489,16 @@ export function TeacherDataEntry() {
                    render={({ field }) => (
                     <FormItem>
                       <FormLabel>Select Subject</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value as string} disabled={isSubmittingAttendance}>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value || ''} 
+                        disabled={isSubmittingAttendance || !attendanceForm.getValues("studentId")}
+                        >
                         <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select a subject" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder={!attendanceForm.getValues("studentId") ? "Select student first" : "Select a subject"} /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {subjectNamesArray.map(subject => (
+                          {availableSubjectsForSelectedStudent.map(subject => (
                             <SelectItem key={subject} value={subject}>{subject}</SelectItem>
                           ))}
                         </SelectContent>
@@ -440,7 +568,7 @@ export function TeacherDataEntry() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full md:w-auto" disabled={students.length === 0 || isSubmittingAttendance}>
+                <Button type="submit" className="w-full md:w-auto" disabled={allAssignedStudents.length === 0 || isSubmittingAttendance}>
                   {isSubmittingAttendance ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
                    Submit Attendance
                 </Button>
@@ -452,3 +580,6 @@ export function TeacherDataEntry() {
     </Card>
   );
 }
+
+
+    

@@ -9,15 +9,17 @@ import { useEffect, useState } from 'react';
 import { firestore } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { useAppContext } from '@/app/(protected)/layout'; // Import app context
+import { useAppContext } from '@/app/(protected)/layout'; 
 
-// Helper function to generate student collection name
-const getStudentCollectionName = (classId: string): string => {
-  if (!classId) throw new Error("classId is required to determine collection name for student attendance");
-  return `students_${classId.toLowerCase().replace(/[^a-z0-9_]/gi, '_')}`;
+const STUDENT_DATA_ROOT_COLLECTION = 'student_data_by_class';
+const PROFILES_SUBCOLLECTION_NAME = 'profiles';
+
+// Helper function to get the path to a student's document
+const getStudentDocPath = (classId: string, studentProfileId: string): string => {
+  if (!classId || !studentProfileId) throw new Error("classId and studentProfileId are required to determine student document path");
+  return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}/${studentProfileId}`;
 };
 
-// Helper function to process raw attendance records
 function processRawAttendance(rawRecords: RawAttendanceRecord[] | undefined): StudentSubjectAttendance[] {
   if (!rawRecords || rawRecords.length === 0) {
     return subjectNamesArray.map(subjectName => ({
@@ -55,7 +57,7 @@ function processRawAttendance(rawRecords: RawAttendanceRecord[] | undefined): St
 
 
 export default function StudentAttendancePage() {
-  const { userProfile, isLoadingAuth } = useAppContext(); // Get userProfile from context
+  const { userProfile, isLoadingAuth } = useAppContext(); 
   const [attendanceData, setAttendanceData] = useState<StudentSubjectAttendance[] | undefined>(undefined);
   const [studentName, setStudentName] = useState<string | undefined>(undefined);
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
@@ -73,15 +75,15 @@ export default function StudentAttendancePage() {
 
       if (!userProfile.classId || !userProfile.studentProfileId) {
         toast({ title: "Error", description: "Student class or profile ID missing. Cannot fetch attendance.", variant: "destructive" });
-        setAttendanceData(processRawAttendance(undefined)); // Show empty state
+        setAttendanceData(processRawAttendance(undefined)); 
         setIsLoadingPageData(false);
         return;
       }
 
       setIsLoadingPageData(true);
       try {
-        const studentCollection = getStudentCollectionName(userProfile.classId);
-        const studentDocRef = doc(firestore, studentCollection, userProfile.studentProfileId);
+        const studentDocPath = getStudentDocPath(userProfile.classId, userProfile.studentProfileId);
+        const studentDocRef = doc(firestore, studentDocPath);
         const studentDocSnap = await getDoc(studentDocRef);
 
         if (studentDocSnap.exists()) {
@@ -133,5 +135,6 @@ export default function StudentAttendancePage() {
     </div>
   );
 }
+    
 
     

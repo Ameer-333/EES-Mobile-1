@@ -8,16 +8,20 @@ import { firestore } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { Loader2, BookCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAppContext } from '@/app/(protected)/layout'; // Import app context
+import { useAppContext } from '@/app/(protected)/layout'; 
 
-// Helper function to generate student collection name
-const getStudentCollectionName = (classId: string): string => {
-  if (!classId) throw new Error("classId is required to determine collection name for student records");
-  return `students_${classId.toLowerCase().replace(/[^a-z0-9_]/gi, '_')}`;
+const STUDENT_DATA_ROOT_COLLECTION = 'student_data_by_class';
+const PROFILES_SUBCOLLECTION_NAME = 'profiles';
+
+// Helper function to get the path to a student's document
+const getStudentDocPath = (classId: string, studentProfileId: string): string => {
+  if (!classId || !studentProfileId) throw new Error("classId and studentProfileId are required to determine student document path");
+  return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}/${studentProfileId}`;
 };
 
+
 export default function StudentRecordsPage() {
-  const { userProfile, isLoadingAuth } = useAppContext(); // Get userProfile from context
+  const { userProfile, isLoadingAuth } = useAppContext(); 
   const [examRecords, setExamRecords] = useState<ExamRecord[] | undefined>(undefined);
   const [studentName, setStudentName] = useState<string | undefined>(undefined);
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
@@ -42,8 +46,8 @@ export default function StudentRecordsPage() {
       
       setIsLoadingPageData(true);
       try {
-        const studentCollection = getStudentCollectionName(userProfile.classId);
-        const studentDocRef = doc(firestore, studentCollection, userProfile.studentProfileId);
+        const studentDocPath = getStudentDocPath(userProfile.classId, userProfile.studentProfileId);
+        const studentDocRef = doc(firestore, studentDocPath);
         const studentDocSnap = await getDoc(studentDocRef);
 
         if (studentDocSnap.exists()) {
@@ -90,5 +94,6 @@ export default function StudentRecordsPage() {
     </div>
   );
 }
+    
 
     

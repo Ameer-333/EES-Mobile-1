@@ -34,19 +34,21 @@ import { firestore, auth as firebaseAuth } from '@/lib/firebase';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 
-// Helper function to generate student collection name
-const getStudentCollectionName = (classId: string): string => {
-  if (!classId) throw new Error("classId is required to determine collection name");
-  return `students_${classId.toLowerCase().replace(/[^a-z0-9_]/gi, '_')}`;
-};
-
+const STUDENT_DATA_ROOT_COLLECTION = 'student_data_by_class';
+const PROFILES_SUBCOLLECTION_NAME = 'profiles';
 const USERS_COLLECTION = 'users';
+
+// Helper function to get the path to a class's profiles subcollection
+const getStudentProfilesCollectionPath = (classId: string): string => {
+  if (!classId) throw new Error("classId is required to determine student profiles collection path");
+  return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}`;
+};
 
 const addStudentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   satsNumber: z.string().min(3, { message: 'SATS number must be at least 3 characters.' }).regex(/^[a-zA-Z0-9]+$/, "SATS number should be alphanumeric."),
   className: z.string().min(1, { message: 'Class Name (e.g., 10th Grade, LKG) is required.' }),
-  classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG, NIOS - used for collection name) is required.' }),
+  classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG, NIOS - used for collection path) is required.' }),
   sectionId: z.string().max(2).optional().or(z.literal('')),
   groupId: z.string().optional().or(z.literal('')),
   dateOfBirth: z.string().optional().or(z.literal('')),
@@ -92,17 +94,23 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     setIsSubmitting(true);
     setGeneratedCredentials(null);
 
+    if (!values.classId) {
+        toast({ title: "Error", description: "Class ID is missing. Cannot add student.", variant: "destructive"});
+        setIsSubmitting(false);
+        return;
+    }
+    
     const generatedLoginEmail = `${values.satsNumber.toLowerCase().replace(/[^a-z0-9]/gi, '')}.student@eesedu.com`;
     const generatedPassword = `${values.satsNumber.toUpperCase()}Default@123`;
-    const studentTargetCollection = getStudentCollectionName(values.classId);
+    const studentProfilesCollectionPath = getStudentProfilesCollectionPath(values.classId);
 
     try {
       // 1. Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, generatedLoginEmail, generatedPassword);
       const authUid = userCredential.user.uid;
 
-      // 2. Prepare and add student document to the class-specific collection
-      const studentProfileData: Omit<Student, 'id'> = {
+      // 2. Prepare and add student document to the class-specific profiles subcollection
+      const studentProfileDataForDb: Omit<Student, 'id'> = {
         authUid: authUid,
         name: values.name,
         satsNumber: values.satsNumber,
@@ -110,8 +118,8 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
         classId: values.classId,
         sectionId: values.sectionId || undefined,
         groupId: values.groupId || undefined,
-        class: values.className, // For temp backward compatibility
-        section: values.sectionId || 'N/A', // For temp backward compatibility
+        class: values.className, 
+        section: values.sectionId || 'N/A',
         dateOfBirth: values.dateOfBirth || undefined,
         fatherName: values.fatherName || undefined,
         motherName: values.motherName || undefined,
@@ -131,8 +139,8 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
         examRecords: [],
         rawAttendanceRecords: [],
       };
-      const studentDocRef = await addDoc(collection(firestore, studentTargetCollection), studentProfileData);
-      const studentProfileId = studentDocRef.id; // This is the ID in the students_<classId> collection
+      const studentDocRef = await addDoc(collection(firestore, studentProfilesCollectionPath), studentProfileDataForDb);
+      const studentProfileId = studentDocRef.id; 
 
       // 3. Create/Update document in 'users' collection to link Auth UID to student profile
       const userDocData: Omit<ManagedUser, 'id' | 'lastLogin' | 'assignments'> = {
@@ -145,10 +153,9 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       };
       await setDoc(doc(firestore, USERS_COLLECTION, authUid), userDocData);
 
-      // For callback and UI update
       const newStudentForCallback: Student = {
-        ...studentProfileData,
-        id: studentProfileId, // id is the doc ID from students_<classId>
+        ...studentProfileDataForDb,
+        id: studentProfileId, 
       };
       onStudentAdded(newStudentForCallback);
 
@@ -157,7 +164,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
           title: "Student Added Successfully!",
           description: (
             React.createElement('div', null,
-              React.createElement('p', null, `${values.name} added to ${studentTargetCollection} and auth account created.`),
+              React.createElement('p', null, `${values.name} added to class ${values.className} and auth account created.`),
               React.createElement('p', {className: "mt-2 font-semibold"}, `Login Email: ${generatedLoginEmail}`),
               React.createElement('p', {className: "font-semibold"}, `Default Password: ${generatedPassword}`),
               React.createElement('p', {className: "text-xs mt-1 text-destructive"}, "Advise student to change password on first login.")
@@ -198,7 +205,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
         <DialogHeader>
           <DialogTitle>Add New Student</DialogTitle>
           <DialogDescription>
-            Enter student details. Login email & password will be auto-generated. Student data will be stored in a collection specific to their Class ID (e.g., students_lkg, students_10).
+            Enter student details. Login email & password will be auto-generated. Student data will be stored in a class-specific subcollection (e.g., student_data_by_class/LKG/profiles).
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -214,7 +221,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                 <FormItem><FormLabel>Class Name (Display)</FormLabel><FormControl><Input placeholder="e.g. 10th Grade, LKG" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
               <FormField control={form.control} name="classId" render={({ field }) => (
-                <FormItem><FormLabel>Class ID (System, e.g., 10, LKG, NIOS)</FormLabel><FormControl><Input placeholder="e.g. 10, LKG, NIOS" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Class ID (System, e.g., 10, LKG, NIOS)</FormLabel><FormControl><Input placeholder="e.g. 10, LKG, NIOS, 10TH_PASSOUT_2025" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -306,5 +313,6 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     </Dialog>
   );
 }
+    
 
     
