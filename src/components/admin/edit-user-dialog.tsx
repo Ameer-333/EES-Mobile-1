@@ -34,14 +34,13 @@ import {
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { firestore } from '@/lib/firebase'; // Import firestore
-import { doc, updateDoc, setDoc } from 'firebase/firestore'; // Import firestore functions
+import { firestore } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { getUserDocPath } from '@/lib/firestore-paths';
 
 const editUserSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }),
-  // Role is typically not easily editable or has specific logic.
-  // For simplicity, we'll allow editing it here, but in a real system, this might be restricted.
   role: z.custom<UserRole>(val => ['Admin', 'Teacher', 'Student'].includes(val as UserRole), 'Role is required.'),
   status: z.enum(['Active', 'Inactive', 'Pending'], { required_error: "Status is required."}),
 });
@@ -51,11 +50,9 @@ type EditUserFormValues = z.infer<typeof editUserSchema>;
 interface EditUserDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onUserEdited: (editedUser: ManagedUser) => void; // This prop might change or be removed
+  onUserEdited: (editedUser: ManagedUser) => void;
   userToEdit: ManagedUser | null;
 }
-
-const USERS_COLLECTION = 'users';
 
 export function EditUserDialog({ isOpen, onOpenChange, onUserEdited, userToEdit }: EditUserDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,26 +78,26 @@ export function EditUserDialog({ isOpen, onOpenChange, onUserEdited, userToEdit 
 
     setIsSubmitting(true);
     try {
-      const userDocRef = doc(firestore, USERS_COLLECTION, userToEdit.id);
+      const userDocPath = getUserDocPath(userToEdit.id);
+      const userDocRef = doc(firestore, userDocPath);
       
       const updatedUserProfileData = {
         name: values.name,
         email: values.email,
-        role: values.role, // Include role in update
+        role: values.role,
         status: values.status,
-        lastLogin: userToEdit.lastLogin, // Preserve lastLogin unless explicitly changed
+        lastLogin: userToEdit.lastLogin, 
       };
 
-      await setDoc(userDocRef, updatedUserProfileData, { merge: true }); // Use setDoc with merge to update or create if somehow deleted
+      await setDoc(userDocRef, updatedUserProfileData, { merge: true });
       
-      // The onSnapshot listener in UserManagementTable will pick up this change.
       onUserEdited({ ...updatedUserProfileData, id: userToEdit.id });
 
       toast({
         title: "User Profile Updated",
         description: `${values.name}'s profile has been successfully updated in Firestore.`,
       });
-      onOpenChange(false); // Close dialog
+      onOpenChange(false);
     } catch (error) {
       console.error("Error updating user profile in Firestore:", error);
       toast({
@@ -218,3 +215,5 @@ export function EditUserDialog({ isOpen, onOpenChange, onUserEdited, userToEdit 
     </Dialog>
   );
 }
+
+    

@@ -12,15 +12,14 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Trash2, Save, Loader2, ImageUp } from 'lucide-react';
+import { PlusCircle, Trash2, Save, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { firestore } from '@/lib/firebase';
 import { collection, getDocs, writeBatch, doc, addDoc, deleteDoc, serverTimestamp, orderBy, query } from 'firebase/firestore';
-
-const HALL_OF_FAME_COLLECTION = 'hall_of_fame_items';
+import { getHallOfFameCollectionPath, getHallOfFameItemDocPath } from '@/lib/firestore-paths';
 
 const hallOfFameItemSchema = z.object({
-  id: z.string().optional(), // Firestore document ID
+  id: z.string().optional(),
   category: z.enum(['founder', 'co-founder', 'principal', 'school-award', 'founder-award', 'student-achievement'], { required_error: "Category is required."}),
   name: z.string().min(3, "Name must be at least 3 characters."),
   title: z.string().optional().or(z.literal('')),
@@ -28,7 +27,6 @@ const hallOfFameItemSchema = z.object({
   imageUrl: z.string().url("Must be a valid URL for the image. Use https://placehold.co for placeholders."),
   year: z.string().optional().or(z.literal('')),
   dataAiHint: z.string().optional().or(z.literal('')),
-  // createdAt: z.any().optional(), // For Firestore serverTimestamp
 });
 
 const hallOfFameSchema = z.object({
@@ -59,15 +57,16 @@ export function HallOfFameEditor() {
     const fetchItems = async () => {
       setIsLoading(true);
       try {
-        const q = query(collection(firestore, HALL_OF_FAME_COLLECTION), orderBy("name")); // Add ordering if desired
+        const hallOfFamePath = getHallOfFameCollectionPath();
+        const q = query(collection(firestore, hallOfFamePath), orderBy("name"));
         const querySnapshot = await getDocs(q);
         const fetchedItems: HallOfFameItem[] = [];
         const ids = new Set<string>();
-        querySnapshot.forEach((doc) => {
-          fetchedItems.push({ id: doc.id, ...doc.data() } as HallOfFameItem);
-          ids.add(doc.id);
+        querySnapshot.forEach((docSnap) => {
+          fetchedItems.push({ id: docSnap.id, ...docSnap.data() } as HallOfFameItem);
+          ids.add(docSnap.id);
         });
-        replace(fetchedItems); // Use replace to set the form field array
+        replace(fetchedItems);
         setInitialItemIds(ids);
       } catch (error) {
         console.error("Error fetching Hall of Fame items:", error);
@@ -86,69 +85,55 @@ export function HallOfFameEditor() {
   async function onSubmit(values: HallOfFameFormValues) {
     setIsSubmitting(true);
     const batch = writeBatch(firestore);
-    const currentItemIds = new Set<string>();
+    const hallOfFamePath = getHallOfFameCollectionPath();
 
     try {
       for (const item of values.items) {
         const { id, ...itemData } = item;
-        // Ensure empty optional fields are not sent as empty strings if Firestore expects them to be absent or null
         const cleanItemData = {
             ...itemData,
-            title: itemData.title || null, // Store null if empty
+            title: itemData.title || null,
             year: itemData.year || null,
             dataAiHint: itemData.dataAiHint || null,
         };
 
-        if (id) { // Existing item
-          const docRef = doc(firestore, HALL_OF_FAME_COLLECTION, id);
-          batch.set(docRef, cleanItemData, { merge: true }); // Use set with merge to update or create if ID exists but doc was deleted
-          currentItemIds.add(id);
-        } else { // New item
-          const docRef = doc(collection(firestore, HALL_OF_FAME_COLLECTION)); // Auto-generate ID
-          batch.set(docRef, { ...cleanItemData /*, createdAt: serverTimestamp() */ });
-          // currentItemIds.add(docRef.id); // Not strictly needed for deletion logic if only tracking initial IDs
+        if (id) {
+          const itemDocPath = getHallOfFameItemDocPath(id);
+          const docRef = doc(firestore, itemDocPath);
+          batch.set(docRef, cleanItemData, { merge: true });
+        } else {
+          const docRef = doc(collection(firestore, hallOfFamePath));
+          batch.set(docRef, { ...cleanItemData });
         }
       }
 
-      // Delete items that were removed from the form
+      const currentItemIdsInForm = new Set(values.items.map(item => item.id).filter(Boolean));
       initialItemIds.forEach(id => {
-        let foundInForm = false;
-        for (const formItem of values.items) {
-            if (formItem.id === id) {
-                foundInForm = true;
-                break;
-            }
-        }
-        if (!foundInForm) {
-            const docRef = doc(firestore, HALL_OF_FAME_COLLECTION, id);
+        if (!currentItemIdsInForm.has(id)) {
+            const itemDocPath = getHallOfFameItemDocPath(id);
+            const docRef = doc(firestore, itemDocPath);
             batch.delete(docRef);
         }
       });
       
       await batch.commit();
 
-      // Re-fetch or update initialItemIds based on new state
-      const newInitialIds = new Set<string>();
-      values.items.forEach(item => { if(item.id) newInitialIds.add(item.id) });
-      // New items added in this batch won't have their IDs in `values.items` yet.
-      // A full re-fetch after save (like in useEffect) is more robust for updating initialItemIds and form.
-      // For now, we'll rely on the onSnapshot if it were implemented or manual refresh for perfect ID sync of new items.
-
       toast({
         title: 'Hall of Fame Updated',
         description: 'The Hall of Fame content has been successfully saved to Firestore.',
       });
-       // Manually trigger a re-fetch to get new IDs and sync state
-        const q = query(collection(firestore, HALL_OF_FAME_COLLECTION), orderBy("name"));
-        const querySnapshot = await getDocs(q);
-        const fetchedItems: HallOfFameItem[] = [];
-        const ids = new Set<string>();
-        querySnapshot.forEach((doc) => {
-          fetchedItems.push({ id: doc.id, ...doc.data() } as HallOfFameItem);
-          ids.add(doc.id);
-        });
-        replace(fetchedItems);
-        setInitialItemIds(ids);
+      
+      // Re-fetch to update form state including new IDs and reflect deletions
+      const q = query(collection(firestore, hallOfFamePath), orderBy("name"));
+      const querySnapshot = await getDocs(q);
+      const fetchedItems: HallOfFameItem[] = [];
+      const newIds = new Set<string>();
+      querySnapshot.forEach((docSnap) => {
+        fetchedItems.push({ id: docSnap.id, ...docSnap.data() } as HallOfFameItem);
+        newIds.add(docSnap.id);
+      });
+      replace(fetchedItems);
+      setInitialItemIds(newIds);
 
     } catch (error) {
         console.error("Error saving Hall of Fame to Firestore:", error);
@@ -175,9 +160,6 @@ export function HallOfFameEditor() {
   };
 
   const removeItem = (index: number) => {
-    const itemToRemove = fields[index];
-    // If itemToRemove.id exists, it means it's an item from Firestore.
-    // Deletion from Firestore will be handled by the onSubmit logic by comparing initialItemIds and currentItemIds.
     remove(index);
   };
 
@@ -263,3 +245,5 @@ export function HallOfFameEditor() {
     </Card>
   );
 }
+
+    

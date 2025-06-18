@@ -25,12 +25,10 @@ import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { firestore } from '@/lib/firebase';
 import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData } from 'firebase/firestore';
-
-const TEACHERS_COLLECTION = 'teachers'; // Collection for HR-specific teacher data
-const USERS_COLLECTION = 'users'; // Collection for auth supplemental data (roles, assignments)
+import { getTeachersCollectionPath, getUserDocPath } from '@/lib/firestore-paths';
 
 export function ManageTeacherProfiles() {
-  const [teachers, setTeachers] = useState<Teacher[]>([]); // Stores data from 'teachers' collection
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -39,13 +37,12 @@ export function ManageTeacherProfiles() {
 
   useEffect(() => {
     setIsLoading(true);
-    // Listen to 'teachers' collection (HR profiles)
-    // Document IDs in 'teachers' are now the authUid
-    const teachersCollectionRef = collection(firestore, TEACHERS_COLLECTION);
+    const teachersCollectionPath = getTeachersCollectionPath();
+    const teachersCollectionRef = collection(firestore, teachersCollectionPath);
 
     const unsubscribe = onSnapshot(teachersCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
       const fetchedTeachers = snapshot.docs.map(docSnapshot => ({
-        id: docSnapshot.id, // This ID is the authUid
+        id: docSnapshot.id,
         ...docSnapshot.data(),
       } as Teacher));
       setTeachers(fetchedTeachers);
@@ -69,7 +66,7 @@ export function ManageTeacherProfiles() {
       (teacher) =>
         teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        teacher.id.toLowerCase().includes(searchTerm.toLowerCase()) || // id is authUid
+        (teacher.authUid && teacher.authUid.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (teacher.subjectsTaught && teacher.subjectsTaught.some(s => s.toLowerCase().includes(searchTerm.toLowerCase())))
     );
   }, [teachers, searchTerm]);
@@ -80,25 +77,20 @@ export function ManageTeacherProfiles() {
   };
 
   const handleEditTeacher = (teacher: Teacher) => {
-    // teacher.id here is the authUid, which is the doc ID in 'teachers' collection
-    // teacherToEdit.authUid is also the same for clarity if needed in the form.
     setTeacherToEdit(teacher);
     setIsFormOpen(true);
   };
 
   const handleDeleteTeacher = async (teacherAuthUid: string, teacherName: string) => {
-    // teacherAuthUid is the ID for both 'teachers' and 'users' documents.
     try {
-      // 1. Delete from 'teachers' (HR profiles) collection
-      const teacherDocRef = doc(firestore, TEACHERS_COLLECTION, teacherAuthUid);
+      const teacherDocPath = getTeachersCollectionPath() + '/' + teacherAuthUid; // Using path builder logic directly
+      const teacherDocRef = doc(firestore, teacherDocPath);
       await deleteDoc(teacherDocRef);
 
-      // 2. Delete from 'users' (auth supplemental data, roles, assignments) collection
-      const userDocRef = doc(firestore, USERS_COLLECTION, teacherAuthUid);
+      const userDocPath = getUserDocPath(teacherAuthUid);
+      const userDocRef = doc(firestore, userDocPath);
       await deleteDoc(userDocRef);
 
-      // Note: Deleting Firebase Auth user needs Admin SDK or Cloud Function, not done client-side.
-      // This should be communicated to the admin.
       toast({
           title: "Teacher Records Deleted",
           description: (
@@ -120,9 +112,6 @@ export function ManageTeacherProfiles() {
   };
 
   const handleTeacherSaved = (savedTeacher: Teacher, isEditing: boolean) => {
-    // Firestore onSnapshot will handle UI updates.
-    // The form dialog now handles its own closing for new teacher credential display.
-    // If it's an edit, we can close it here.
     if (isEditing) {
       setIsFormOpen(false);
     }
@@ -211,7 +200,7 @@ export function ManageTeacherProfiles() {
               </TableHeader>
               <TableBody>
                 {filteredTeachers.length > 0 ? filteredTeachers.map((teacher) => (
-                  <TableRow key={teacher.id}> {/* teacher.id is now authUid */}
+                  <TableRow key={teacher.authUid}>
                     <TableCell>
                       <Image
                         src={teacher.profilePictureUrl || `https://placehold.co/40x40.png?text=${teacher.name.charAt(0)}`}
@@ -222,7 +211,7 @@ export function ManageTeacherProfiles() {
                         data-ai-hint="teacher avatar"
                       />
                     </TableCell>
-                    <TableCell className="font-medium truncate max-w-[100px]">{teacher.id}</TableCell>
+                    <TableCell className="font-medium truncate max-w-[100px]">{teacher.authUid}</TableCell>
                     <TableCell>{teacher.name}</TableCell>
                     <TableCell className="text-muted-foreground">{teacher.email}</TableCell>
                     <TableCell>
@@ -246,12 +235,12 @@ export function ManageTeacherProfiles() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the HR profile and user data (assignments, role) for <strong>{teacher.name}</strong> (Auth ID: {teacher.id}) from Firestore. The Firebase Authentication account will need to be deleted manually from the Firebase console if required.
+                              This action cannot be undone. This will permanently delete the HR profile and user data (assignments, role) for <strong>{teacher.name}</strong> (Auth ID: {teacher.authUid}) from Firestore. The Firebase Authentication account will need to be deleted manually from the Firebase console if required.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}>
+                            <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.authUid, teacher.name)}>
                               Yes, delete records
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -286,3 +275,5 @@ export function ManageTeacherProfiles() {
     </>
   );
 }
+
+    

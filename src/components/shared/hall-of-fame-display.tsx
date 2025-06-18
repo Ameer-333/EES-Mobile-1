@@ -4,15 +4,14 @@
 import type { HallOfFameItem, UserRole } from '@/types';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Award, Briefcase, Building, Edit, Crown, Loader2, Star } from 'lucide-react';
+import { Award, Briefcase, Users as UsersIconLucide, Edit, Crown, Loader2, Star, Building } from 'lucide-react'; // Renamed Users to UsersIconLucide
 import { Button } from '../ui/button';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { firestore } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-
-const HALL_OF_FAME_COLLECTION = 'hall_of_fame_items';
+import { getHallOfFameCollectionPath } from '@/lib/firestore-paths';
 
 interface HallOfFameDisplayProps {
   currentRole?: UserRole | null;
@@ -21,12 +20,12 @@ interface HallOfFameDisplayProps {
 const categoryIcons: Record<HallOfFameItem['category'] | 'Founders & Visionaries' | 'Leadership' | 'School Accolades' | 'Founder Accolades' | 'Student Achievements', React.ElementType> = {
   'founder': Briefcase,
   'co-founder': Briefcase,
-  'principal': Users, // Using Users for Leadership
+  'principal': UsersIconLucide, 
   'school-award': Award,
-  'founder-award': Star, // Using Star for Founder Accolades
+  'founder-award': Star, 
   'student-achievement': Crown,
   'Founders & Visionaries': Briefcase,
-  'Leadership': Users,
+  'Leadership': UsersIconLucide,
   'School Accolades': Award,
   'Founder Accolades': Star,
   'Student Achievements': Crown,
@@ -48,7 +47,8 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
 
   useEffect(() => {
     setIsLoading(true);
-    const q = query(collection(firestore, HALL_OF_FAME_COLLECTION), orderBy("name")); 
+    const hallOfFamePath = getHallOfFameCollectionPath();
+    const q = query(collection(firestore, hallOfFamePath), orderBy("name")); 
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const fetchedItems: HallOfFameItem[] = [];
@@ -206,3 +206,5 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
     </div>
   );
 }
+
+    

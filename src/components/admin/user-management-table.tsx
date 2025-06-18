@@ -18,7 +18,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -32,9 +31,8 @@ import { AddUserDialog } from '@/components/admin/add-user-dialog';
 import { EditUserDialog } from '@/components/admin/edit-user-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { firestore } from '@/lib/firebase';
-import { collection, getDocs, deleteDoc, doc, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
-
-const USERS_COLLECTION = 'users';
+import { collection, deleteDoc, doc, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
+import { getUsersCollectionPath, getUserDocPath } from '@/lib/firestore-paths';
 
 const roleIcons: Record<UserRole, React.ElementType> = {
   Admin: ShieldCheck,
@@ -54,12 +52,13 @@ export function UserManagementTable() {
 
   useEffect(() => {
     setIsLoading(true);
-    const usersCollectionRef = collection(firestore, USERS_COLLECTION);
+    const usersCollectionPath = getUsersCollectionPath();
+    const usersCollectionRef = collection(firestore, usersCollectionPath);
     
     const unsubscribe = onSnapshot(usersCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
-      const fetchedUsers = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
+      const fetchedUsers = snapshot.docs.map(docSnap => ({ // Renamed doc to docSnap
+        id: docSnap.id,
+        ...docSnap.data(),
       } as ManagedUser));
       setUsers(fetchedUsers);
       setIsLoading(false);
@@ -73,7 +72,7 @@ export function UserManagementTable() {
       setIsLoading(false);
     });
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
+    return () => unsubscribe();
   }, [toast]);
 
   const filteredUsers = useMemo(() => {
@@ -93,9 +92,9 @@ export function UserManagementTable() {
   
   const handleDeleteUser = async (userId: string, userName: string) => {
     try {
-      const userDocRef = doc(firestore, USERS_COLLECTION, userId);
+      const userDocPath = getUserDocPath(userId);
+      const userDocRef = doc(firestore, userDocPath);
       await deleteDoc(userDocRef);
-      // The onSnapshot listener will automatically update the local state
       toast({ title: "User Deleted", description: `User ${userName} has been removed.` });
     } catch (error) {
       console.error("Error deleting user from Firestore:", error);
@@ -107,15 +106,11 @@ export function UserManagementTable() {
     }
   };
 
-  // onUserAdded and onUserEdited are now primarily for closing dialogs, 
-  // as Firestore listener updates the table.
   const handleUserAdded = (newUser: ManagedUser) => {
-    // Firestore listener will update the state. Toast from AddUserDialog.
     setIsAddUserDialogOpen(false);
   };
 
   const handleUserEdited = (editedUser: ManagedUser) => {
-    // Firestore listener will update the state. Toast from EditUserDialog.
     setIsEditUserDialogOpen(false);
   };
   
@@ -285,14 +280,16 @@ export function UserManagementTable() {
       <AddUserDialog 
         isOpen={isAddUserDialogOpen} 
         onOpenChange={setIsAddUserDialogOpen}
-        onUserAdded={handleUserAdded} // Prop might be removed if dialog directly updates Firestore and table re-fetches
+        onUserAdded={handleUserAdded}
       />
       <EditUserDialog
         isOpen={isEditUserDialogOpen}
         onOpenChange={setIsEditUserDialogOpen}
-        onUserEdited={handleUserEdited} // Prop might be removed for same reason
+        onUserEdited={handleUserEdited}
         userToEdit={currentUserToEdit}
       />
     </>
   );
 }
+
+    

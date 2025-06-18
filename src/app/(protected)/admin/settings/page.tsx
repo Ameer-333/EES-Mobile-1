@@ -13,9 +13,7 @@ import { Save, Bell, Palette, Lock, Settings, Image as ImageIcon } from "lucide-
 import { useToast } from "@/hooks/use-toast";
 import { firestore } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-
-const APP_SETTINGS_COLLECTION = 'app_settings';
-const GENERAL_SETTINGS_DOC_ID = 'general';
+import { getGeneralSettingsDocPath } from '@/lib/firestore-paths';
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
@@ -33,7 +31,8 @@ export default function AdminSettingsPage() {
     const fetchSettings = async () => {
       setIsLoadingSettings(true);
       try {
-        const settingsDocRef = doc(firestore, APP_SETTINGS_COLLECTION, GENERAL_SETTINGS_DOC_ID);
+        const settingsDocPath = getGeneralSettingsDocPath();
+        const settingsDocRef = doc(firestore, settingsDocPath);
         const docSnap = await getDoc(settingsDocRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -71,7 +70,8 @@ export default function AdminSettingsPage() {
     }
 
     try {
-      const settingsDocRef = doc(firestore, APP_SETTINGS_COLLECTION, GENERAL_SETTINGS_DOC_ID);
+      const settingsDocPath = getGeneralSettingsDocPath();
+      const settingsDocRef = doc(firestore, settingsDocPath);
       await setDoc(settingsDocRef, { appName, logoUrl: logoUrl || "" }, { merge: true }); // Save empty string if logoUrl is falsy
       toast({
         title: "Settings Saved",
@@ -242,3 +242,4 @@ export default function AdminSettingsPage() {
   );
 }
 
+    

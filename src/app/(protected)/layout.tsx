@@ -24,10 +24,8 @@ import { signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import { getGeneralSettingsDocPath, getUserDocPath } from '@/lib/firestore-paths';
 
-const APP_SETTINGS_COLLECTION = 'app_settings';
-const GENERAL_SETTINGS_DOC_ID = 'general';
-const USERS_COLLECTION = 'users';
 
 // UserProfile now aligns more with ManagedUser but for the logged-in user's context
 interface UserProfileContextData extends ManagedUser {
@@ -104,7 +102,8 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   
   useEffect(() => {
     const fetchAppSettings = async () => {
-      const settingsDocRef = doc(firestore, APP_SETTINGS_COLLECTION, GENERAL_SETTINGS_DOC_ID);
+      const settingsDocPath = getGeneralSettingsDocPath();
+      const settingsDocRef = doc(firestore, settingsDocPath);
       try {
         const settingsDocSnap = await getDoc(settingsDocRef);
         if (settingsDocSnap.exists()) {
@@ -125,19 +124,19 @@ function AppProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingAuth(true); 
       if (user) {
         setAuthUser(user);
-        const userDocRef = doc(firestore, USERS_COLLECTION, user.uid);
+        const userDocPath = getUserDocPath(user.uid);
+        const userDocRef = doc(firestore, userDocPath);
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
-          const userDataFromFirestore = userDocSnap.data() as ManagedUser; // Explicitly type from Firestore
+          const userDataFromFirestore = userDocSnap.data() as ManagedUser; 
           
           const profile: UserProfileContextData = {
-            ...userDataFromFirestore, // Spread all fields from ManagedUser
-            id: user.uid, // Ensure id is authUid
-            email: user.email || userDataFromFirestore.email, // Prefer auth email, fallback to Firestore
+            ...userDataFromFirestore, 
+            id: user.uid, 
+            email: user.email || userDataFromFirestore.email, 
             displayName: userDataFromFirestore.name || user.displayName || user.email?.split('@')[0] || "User",
-            photoURL: user.photoURL, // Get from Firebase Auth user object
-            // role, assignments, classId, studentProfileId, status, etc., come from userDataFromFirestore
+            photoURL: user.photoURL, 
           };
           setUserProfile(profile);
 

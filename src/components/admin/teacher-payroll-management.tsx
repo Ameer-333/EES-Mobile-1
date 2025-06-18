@@ -15,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
 import {
@@ -33,9 +32,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { firestore } from '@/lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, QuerySnapshot, DocumentData, arrayUnion } from 'firebase/firestore';
-
-const TEACHERS_COLLECTION = 'teachers';
+import { collection, onSnapshot, doc, updateDoc, QuerySnapshot, DocumentData } from 'firebase/firestore';
+import { getTeachersCollectionPath, getTeacherDocPath } from '@/lib/firestore-paths';
 
 const salaryRecordSchema = z.object({
   monthYear: z.string().min(1, "Month/Year is required (e.g., July 2024)"),
@@ -57,11 +55,12 @@ export function TeacherPayrollManagement() {
 
   useEffect(() => {
     setIsLoading(true);
-    const teachersCollectionRef = collection(firestore, TEACHERS_COLLECTION);
+    const teachersCollectionPath = getTeachersCollectionPath();
+    const teachersCollectionRef = collection(firestore, teachersCollectionPath);
     
     const unsubscribe = onSnapshot(teachersCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
-      const fetchedTeachers = snapshot.docs.map(docSnapshot => ({ // Renamed doc to docSnapshot
-        id: docSnapshot.id,
+      const fetchedTeachers = snapshot.docs.map(docSnapshot => ({
+        id: docSnapshot.id, // authUid is the document ID here
         ...docSnapshot.data(),
       } as Teacher));
       setTeachers(fetchedTeachers);
@@ -89,14 +88,13 @@ export function TeacherPayrollManagement() {
       (teacher) =>
         teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        teacher.id.toLowerCase().includes(searchTerm.toLowerCase())
+        (teacher.authUid && teacher.authUid.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [teachers, searchTerm]);
 
   const handleOpenSalaryDialog = (teacher: Teacher) => {
     setSelectedTeacher(teacher);
     const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-    // Try to find existing salary for this month for this teacher to prefill, or use defaults
     const existingSalaryForMonth = teacher.salaryHistory?.find(s => s.monthYear === currentMonthYear);
 
     form.reset({
@@ -110,30 +108,32 @@ export function TeacherPayrollManagement() {
   };
 
   const handleSaveSalaryRecord = async (values: SalaryRecordFormValues) => {
-    if (!selectedTeacher) return;
+    if (!selectedTeacher || !selectedTeacher.authUid) { // Ensure authUid is present
+        toast({title: "Error", description: "Selected teacher data is incomplete.", variant: "destructive"});
+        return;
+    }
     setIsSubmittingSalary(true);
 
     try {
-        const teacherDocRef = doc(firestore, TEACHERS_COLLECTION, selectedTeacher.id);
+        const teacherDocFirestorePath = getTeacherDocPath(selectedTeacher.authUid);
+        const teacherDocRef = doc(firestore, teacherDocFirestorePath);
         const newRecord: TeacherSalaryRecord = {
-            id: `sal_${selectedTeacher.id}_${values.monthYear.replace(/\s+/g, '_')}_${Date.now()}`, // More unique ID
-            dateIssued: new Date().toISOString().split('T')[0], // Today's date
+            id: `sal_${selectedTeacher.authUid}_${values.monthYear.replace(/\s+/g, '_')}_${Date.now()}`,
+            dateIssued: new Date().toISOString().split('T')[0],
             ...values,
-            amountDeducted: values.amountDeducted || 0, // Ensure default if not provided
+            amountDeducted: values.amountDeducted || 0,
         };
 
-        // Update the salary history: remove old record for the same monthYear if exists, then add new one.
         const updatedSalaryHistory = (selectedTeacher.salaryHistory || []).filter(
             (record) => record.monthYear !== values.monthYear
         );
-        updatedSalaryHistory.unshift(newRecord); // Add new record to the beginning
+        updatedSalaryHistory.unshift(newRecord);
 
         await updateDoc(teacherDocRef, {
             salaryHistory: updatedSalaryHistory,
-            daysAbsentThisMonth: values.daysAbsent, // Update current month's absence count
+            daysAbsentThisMonth: values.daysAbsent,
         });
         
-        // onSnapshot will update the local state of `teachers`
         toast({ title: "Salary Record Updated", description: `Salary for ${values.monthYear} for ${selectedTeacher.name} updated in Firestore.` });
         setIsSalaryDialogOpen(false);
     } catch (error) {
@@ -203,7 +203,7 @@ export function TeacherPayrollManagement() {
             <div className="relative flex-grow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Search by Teacher ID, name, or email..."
+                placeholder="Search by Teacher Auth ID, name, or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 w-full"
@@ -216,7 +216,7 @@ export function TeacherPayrollManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
+                  <TableHead>Auth ID</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead className="text-center">Days Absent (Current Month)</TableHead>
@@ -228,8 +228,8 @@ export function TeacherPayrollManagement() {
                 {filteredTeachers.length > 0 ? filteredTeachers.map((teacher) => {
                   const lastSalary = teacher.salaryHistory && teacher.salaryHistory.length > 0 ? teacher.salaryHistory[0] : null;
                   return (
-                  <TableRow key={teacher.id}>
-                    <TableCell className="font-medium truncate max-w-[100px]">{teacher.id}</TableCell>
+                  <TableRow key={teacher.authUid}>
+                    <TableCell className="font-medium truncate max-w-[100px]">{teacher.authUid}</TableCell>
                     <TableCell>{teacher.name}</TableCell>
                     <TableCell className="text-muted-foreground">{teacher.email}</TableCell>
                     <TableCell className="text-center">

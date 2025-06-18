@@ -1,8 +1,7 @@
 
 'use client';
 
-import { useState }
-from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -34,16 +33,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-import { firestore } from '@/lib/firebase'; // Import firestore
-import { collection, addDoc } from 'firebase/firestore'; // Import firestore functions
+import { firestore } from '@/lib/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
+import { getUsersCollectionPath } from '@/lib/firestore-paths';
 
 const addUserSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }),
   role: z.custom<UserRole>(val => ['Admin', 'Teacher', 'Student'].includes(val as UserRole), 'Role is required.'),
-  // For this prototype, password is not handled here. User creation in Firebase Auth is separate.
-  // status will default to 'Pending'
 });
 
 type AddUserFormValues = z.infer<typeof addUserSchema>;
@@ -51,10 +49,8 @@ type AddUserFormValues = z.infer<typeof addUserSchema>;
 interface AddUserDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onUserAdded: (newUser: ManagedUser) => void; // This prop might change or be removed if table directly listens to Firestore
+  onUserAdded: (newUser: ManagedUser) => void;
 }
-
-const USERS_COLLECTION = 'users';
 
 export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,14 +72,13 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
         name: values.name,
         email: values.email,
         role: values.role,
-        status: 'Pending' as ManagedUser['status'], // Default status for new users
-        lastLogin: 'N/A', // Default last login
+        status: 'Pending' as ManagedUser['status'],
+        lastLogin: 'N/A',
       };
 
-      const docRef = await addDoc(collection(firestore, USERS_COLLECTION), newUserProfileData);
+      const usersCollectionPath = getUsersCollectionPath();
+      const docRef = await addDoc(collection(firestore, usersCollectionPath), newUserProfileData);
       
-      // The onSnapshot listener in UserManagementTable will pick up this new user.
-      // onUserAdded might still be useful for immediately closing the dialog.
       onUserAdded({ ...newUserProfileData, id: docRef.id }); 
       
       toast({
@@ -91,7 +86,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
         description: `${values.name}'s profile has been added to Firestore. Note: Firebase Auth account needs separate creation.`,
       });
       form.reset();
-      onOpenChange(false); // Close dialog
+      onOpenChange(false);
     } catch (error) {
       console.error("Error adding user profile to Firestore:", error);
       toast({
@@ -185,3 +180,5 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     </Dialog>
   );
 }
+
+    

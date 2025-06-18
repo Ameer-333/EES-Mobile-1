@@ -10,9 +10,7 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { firestore } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-
-const APP_SETTINGS_COLLECTION = 'app_settings';
-const GENERAL_SETTINGS_DOC_ID = 'general';
+import { getGeneralSettingsDocPath } from '@/lib/firestore-paths';
 
 export default function StudentLoginPage() {
   const [appName, setAppName] = useState('EES Education');
@@ -23,7 +21,8 @@ export default function StudentLoginPage() {
     const fetchAppSettings = async () => {
       setIsLoading(true);
       try {
-        const settingsDocRef = doc(firestore, APP_SETTINGS_COLLECTION, GENERAL_SETTINGS_DOC_ID);
+        const settingsDocPath = getGeneralSettingsDocPath();
+        const settingsDocRef = doc(firestore, settingsDocPath);
         const settingsDocSnap = await getDoc(settingsDocRef);
         if (settingsDocSnap.exists()) {
           const appData = settingsDocSnap.data();
@@ -77,3 +76,5 @@ export default function StudentLoginPage() {
     </div>
   );
 }
+
+    
