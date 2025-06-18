@@ -6,7 +6,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import type { Teacher, TeacherFormData, SubjectName, TeacherAssignment, TeacherAssignmentType, ManagedUser, NIOSSubjectName, NCLPSubjectName } from '@/types';
-import { allSubjectNamesArray, standardSubjectNamesArray, niosSubjectNamesArray, nclpSubjectNamesArray, assignmentTypeLabels, motherTeacherCoreSubjects } from '@/types';
+import { allSubjectNamesArray, standardSubjectNamesArray, niosSubjectNamesArray, nclpSubjectNamesArray, assignmentTypeLabels, motherTeacherCoreSubjects, nclpAllSubjects, nclpGroupBSubjectsNoHindi } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -37,11 +37,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader as UICardHeader, CardContent as UICardContent, CardTitle as UICardTitle, CardDescription as UICardDescription } from '@/components/ui/card';
 import { getUsersCollectionPath, getTeacherDocPath } from '@/lib/firestore-paths';
 
-// Top-level helper function
+// Helper function at the top-level
 function getSubjectOptionsForAssignment(assignmentType?: TeacherAssignmentType): SubjectName[] {
   if (assignmentType === 'nios_teacher') return niosSubjectNamesArray as SubjectName[];
   if (assignmentType === 'nclp_teacher') return nclpSubjectNamesArray as SubjectName[];
-  return standardSubjectNamesArray as SubjectName[]; // Default to standard subjects
+  return standardSubjectNamesArray as SubjectName[];
 }
 
 const teacherAssignmentItemSchema = z.object({
@@ -197,54 +197,50 @@ export function TeacherProfileFormDialog({
   };
 
   useEffect(() => {
-    const loadTeacherData = async () => {
-      if (teacherToEdit) { // Removed isOpen from this outer condition
-        setIsLoadingAssignments(true);
-        if (!teacherToEdit.authUid) {
-            console.error("Teacher to edit is missing authUid.");
-            toast({ title: "Error", description: "Cannot load teacher data: Missing Auth ID.", variant: "destructive" });
-            setIsLoadingAssignments(false);
-            onOpenChange(false);
-            return;
-        }
-        try {
-            const userDocRef = doc(firestore, getUsersCollectionPath(), teacherToEdit.authUid);
-            const userDocSnap = await getDoc(userDocRef);
-            const existingAssignmentsFromDb = userDocSnap.exists() ? (userDocSnap.data() as ManagedUser).assignments || [] : [];
+    (async () => {
+      if (isOpen) {
+        if (teacherToEdit) {
+          setIsLoadingAssignments(true);
+          if (!teacherToEdit.authUid) {
+              console.error("Teacher to edit is missing authUid.");
+              toast({ title: "Error", description: "Cannot load teacher data: Missing Auth ID.", variant: "destructive" });
+              setIsLoadingAssignments(false);
+              onOpenChange(false);
+              return;
+          }
+          try {
+              const userDocRef = doc(firestore, getUsersCollectionPath(), teacherToEdit.authUid);
+              const userDocSnap = await getDoc(userDocRef);
+              const existingAssignmentsFromDb = userDocSnap.exists() ? (userDocSnap.data() as ManagedUser).assignments || [] : [];
 
-            form.reset({
-              name: teacherToEdit.name,
-              email: teacherToEdit.email,
-              phoneNumber: teacherToEdit.phoneNumber,
-              address: teacherToEdit.address,
-              yearOfJoining: teacherToEdit.yearOfJoining,
-              subjectsTaught: teacherToEdit.subjectsTaught || [],
-              profilePictureUrl: teacherToEdit.profilePictureUrl || '',
-              assignments: existingAssignmentsFromDb.map(a => ({...a, id: a.id || Date.now().toString() + Math.random().toString(36).substring(2,9) })),
-            });
-            setGeneratedCredentials(null);
-        } catch (error) {
-            console.error("Error in useEffect fetching teacher assignments:", error);
-            toast({ title: "Data Load Error", description: "Could not load teacher's assignment details.", variant: "destructive"});
-        } finally {
-            setIsLoadingAssignments(false);
+              form.reset({
+                name: teacherToEdit.name,
+                email: teacherToEdit.email,
+                phoneNumber: teacherToEdit.phoneNumber,
+                address: teacherToEdit.address,
+                yearOfJoining: teacherToEdit.yearOfJoining,
+                subjectsTaught: teacherToEdit.subjectsTaught || [],
+                profilePictureUrl: teacherToEdit.profilePictureUrl || '',
+                assignments: existingAssignmentsFromDb.map(a => ({...a, id: a.id || Date.now().toString() + Math.random().toString(36).substring(2,9) })),
+              });
+              setGeneratedCredentials(null);
+          } catch (error) {
+              console.error("Error in useEffect fetching teacher assignments:", error);
+              toast({ title: "Data Load Error", description: "Could not load teacher's assignment details.", variant: "destructive"});
+          } finally {
+              setIsLoadingAssignments(false);
+          }
+        } else {
+              form.reset({
+                name: '', email: '', phoneNumber: '', address: '',
+                yearOfJoining: currentYear, subjectsTaught: [], profilePictureUrl: '', assignments: [],
+              });
+              setGeneratedCredentials(null);
+              setIsLoadingAssignments(false);
         }
       }
-    };
-
-    if (isOpen) { // Load data only when dialog is open
-        if (teacherToEdit) {
-            loadTeacherData();
-        } else { // Reset for new teacher form if dialog opens for adding
-            form.reset({
-              name: '', email: '', phoneNumber: '', address: '',
-              yearOfJoining: currentYear, subjectsTaught: [], profilePictureUrl: '', assignments: [],
-            });
-            setGeneratedCredentials(null);
-            setIsLoadingAssignments(false); // Not loading anything new
-        }
-    }
-  }, [teacherToEdit, isOpen, form, currentYear, toast, onOpenChange]);
+    })();
+  }, [teacherToEdit, isOpen, form, isEditing, currentYear, toast, onOpenChange]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
