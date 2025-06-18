@@ -1,23 +1,46 @@
 
-export type SubjectName = 'English' | 'Kannada' | 'Hindi' | 'Science' | 'Maths' | 'Social Science';
-export const subjectNamesArray: SubjectName[] = ['English', 'Kannada', 'Hindi', 'Science', 'Maths', 'Social Science'];
+export type StandardSubjectName = 'English' | 'Kannada' | 'Hindi' | 'Science' | 'Maths' | 'Social Science' | 'EVS';
+export type NIOSSubjectName = 'Data Entry' | 'Painting' | 'Indian Culture and Heritage' | 'Home Science' | 'English (NIOS)'; // NIOS English distinct if needed
+export type NCLPSubjectName = 'English (NCLP)' | 'Kannada (NCLP)' | 'Hindi (NCLP)' | 'Maths (NCLP)' | 'EVS (NCLP)'; // NCLP subjects distinct if needed
 
-export type ExamName = 'FA1' | 'FA2' | 'SA1' | 'FA3' | 'FA4' | 'SA2';
-export const examNamesArray: ExamName[] = ['FA1', 'FA2', 'SA1', 'FA3', 'FA4', 'SA2'];
+export type SubjectName = StandardSubjectName | NIOSSubjectName | NCLPSubjectName;
+
+export const standardSubjectNamesArray: StandardSubjectName[] = ['English', 'Kannada', 'Hindi', 'Science', 'Maths', 'Social Science', 'EVS'];
+export const niosSubjectNamesArray: NIOSSubjectName[] = ['Data Entry', 'Painting', 'Indian Culture and Heritage', 'Home Science', 'English (NIOS)'];
+export const nclpSubjectNamesArray: NCLPSubjectName[] = ['English (NCLP)', 'Kannada (NCLP)', 'Hindi (NCLP)', 'Maths (NCLP)', 'EVS (NCLP)'];
+
+// Combined list for general dropdowns, specific lists for specific assignment types
+export const allSubjectNamesArray: SubjectName[] = [
+    ...standardSubjectNamesArray,
+    ...niosSubjectNamesArray,
+    ...nclpSubjectNamesArray,
+].filter((value, index, self) => self.indexOf(value) === index); // Remove duplicates if any overlap
+
+
+export type ExamName = 'FA1' | 'FA2' | 'SA1' | 'FA3' | 'FA4' | 'SA2' | 'Unit Test' | 'Mid Term' | 'Final Exam';
+export const examNamesArray: ExamName[] = ['FA1', 'FA2', 'SA1', 'FA3', 'FA4', 'SA2', 'Unit Test', 'Mid Term', 'Final Exam'];
 
 export type ReligionType = 'Hindu' | 'Muslim' | 'Christian' | 'Sikh' | 'Jain' | 'Buddhist' | 'Other';
 export const religionOptions: ReligionType[] = ['Hindu', 'Muslim', 'Christian', 'Sikh', 'Jain', 'Buddhist', 'Other'];
 
 export type UserRole = 'Admin' | 'Teacher' | 'Student';
 
-export type TeacherAssignmentType = 'mother_teacher' | 'class_teacher' | 'subject_teacher' | 'nios_teacher' | 'nclp_teacher';
+export type TeacherAssignmentType = 
+  | 'class_teacher'       // For a specific class and section (e.g., 9A Class Teacher)
+  | 'subject_teacher'     // For a specific subject across one or more classes/sections
+  | 'mother_teacher'      // For LKG-4th, primary teacher for a class/section
+  | 'nios_teacher'        // Teacher for NIOS students/groups
+  | 'nclp_teacher';       // Teacher for NCLP students/groups
 
 export interface TeacherAssignment {
+  id: string; // Unique ID for the assignment itself (e.g., UUID)
   type: TeacherAssignmentType;
-  classId: string; // e.g., "LKG", "1", "10", "NIOS"
-  sectionId?: string; // e.g., "A", "B"
-  subjectId?: SubjectName; // Only for subject_teacher
-  groupId?: string; // e.g., "Alpha" (for NIOS/NCLP groups)
+  classId: string;        // e.g., "LKG", "1", "10", "NIOS_A", "NCLP_B" (System ID for the class/group)
+  className?: string;      // e.g., "LKG Alpha", "Class 10 A", "NIOS Group A" (Display name)
+  sectionId?: string;      // e.g., "A", "B" (If applicable, standard sections)
+  subjectId?: SubjectName; // Only for subject_teacher (and potentially for NIOS/NCLP specific subject assignments)
+  groupId?: string;        // More specific grouping within a classId, e.g., "NCLP_B_Math_Group1"
+                           // For NIOS/NCLP, classId might be "NIOS" and groupId "GroupA" or "PaintingBatch1"
 }
 
 export interface StudentRemark {
@@ -66,21 +89,18 @@ export interface RawAttendanceRecord {
   status: 'Present' | 'Absent';
 }
 
-// This interface represents the data stored in class-specific collections like 'students_lkg', 'students_1', etc.
-// The 'id' field here is the document ID within that specific class collection.
 export interface Student {
-  id: string; // Document ID in the class-specific collection (e.g., students_lkg)
+  id: string; 
   name: string;
   satsNumber: string;
 
-  className: string; // e.g., "10th Grade", "LKG" (for display)
-  classId: string;   // e.g., "10", "LKG", "NIOS" (for logic, determines collection)
-  sectionId?: string; // e.g., "A", "B"
-  groupId?: string;   // e.g., "NIOS-Alpha", "NCLP-Batch1" (for special groupings)
+  className: string; 
+  classId: string;   
+  sectionId?: string; 
+  groupId?: string;   
 
-  // Old fields, kept for now for smoother transition, ideally phased out by ensuring all code uses new fields.
-  class: string; // To be replaced by className/classId
-  section: string; // To be replaced by sectionId
+  class: string; 
+  section: string; 
 
   dateOfBirth?: string;
   fatherName?: string;
@@ -89,18 +109,18 @@ export interface Student {
   motherOccupation?: string;
   parentsAnnualIncome?: number;
   parentContactNumber?: string;
-  email?: string; // Student's personal email, optional
+  email?: string; 
   caste: string;
   religion: ReligionType;
   address: string;
   siblingReference?: string;
   profilePictureUrl?: string | null;
-  remarks: StudentRemark[]; // Should be initialized as []
-  scholarships: Scholarship[]; // Should be initialized as []
-  examRecords: ExamRecord[]; // Should be initialized as []
-  rawAttendanceRecords: RawAttendanceRecord[]; // Should be initialized as []
+  remarks: StudentRemark[]; 
+  scholarships: Scholarship[]; 
+  examRecords: ExamRecord[]; 
+  rawAttendanceRecords: RawAttendanceRecord[]; 
   backgroundInfo?: string;
-  authUid: string; // Firebase Auth UID, links to 'users' collection entry
+  authUid: string; 
 }
 
 
@@ -118,20 +138,17 @@ export interface StudentSubjectAttendance {
   attendedClasses: number;
 }
 
-// This interface is for documents in the 'users' collection
 export interface ManagedUser {
-  id: string; // Firestore document ID (which is the Firebase Auth UID)
+  id: string; 
   name: string;
-  email: string; // Auth email
+  email: string; 
   role: UserRole;
   status: 'Active' | 'Inactive' | 'Pending';
   lastLogin?: string;
 
-  // Student-specific fields if role is 'Student'
-  classId?: string; // e.g., "LKG", "1", "NIOS" - helps find their collection
-  studentProfileId?: string; // The document ID of their profile in the 'students_<classId>' collection
+  classId?: string; 
+  studentProfileId?: string; 
 
-  // Teacher-specific fields if role is 'Teacher'
   assignments?: TeacherAssignment[];
 }
 
@@ -139,8 +156,8 @@ export interface StudentFormData {
   name: string;
   satsNumber: string;
 
-  className: string; // e.g., "10th Grade"
-  classId: string;   // e.g., "10", "LKG" (used to determine collection)
+  className: string; 
+  classId: string;   
   sectionId?: string;
   groupId?: string;
 
@@ -170,32 +187,32 @@ export interface TeacherSalaryRecord {
   reasonForAbsence?: string;
 }
 
-// This interface is for documents in the 'teachers' (HR) collection
 export interface Teacher {
-  id: string; // Firestore document ID (should be authUid for teachers)
-  authUid: string; // Firebase Auth UID, links to 'users' collection entry
+  id: string; 
+  authUid: string; 
   name: string;
-  email: string; // Contact email, may differ from auth email
+  email: string; 
   phoneNumber: string;
   address: string;
   yearOfJoining: number;
   totalYearsWorked?: number;
-  subjectsTaught: SubjectName[];
+  subjectsTaught: SubjectName[]; // General qualification
   profilePictureUrl?: string | null;
   salaryHistory?: TeacherSalaryRecord[];
   daysPresentThisMonth?: number;
   daysAbsentThisMonth?: number;
 }
 
+// Used by TeacherProfileFormDialog
 export interface TeacherFormData {
   name: string;
-  email: string;
+  email: string; // Contact Email, will be used for Auth if new
   phoneNumber: string;
   address: string;
   yearOfJoining: number;
-  subjectsTaught: SubjectName[];
+  subjectsTaught: SubjectName[]; // General qualifications
   profilePictureUrl?: string;
-  assignments?: TeacherAssignment[];
+  assignments: TeacherAssignment[]; // Specific teaching duties
 }
 
 
@@ -222,4 +239,15 @@ export interface HallOfFameItem {
   dataAiHint?: string;
 }
 
-    
+export const motherTeacherCoreSubjects: StandardSubjectName[] = ['English', 'EVS', 'Maths'];
+export const nclpAllSubjects: SubjectName[] = ['English (NCLP)', 'Kannada (NCLP)', 'Hindi (NCLP)', 'Maths (NCLP)', 'EVS (NCLP)'];
+export const nclpGroupBSubjectsNoHindi: SubjectName[] = ['English (NCLP)', 'Kannada (NCLP)', 'Maths (NCLP)', 'EVS (NCLP)'];
+export const niosSubjectsForAssignment: NIOSSubjectName[] = ['Data Entry', 'Painting', 'Indian Culture and Heritage', 'Home Science', 'English (NIOS)'];
+
+export const assignmentTypeLabels: Record<TeacherAssignmentType, string> = {
+  class_teacher: "Class Teacher",
+  subject_teacher: "Subject Teacher",
+  mother_teacher: "Mother Teacher (LKG-4th)",
+  nios_teacher: "NIOS Program Teacher",
+  nclp_teacher: "NCLP Program Teacher",
+};

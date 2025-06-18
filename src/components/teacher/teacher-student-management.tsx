@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Edit, Search, UserPlus, Trash2, Loader2, Filter } from 'lucide-react';
+import { Edit, Search, UserPlus, Trash2, Loader2, Filter, Info } from 'lucide-react';
 import Image from 'next/image';
 import {
   AlertDialog,
@@ -26,30 +26,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { firestore } from '@/lib/firebase';
 import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData, query, where } from 'firebase/firestore';
 import { useAppContext } from '@/app/(protected)/layout';
-
-const STUDENT_DATA_ROOT_COLLECTION = 'student_data_by_class';
-const PROFILES_SUBCOLLECTION_NAME = 'profiles';
-const USERS_COLLECTION = 'users'; 
-
-// Helper function to get the path to a class's profiles subcollection
-const getStudentProfilesCollectionPath = (classId: string): string => {
-  if (!classId) {
-    console.warn("Attempted to get student profiles collection path with undefined classId");
-    return `${STUDENT_DATA_ROOT_COLLECTION}/unknown_class/${PROFILES_SUBCOLLECTION_NAME}`; // Fallback
-  }
-  return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}`;
-};
-
-// Helper function to get the path to a student's document
-const getStudentDocPath = (classId: string, studentProfileId: string): string => {
-    if (!classId || !studentProfileId) throw new Error("classId and studentProfileId are required to determine student document path");
-    return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}/${studentProfileId}`;
-  };
-
+import { getStudentProfilesCollectionPath, getStudentDocPath, getUserDocPath } from '@/lib/firestore-paths'; // Ensure getUserDocPath is imported
 
 export function TeacherStudentManagement() {
   const { userProfile } = useAppContext();
-  const teacherAssignments = userProfile?.role === 'Teacher' ? userProfile.assignments : [];
+  const teacherAssignments = userProfile?.role === 'Teacher' ? userProfile.assignments || [] : [];
 
   const [assignedStudents, setAssignedStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,7 +41,7 @@ export function TeacherStudentManagement() {
   const [currentStudentToEdit, setCurrentStudentToEdit] = useState<Student | null>(null);
 
   useEffect(() => {
-    if (userProfile?.role !== 'Teacher' || !teacherAssignments || teacherAssignments.length === 0) {
+    if (userProfile?.role !== 'Teacher' || teacherAssignments.length === 0) {
       setIsLoading(false);
       setAssignedStudents([]);
       return;
@@ -68,59 +49,83 @@ export function TeacherStudentManagement() {
 
     setIsLoading(true);
     const unsubscribers: (() => void)[] = [];
-    let allFetchedStudentsMap: Map<string, Student> = new Map();
+    const fetchedStudentsMap: Map<string, Student> = new Map(); // Keyed by student.id (studentProfileId)
 
-    const uniqueClassIds = Array.from(new Set(teacherAssignments.map(a => a.classId).filter(Boolean as unknown as (value: string | undefined) => value is string)));
+    // Get unique classIds the teacher is assigned to
+    const uniqueClassIdsTeacherIsAssignedTo = Array.from(new Set(teacherAssignments.map(a => a.classId)));
 
-
-    if (uniqueClassIds.length === 0) {
+    if (uniqueClassIdsTeacherIsAssignedTo.length === 0) {
         setIsLoading(false);
         setAssignedStudents([]);
         return;
     }
+    
+    let activeListeners = uniqueClassIdsTeacherIsAssignedTo.length;
 
-    uniqueClassIds.forEach(classId => {
-      const studentProfilesCollectionPath = getStudentProfilesCollectionPath(classId);
-      const studentsCollectionRef = collection(firestore, studentProfilesCollectionPath);
+    uniqueClassIdsTeacherIsAssignedTo.forEach(classId => {
+      const studentProfilesPath = getStudentProfilesCollectionPath(classId);
+      const studentsCollectionRef = collection(firestore, studentProfilesPath);
       
       const unsubscribe = onSnapshot(studentsCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
         snapshot.docChanges().forEach((change) => {
-            const studentData = {
-                id: change.doc.id, // This is the studentProfileId
-                ...change.doc.data(),
-              } as Student;
+            const studentData = { id: change.doc.id, ...change.doc.data() } as Student;
             if (change.type === "added" || change.type === "modified") {
-                allFetchedStudentsMap.set(studentData.authUid, studentData); // Use authUid as key for global uniqueness
+                fetchedStudentsMap.set(studentData.id, studentData);
             } else if (change.type === "removed") {
-                allFetchedStudentsMap.delete(studentData.authUid);
+                fetchedStudentsMap.delete(studentData.id);
             }
         });
         
-        const currentlyAssigned = Array.from(allFetchedStudentsMap.values()).filter(student => {
-            return teacherAssignments.some(assignment => {
-                if (student.classId !== assignment.classId) return false;
-                if (['mother_teacher', 'class_teacher', 'subject_teacher'].includes(assignment.type)) {
-                    return assignment.sectionId ? student.sectionId === assignment.sectionId : true;
+        // Filter all fetched students based on the teacher's specific assignments
+        const currentFilteredStudents = Array.from(fetchedStudentsMap.values()).filter(student => 
+            teacherAssignments.some(assignment => {
+                if (student.classId !== assignment.classId) return false; // Student must be in an assigned classId
+
+                // For Class/Mother teacher, match sectionId if present in assignment
+                if ((assignment.type === 'class_teacher' || assignment.type === 'mother_teacher')) {
+                    return !assignment.sectionId || student.sectionId === assignment.sectionId;
                 }
-                if (['nios_teacher', 'nclp_teacher'].includes(assignment.type)) {
-                    return assignment.groupId ? student.groupId === assignment.groupId : true;
+                // For Subject teacher, NIOS, NCLP, they see all students in the classId unless further filtered by groupId
+                if (assignment.type === 'subject_teacher' || assignment.type === 'nios_teacher' || assignment.type === 'nclp_teacher') {
+                    if (assignment.sectionId && student.sectionId !== assignment.sectionId) return false; // if section is specified for these types
+                    if (assignment.groupId && student.groupId !== assignment.groupId) return false; // if group is specified
+                    return true; // Generally, they see all students in the assigned classId/sectionId/groupId
                 }
                 return false;
-            });
-        });
-        setAssignedStudents(currentlyAssigned);
-        setIsLoading(false); 
+            })
+        );
+        setAssignedStudents(currentFilteredStudents);
+        
       }, (error) => {
-        console.error(`Error fetching students from ${studentProfilesCollectionPath}:`, error);
+        console.error(`Error fetching students from ${studentProfilesPath}:`, error);
         toast({
-          title: `Error Loading Students from ${classId}`,
-          description: `Could not fetch student data from ${studentProfilesCollectionPath}.`,
+          title: `Error Loading Students`,
+          description: `Could not fetch student data from class ${classId}.`,
           variant: "destructive",
         });
-        setIsLoading(false);
       });
       unsubscribers.push(unsubscribe);
     });
+    
+    // Initial loading state update after setting up all listeners
+    // This might need refinement if listeners update student list incrementally
+    if (activeListeners > 0) { // Check if there were any listeners to begin with
+        const initialLoadCheck = setInterval(() => {
+             // A simple heuristic: if after some time, students are still empty but no errors, 
+             // it might mean no students match or collections are empty.
+            if (unsubscribers.length === activeListeners) { // Ensure all listeners are attached
+                setIsLoading(false);
+                clearInterval(initialLoadCheck);
+            }
+        }, 500); // Check every 500ms, clear after a few seconds or when students load
+         setTimeout(() => { // Fallback to stop loading indicator
+            if(isLoading) setIsLoading(false);
+            clearInterval(initialLoadCheck);
+        }, 5000); // Stop after 5 seconds regardless
+    } else {
+        setIsLoading(false); // No assignments, so not loading
+    }
+
 
     return () => {
       unsubscribers.forEach(unsub => unsub());
@@ -149,30 +154,31 @@ export function TeacherStudentManagement() {
         toast({ title: "Error", description: "Student data is incomplete for deletion.", variant: "destructive" });
         return;
     }
-    const studentDocPath = getStudentDocPath(student.classId, student.id);
     try {
-      const studentDocRef = doc(firestore, studentDocPath);
+      const studentDocRef = doc(firestore, getStudentDocPath(student.classId, student.id));
       await deleteDoc(studentDocRef);
 
-      const userDocRef = doc(firestore, USERS_COLLECTION, student.authUid);
+      const userDocRef = doc(firestore, getUserDocPath(student.authUid));
       await deleteDoc(userDocRef);
       
-      toast({ title: "Student Record Deleted", description: `Student ${student.name || 'Unknown'} and their user link have been removed from Firestore.` });
+      toast({ title: "Student Record Deleted", description: `Student ${student.name || 'Unknown'} and their auth user record have been removed.` });
     } catch (error) {
-      console.error("Error deleting student from Firestore:", error);
+      console.error("Error deleting student:", error);
       toast({
         title: "Deletion Failed",
-        description: "Could not delete student records from Firestore.",
+        description: "Could not delete student records.",
         variant: "destructive",
       });
     }
   };
 
   const handleStudentAdded = (newStudent: Student) => {
+    // The onSnapshot listener should automatically update the list
     setIsAddStudentDialogOpen(false);
   };
 
   const handleStudentEdited = (editedStudent: Student) => {
+    // The onSnapshot listener should automatically update the list
     setIsEditStudentDialogOpen(false);
   };
 
@@ -190,8 +196,8 @@ export function TeacherStudentManagement() {
           <div className="rounded-md border">
             <Table><TableHeader><TableRow>{Array(7).fill(0).map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}</TableRow></TableHeader>
               <TableBody>{Array(3).fill(0).map((_, i) => (
-                  <TableRow key={i}><TableCell colSpan={7} className="p-4">
-                      <div className="flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /><span className="ml-2">Loading students...</span></div>
+                  <TableRow key={`skel-stud-${i}`}><TableCell colSpan={7} className="p-4">
+                      <div className="flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /><span className="ml-2">Loading assigned students...</span></div>
                   </TableCell></TableRow>))}
               </TableBody>
             </Table>
@@ -201,6 +207,8 @@ export function TeacherStudentManagement() {
     );
   }
 
+  const canAddStudents = teacherAssignments.some(a => a.type === 'class_teacher' || a.type === 'mother_teacher');
+
   return (
     <>
     <Card className="w-full shadow-lg rounded-lg">
@@ -209,14 +217,21 @@ export function TeacherStudentManagement() {
           <div>
             <CardTitle className="text-2xl font-headline text-primary">My Assigned Students</CardTitle>
             <CardDescription>
-              {userProfile?.role === 'Teacher' && (!teacherAssignments || teacherAssignments.length === 0)
-                ? "You are not currently assigned to any classes. Please contact an administrator."
-                : "View, search, and manage records for students in your assigned classes."}
+              {teacherAssignments.length === 0
+                ? "You are not currently assigned to any classes or students. Please contact an administrator."
+                : "View, search, and manage records for students based on your teaching assignments."}
             </CardDescription>
           </div>
-          <Button onClick={() => setIsAddStudentDialogOpen(true)} disabled={userProfile?.role === 'Teacher' && (!teacherAssignments || teacherAssignments.length === 0)}>
-            <UserPlus className="mr-2 h-4 w-4" /> Add New Student
-          </Button>
+          {canAddStudents && (
+            <Button onClick={() => setIsAddStudentDialogOpen(true)} disabled={teacherAssignments.length === 0}>
+                <UserPlus className="mr-2 h-4 w-4" /> Add New Student
+            </Button>
+           )}
+           {!canAddStudents && teacherAssignments.length > 0 && (
+             <div className="text-sm text-muted-foreground p-2 border border-dashed rounded-md flex items-center gap-2">
+                <Info size={16} /> Student addition is typically handled by Class/Mother Teachers.
+             </div>
+           )}
         </div>
         <div className="mt-4 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -225,6 +240,7 @@ export function TeacherStudentManagement() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 w-full md:w-1/2"
+            disabled={teacherAssignments.length === 0}
           />
         </div>
       </CardHeader>
@@ -237,14 +253,13 @@ export function TeacherStudentManagement() {
                 <TableHead>Name</TableHead>
                 <TableHead>SATS No.</TableHead>
                 <TableHead>Class (Display)</TableHead>
-                <TableHead>Class ID (System)</TableHead>
-                <TableHead>Section ID</TableHead>
+                <TableHead>Section/Group</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredStudentsToDisplay.length > 0 ? filteredStudentsToDisplay.map((student) => (
-                <TableRow key={student.authUid || student.id}> 
+                <TableRow key={student.id}> 
                   <TableCell>
                     <Image
                       src={student.profilePictureUrl || `https://placehold.co/40x40.png?text=${student.name && student.name.length > 0 ? student.name.charAt(0) : 'S'}`}
@@ -257,9 +272,8 @@ export function TeacherStudentManagement() {
                   </TableCell>
                   <TableCell>{student.name || 'N/A'}</TableCell>
                   <TableCell>{student.satsNumber || 'N/A'}</TableCell>
-                  <TableCell>{student.className || 'N/A'}</TableCell>
-                  <TableCell className="font-mono text-xs">{student.classId || 'N/A'}</TableCell>
-                  <TableCell>{student.sectionId || 'N/A'}</TableCell>
+                  <TableCell>{student.className || student.classId || 'N/A'}</TableCell>
+                  <TableCell>{student.sectionId || student.groupId || 'N/A'}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(student)}>
                       <Edit className="h-4 w-4 mr-1" /> Edit
@@ -275,7 +289,7 @@ export function TeacherStudentManagement() {
                           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                           <AlertDialogDescription>
                             This action cannot be undone. This will permanently delete the student
-                            record for {student.name || 'this student'} from its class subcollection ({getStudentProfilesCollectionPath(student.classId)}) and their user link from Firestore.
+                            record for {student.name || 'this student'} from Firestore (path: {getStudentDocPath(student.classId, student.id)}) and their main user record (path: {getUserDocPath(student.authUid)}).
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -290,9 +304,9 @@ export function TeacherStudentManagement() {
                 </TableRow>
               )) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
-                    {userProfile?.role === 'Teacher' && (!teacherAssignments || teacherAssignments.length === 0)
-                      ? "No classes assigned."
+                  <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
+                    {teacherAssignments.length === 0
+                      ? "No classes assigned to you."
                       : "No students found matching your assignments or search criteria."}
                   </TableCell>
                 </TableRow>
@@ -302,7 +316,7 @@ export function TeacherStudentManagement() {
         </div>
         {filteredStudentsToDisplay.length > 0 && (
           <div className="mt-4 text-right text-sm text-muted-foreground">
-            Showing {filteredStudentsToDisplay.length} students based on your assignments and filters.
+            Showing {filteredStudentsToDisplay.length} of {assignedStudents.length} total assigned students.
           </div>
         )}
       </CardContent>
@@ -321,7 +335,3 @@ export function TeacherStudentManagement() {
     </>
   );
 }
-
-    
-
-    

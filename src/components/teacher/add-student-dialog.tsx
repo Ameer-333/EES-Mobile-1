@@ -1,11 +1,11 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Student, ReligionType, ManagedUser } from '@/types';
+import type { Student, ReligionType, ManagedUser, TeacherAssignment } from '@/types';
 import { religionOptions } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogClose,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -28,19 +27,21 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Info } from 'lucide-react';
+import { Loader2, Info, AlertTriangle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { firestore, auth as firebaseAuth } from '@/lib/firebase';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { getStudentProfilesCollectionPath, getUserDocPath } from '@/lib/firestore-paths';
+import { useAppContext } from '@/app/(protected)/layout';
 
 const addStudentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   satsNumber: z.string().min(3, { message: 'SATS number must be at least 3 characters.' }).regex(/^[a-zA-Z0-9]+$/, "SATS number should be alphanumeric."),
-  className: z.string().min(1, { message: 'Class Name (e.g., 10th Grade, LKG) is required.' }),
-  classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG, NIOS - used for collection path) is required.' }),
-  sectionId: z.string().max(2).optional().or(z.literal('')),
+  // className: z.string().min(1, { message: 'Class Name (e.g., 10th Grade, LKG) is required.' }), // Will be derived or selected
+  // classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG - used for collection path) is required.' }), // Will be derived or selected
+  assignedClassInfo: z.string().min(1, "You must select an assigned class/section for the student."), // "classId|sectionId|className"
+  sectionIdManual: z.string().max(3).optional().or(z.literal('')), // For cases where teacher needs to input section for a general class assignment
   groupId: z.string().optional().or(z.literal('')),
   dateOfBirth: z.string().optional().or(z.literal('')),
   fatherName: z.string().optional().or(z.literal('')),
@@ -67,6 +68,8 @@ interface AddStudentDialogProps {
 }
 
 export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddStudentDialogProps) {
+  const { userProfile } = useAppContext();
+  const teacherAssignments = userProfile?.role === 'Teacher' ? userProfile.assignments || [] : [];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState<{email: string, password: string} | null>(null);
   const { toast } = useToast();
@@ -74,18 +77,45 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
   const form = useForm<AddStudentFormValues>({
     resolver: zodResolver(addStudentSchema),
     defaultValues: {
-      name: '', satsNumber: '', className: '', classId: '', sectionId: '', groupId: '',
+      name: '', satsNumber: '', assignedClassInfo: '', sectionIdManual: '', groupId: '',
       dateOfBirth: '', fatherName: '', motherName: '', fatherOccupation: '', motherOccupation: '',
       parentsAnnualIncome: 0, parentContactNumber: '', email: '', caste: '', religion: 'Hindu',
       address: '', siblingReference: '', profilePictureUrl: '', backgroundInfo: '',
     },
   });
+  
+  const teacherAddableClasses = useMemo(() => {
+    return teacherAssignments
+      .filter(a => a.type === 'class_teacher' || a.type === 'mother_teacher')
+      .map(a => ({
+        value: `${a.classId}|${a.sectionId || ''}|${a.className || a.classId}`,
+        label: `${a.className || a.classId}${a.sectionId ? ` - Section ${a.sectionId}` : ''} (${a.type === 'mother_teacher' ? 'Mother Teacher' : 'Class Teacher'})`
+      }));
+  }, [teacherAssignments]);
+
+  const selectedAssignedClassInfo = form.watch('assignedClassInfo');
+  const needsManualSection = useMemo(() => {
+      if (!selectedAssignedClassInfo) return false;
+      const [_classId, sectionId, _className] = selectedAssignedClassInfo.split('|');
+      return !sectionId; // If sectionId was empty in the assignment, might need manual input
+  }, [selectedAssignedClassInfo]);
+
 
   async function onSubmit(values: AddStudentFormValues) {
     setIsSubmitting(true);
     setGeneratedCredentials(null);
 
-    if (!values.classId) {
+    if (!values.assignedClassInfo) {
+        toast({ title: "Error", description: "Assigned class information is missing.", variant: "destructive"});
+        setIsSubmitting(false);
+        return;
+    }
+    
+    const [classId, assignedSectionId, classNameFromAssignment] = values.assignedClassInfo.split('|');
+    const finalClassName = classNameFromAssignment || classId;
+    const finalSectionId = assignedSectionId || values.sectionIdManual || undefined;
+
+    if (!classId) {
         toast({ title: "Error", description: "Class ID is missing. Cannot add student.", variant: "destructive"});
         setIsSubmitting(false);
         return;
@@ -94,7 +124,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     const generatedLoginEmail = `${values.satsNumber.toLowerCase().replace(/[^a-z0-9]/gi, '')}.student@eesedu.com`;
     const generatedPassword = `${values.satsNumber.toUpperCase()}Default@123`;
     
-    const studentProfilesCollectionPath = getStudentProfilesCollectionPath(values.classId);
+    const studentProfilesCollectionPath = getStudentProfilesCollectionPath(classId);
 
     try {
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, generatedLoginEmail, generatedPassword);
@@ -104,12 +134,12 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
         authUid: authUid,
         name: values.name,
         satsNumber: values.satsNumber,
-        className: values.className,
-        classId: values.classId,
-        sectionId: values.sectionId || undefined,
+        className: finalClassName,
+        classId: classId,
+        sectionId: finalSectionId,
         groupId: values.groupId || undefined,
-        class: values.className, 
-        section: values.sectionId || 'N/A',
+        class: finalClassName, // For compatibility if older components use 'class'
+        section: finalSectionId || 'N/A', // For compatibility
         dateOfBirth: values.dateOfBirth || undefined,
         fatherName: values.fatherName || undefined,
         motherName: values.motherName || undefined,
@@ -132,12 +162,12 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       const studentDocRef = await addDoc(collection(firestore, studentProfilesCollectionPath), studentProfileDataForDb);
       const studentProfileId = studentDocRef.id; 
 
-      const userDocData: Omit<ManagedUser, 'id' | 'lastLogin' | 'assignments'> = {
+      const userDocData: Partial<ManagedUser> = { // Using Partial as not all fields are set here
         name: values.name,
         email: generatedLoginEmail,
         role: 'Student',
         status: 'Active',
-        classId: values.classId,
+        classId: classId,
         studentProfileId: studentProfileId,
       };
       await setDoc(doc(firestore, getUserDocPath(authUid)), userDocData); 
@@ -153,22 +183,22 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
           title: "Student Added Successfully!",
           description: (
             React.createElement('div', null,
-              React.createElement('p', null, `${values.name} added to class ${values.className} and auth account created.`),
+              React.createElement('p', null, `${values.name} added to class ${finalClassName} ${finalSectionId ? `Section ${finalSectionId}` : ''} and auth account created.`),
               React.createElement('p', {className: "mt-2 font-semibold"}, `Login Email: ${generatedLoginEmail}`),
               React.createElement('p', {className: "font-semibold"}, `Default Password: ${generatedPassword}`),
               React.createElement('p', {className: "text-xs mt-1 text-destructive"}, "Advise student to change password on first login.")
             )
           ),
-          duration: 20000,
+          duration: 20000, // Longer duration to see credentials
       });
-      form.reset();
+      form.reset(); // Reset after successful submission and credential display
     } catch (error: any) {
       console.error("Error adding student or creating auth user:", error);
       let errorMessage = "Could not add student. Please check console for details.";
       if (error.code === 'auth/email-already-in-use') {
-        errorMessage = `The login email ${generatedLoginEmail} is already in use. This might happen if a student with the same SATS number was already created or if there's an issue with email generation uniqueness. Please verify.`;
+        errorMessage = `The login email ${generatedLoginEmail} is already in use. This student (SATS: ${values.satsNumber}) might already exist or there's an email conflict. Please verify.`;
       } else if (error.code === 'auth/weak-password') {
-        errorMessage = "The generated password is too weak. This is a system issue, please contact an admin.";
+        errorMessage = "The auto-generated password is too weak. This is a system issue, please contact an admin.";
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -181,6 +211,8 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       setIsSubmitting(false);
     }
   }
+  
+  const noAddableClasses = teacherAddableClasses.length === 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -192,35 +224,61 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     }}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Student</DialogTitle>
+          <DialogTitle>Add New Student to Your Class</DialogTitle>
           <DialogDescription>
-            Enter student details. Login email & password will be auto-generated. Student profile will be stored in: {getStudentProfilesCollectionPath(form.getValues('classId') || '{ClassID}')}
+            Enter student details. Login email & password will be auto-generated using SATS number.
           </DialogDescription>
         </DialogHeader>
+        {noAddableClasses && (
+             <div className="p-3 my-2 border border-amber-500/50 bg-amber-500/10 rounded-md text-sm text-amber-700 flex items-start">
+                <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5 text-amber-600" />
+                <div>
+                    <strong>No Assignable Classes:</strong> You are not currently assigned as a Class Teacher or Mother Teacher to any specific class/section, or your assignments lack section details if required by system configuration for student addition. Please contact an administrator if you believe this is an error.
+                </div>
+            </div>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 py-3 pr-2">
+             <FormField
+              control={form.control}
+              name="assignedClassInfo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Assign to Class/Section</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={noAddableClasses}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={noAddableClasses ? "No assignable classes" : "Select your class/section"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {teacherAddableClasses.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {needsManualSection && selectedAssignedClassInfo && (
+                 <FormField control={form.control} name="sectionIdManual" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Enter Section ID for {selectedAssignedClassInfo.split('|')[2] || selectedAssignedClassInfo.split('|')[0]}</FormLabel>
+                        <FormControl><Input placeholder="e.g. A, B, Sunshine" {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}/>
+            )}
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. Priya Sharma" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="satsNumber" render={({ field }) => (
               <FormItem><FormLabel>SATS Number (Alphanumeric)</FormLabel><FormControl><Input placeholder="e.g. SAT00123" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <FormField control={form.control} name="className" render={({ field }) => (
-                <FormItem><FormLabel>Class Name (Display)</FormLabel><FormControl><Input placeholder="e.g. 10th Grade, LKG" {...field} /></FormControl><FormMessage /></FormItem>
-              )}/>
-              <FormField control={form.control} name="classId" render={({ field }) => (
-                <FormItem><FormLabel>Class ID (System, e.g., 10, LKG)</FormLabel><FormControl><Input placeholder="e.g. 10, LKG, NIOS, 10TH_PASSOUT_2025" {...field} /></FormControl><FormMessage /></FormItem>
-              )}/>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <FormField control={form.control} name="sectionId" render={({ field }) => (
-                <FormItem><FormLabel>Section ID (Optional)</FormLabel><FormControl><Input placeholder="e.g. A, B" {...field} /></FormControl><FormMessage /></FormItem>
-              )}/>
-              <FormField control={form.control} name="groupId" render={({ field }) => (
-                <FormItem><FormLabel>Group ID (Optional, for NIOS/NCLP)</FormLabel><FormControl><Input placeholder="e.g. Alpha, Batch1" {...field} /></FormControl><FormMessage /></FormItem>
-              )}/>
-            </div>
+            <FormField control={form.control} name="groupId" render={({ field }) => (
+                <FormItem><FormLabel>Group ID (Optional, for NIOS/NCLP specific sub-groups)</FormLabel><FormControl><Input placeholder="e.g. Alpha, Batch1" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
              <FormField control={form.control} name="email" render={({ field }) => (
               <FormItem><FormLabel>Student Personal Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="student.personal@example.com" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
@@ -280,17 +338,15 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
             )}
 
             <DialogFooter className="pt-3">
-              <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => {
-                    onOpenChange(false);
+               <Button type="button" variant="outline" onClick={() => {
                     form.reset();
                     setGeneratedCredentials(null);
+                    onOpenChange(false);
                 }} disabled={isSubmitting}>
                   {generatedCredentials ? "Close" : "Cancel"}
                 </Button>
-              </DialogClose>
               {!generatedCredentials && (
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="submit" disabled={isSubmitting || noAddableClasses}>
                   {isSubmitting ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : null}
                   Add Student & Create Account
                 </Button>
@@ -302,6 +358,3 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     </Dialog>
   );
 }
-    
-
-    
