@@ -48,6 +48,12 @@ export interface ExamRecord {
   subjectMarks: SubjectMarks[];
 }
 
+export interface RawAttendanceRecord {
+  subjectName: SubjectName;
+  date: string; // YYYY-MM-DD
+  status: 'Present' | 'Absent';
+}
+
 export interface Student {
   id: string; 
   name: string;
@@ -69,7 +75,8 @@ export interface Student {
   profilePictureUrl?: string | null;
   remarks?: StudentRemark[];
   scholarships?: Scholarship[];
-  examRecords?: ExamRecord[]; // Added for storing student marks
+  examRecords?: ExamRecord[];
+  rawAttendanceRecords?: RawAttendanceRecord[];
   backgroundInfo?: string;
   authUid?: string; 
 }
@@ -77,14 +84,14 @@ export interface Student {
 
 export type GradeType = 'Distinction' | 'First Class' | 'Second Class' | 'Pass Class' | 'Not Completed';
 
-export interface AttendanceRecord {
+export interface AttendanceRecord { // This is the processed daily record for display for a subject
   date: string; // YYYY-MM-DD
   status: 'Present' | 'Absent';
 }
 
-export interface StudentSubjectAttendance {
+export interface StudentSubjectAttendance { // This is the summary for display (table/chart)
   subjectName: SubjectName;
-  records: AttendanceRecord[];
+  records: AttendanceRecord[]; // This might be less useful if we only show totals
   totalClasses: number;
   attendedClasses: number;
 }

@@ -4,7 +4,7 @@
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Student, SubjectName, ExamName, ExamRecord, SubjectMarks } from '@/types';
+import type { Student, SubjectName, ExamName, ExamRecord, RawAttendanceRecord } from '@/types';
 import { subjectNamesArray, examNamesArray } from '@/types'; // Import examNamesArray
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -100,19 +100,19 @@ export function TeacherDataEntry() {
       
       let examRecord = examRecords.find(er => er.examName === values.examName);
 
-      if (examRecord) { // Exam record exists, update or add subject marks
+      if (examRecord) { 
         let subjectMark = examRecord.subjectMarks.find(sm => sm.subjectName === values.subjectName);
-        if (subjectMark) { // Subject mark exists, update it
+        if (subjectMark) { 
           subjectMark.marks = values.marks;
           subjectMark.maxMarks = values.maxMarks;
-        } else { // Subject mark doesn't exist, add it
+        } else { 
           examRecord.subjectMarks.push({
             subjectName: values.subjectName,
             marks: values.marks,
             maxMarks: values.maxMarks,
           });
         }
-      } else { // Exam record doesn't exist, create it with the new subject mark
+      } else { 
         examRecords.push({
           examName: values.examName,
           subjectMarks: [{
@@ -127,9 +127,9 @@ export function TeacherDataEntry() {
 
       toast({ title: 'Marks Submitted', description: `Marks for ${values.subjectName} (${values.examName}) recorded for student ${studentData.name}.` });
       marksForm.reset({ 
-        studentId: values.studentId, // Keep student selected
-        examName: values.examName,   // Keep exam selected
-        subjectName: undefined,      // Clear subject for next entry
+        studentId: values.studentId,
+        examName: values.examName,  
+        subjectName: undefined,     
         marks: 0, 
         maxMarks: 100 
       });
@@ -142,10 +142,6 @@ export function TeacherDataEntry() {
 
   async function onAttendanceSubmit(values: z.infer<typeof attendanceSchema>) {
     setIsSubmittingAttendance(true);
-    // Placeholder: Logic to save attendance to Firestore
-    // This might involve an `rawAttendanceRecords` array on the student document
-    // or a separate subcollection for attendance.
-    // For now, we'll just log and show a toast.
     try {
         const studentDocRef = doc(firestore, STUDENTS_COLLECTION, values.studentId);
         const studentSnap = await getDoc(studentDocRef);
@@ -157,22 +153,39 @@ export function TeacherDataEntry() {
         }
         const studentData = studentSnap.data() as Student;
 
-        const newAttendanceRecord = {
+        const newAttendanceRecord: RawAttendanceRecord = {
             subjectName: values.subjectName,
-            date: format(values.date, "yyyy-MM-dd"), // Store date as string
+            date: format(values.date, "yyyy-MM-dd"),
             status: values.status,
         };
         
-        // Assuming `rawAttendanceRecords` is an array field in the student document
-        await updateDoc(studentDocRef, {
-            rawAttendanceRecords: arrayUnion(newAttendanceRecord)
-        });
+        // Check if a record for this student, subject, and date already exists
+        const existingRecords = studentData.rawAttendanceRecords || [];
+        const recordExists = existingRecords.some(
+          record => record.subjectName === newAttendanceRecord.subjectName && record.date === newAttendanceRecord.date
+        );
 
-        toast({ title: 'Attendance Submitted', description: `Attendance for ${values.subjectName} on ${format(values.date, "PPP")} recorded for ${studentData.name}.` });
+        if (recordExists) {
+          // Update existing record
+          const updatedRecords = existingRecords.map(record =>
+            (record.subjectName === newAttendanceRecord.subjectName && record.date === newAttendanceRecord.date)
+              ? newAttendanceRecord 
+              : record
+          );
+          await updateDoc(studentDocRef, { rawAttendanceRecords: updatedRecords });
+          toast({ title: 'Attendance Updated', description: `Attendance for ${values.subjectName} on ${format(values.date, "PPP")} updated for ${studentData.name}.` });
+        } else {
+          // Add new record
+          await updateDoc(studentDocRef, {
+              rawAttendanceRecords: arrayUnion(newAttendanceRecord)
+          });
+          toast({ title: 'Attendance Submitted', description: `Attendance for ${values.subjectName} on ${format(values.date, "PPP")} recorded for ${studentData.name}.` });
+        }
+        
         attendanceForm.reset({ 
-            studentId: values.studentId, // Keep student selected
-            subjectName: values.subjectName, // Keep subject selected
-            date: values.date,           // Keep date selected
+            studentId: values.studentId, 
+            subjectName: values.subjectName, 
+            date: values.date,          
             status: 'Present' 
         });
 

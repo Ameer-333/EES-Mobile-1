@@ -15,10 +15,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MessageSquarePlus, Loader2, Send, BookOpen, Smile, Frown, Meh, Info, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { firestore } from '@/lib/firebase';
+import { auth, firestore } from '@/lib/firebase'; // Import auth for teacher name
 import { collection, getDocs, doc, getDoc, updateDoc, arrayUnion, query, orderBy } from 'firebase/firestore';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
+
 
 const STUDENTS_COLLECTION = 'students';
+const USERS_COLLECTION = 'users'; // For fetching teacher's name
 
 const remarkSchema = z.object({
   studentId: z.string().min(1, 'Student selection is required.'),
@@ -36,10 +39,25 @@ export function GiveStudentRemarkForm() {
   const [studentsList, setStudentsList] = useState<Pick<Student, 'id' | 'name' | 'class' | 'section'>[]>([]);
   const [selectedStudentData, setSelectedStudentData] = useState<Student | null>(null);
   const [remarkAlreadySubmittedThisMonth, setRemarkAlreadySubmittedThisMonth] = useState(false);
+  const [currentTeacherName, setCurrentTeacherName] = useState<string>("Teacher");
 
   const { toast } = useToast();
-  // In a real app, teacher's name would come from auth context
-  const currentTeacherName = "Priya Sharma (Demo Teacher)"; 
+
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
+      if (user) {
+        const userDocRef = doc(firestore, USERS_COLLECTION, user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          setCurrentTeacherName(userDocSnap.data().name || "Teacher");
+        } else {
+          setCurrentTeacherName("Teacher"); // Fallback
+        }
+      }
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
 
   const form = useForm<RemarkFormValues>({
     resolver: zodResolver(remarkSchema),
@@ -78,14 +96,14 @@ export function GiveStudentRemarkForm() {
 
   useEffect(() => {
     const checkExistingRemark = async () => {
-      if (!watchedStudentId || !watchedSubject) {
+      if (!watchedStudentId || !watchedSubject || !currentTeacherName || currentTeacherName === "Teacher") { // Ensure teacher name is loaded
         setRemarkAlreadySubmittedThisMonth(false);
         setSelectedStudentData(null);
         return;
       }
 
       setIsLoadingRemarkCheck(true);
-      setRemarkAlreadySubmittedThisMonth(false); // Reset
+      setRemarkAlreadySubmittedThisMonth(false); 
 
       try {
         const studentDocRef = doc(firestore, STUDENTS_COLLECTION, watchedStudentId);
@@ -103,7 +121,7 @@ export function GiveStudentRemarkForm() {
           const hasRemark = existingRemarks.some(remark => {
             const remarkDate = new Date(remark.date);
             return remark.teacherSubject === watchedSubject &&
-                   remark.teacherName === currentTeacherName && // Assuming teacher name is a reliable identifier
+                   remark.teacherName === currentTeacherName && 
                    remarkDate.getMonth() === currentMonth &&
                    remarkDate.getFullYear() === currentYear;
           });
@@ -120,7 +138,9 @@ export function GiveStudentRemarkForm() {
       setIsLoadingRemarkCheck(false);
     };
 
-    checkExistingRemark();
+    if (currentTeacherName !== "Teacher") { // Only run if teacher name is properly fetched
+      checkExistingRemark();
+    }
   }, [watchedStudentId, watchedSubject, currentTeacherName, toast]);
 
 
@@ -128,7 +148,7 @@ export function GiveStudentRemarkForm() {
     if (remarkAlreadySubmittedThisMonth) {
       toast({
         title: "Submission Blocked",
-        description: `A remark for ${values.teacherSubject} for this student has already been submitted this month.`,
+        description: `A remark for ${values.teacherSubject} for this student has already been submitted this month by you.`,
         variant: "destructive",
       });
       return;
@@ -137,15 +157,20 @@ export function GiveStudentRemarkForm() {
       toast({ title: "Error", description: "Student data not loaded. Cannot submit remark.", variant: "destructive"});
       return;
     }
+     if (currentTeacherName === "Teacher") {
+      toast({ title: "Error", description: "Teacher details not loaded. Please try again.", variant: "destructive"});
+      return;
+    }
+
 
     setIsSubmitting(true);
     
     const newRemark: StudentRemark = {
-      id: `remark_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, // More unique ID
+      id: `remark_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       teacherName: currentTeacherName,
       teacherSubject: values.teacherSubject,
       remark: values.remarkText,
-      date: new Date().toISOString().split('T')[0], // Current date YYYY-MM-DD
+      date: new Date().toISOString().split('T')[0], 
       sentiment: values.sentiment,
     };
 
@@ -160,8 +185,8 @@ export function GiveStudentRemarkForm() {
         description: `Your ${values.sentiment} remark for ${selectedStudentData.name} regarding ${values.teacherSubject} has been saved.`,
       });
       form.reset({studentId: '', teacherSubject: undefined, remarkText: '', sentiment: 'neutral'});
-      setSelectedStudentData(null); // Reset selected student data
-      setRemarkAlreadySubmittedThisMonth(false); // Reset check
+      setSelectedStudentData(null); 
+      setRemarkAlreadySubmittedThisMonth(false); 
     } catch (error) {
       console.error("Error saving remark to Firestore:", error);
       toast({
@@ -174,7 +199,7 @@ export function GiveStudentRemarkForm() {
     }
   }
 
-  const isFormDisabled = isSubmitting || isLoadingRemarkCheck || remarkAlreadySubmittedThisMonth;
+  const isFormDisabled = isSubmitting || isLoadingRemarkCheck || remarkAlreadySubmittedThisMonth || currentTeacherName === "Teacher";
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg rounded-lg border-primary/20">
@@ -182,7 +207,7 @@ export function GiveStudentRemarkForm() {
         <CardTitle className="text-2xl font-headline text-primary flex items-center">
           <MessageSquarePlus className="mr-3 h-7 w-7" /> Provide Student Remark
         </CardTitle>
-        <CardDescription>Select a student, subject, sentiment, and write your feedback. Remarks are limited to one per subject, per student, per month by the same teacher.</CardDescription>
+        <CardDescription>Select a student, subject, sentiment, and write your feedback. Remarks are limited to one per subject, per student, per month by the same teacher ({currentTeacherName}).</CardDescription>
       </CardHeader>
       <CardContent className="pt-6">
         {isLoadingStudents ? (
@@ -202,7 +227,7 @@ export function GiveStudentRemarkForm() {
                   <Select 
                     onValueChange={(value) => {
                       field.onChange(value);
-                      setSelectedStudentData(null); // Reset when student changes
+                      setSelectedStudentData(null); 
                       setRemarkAlreadySubmittedThisMonth(false);
                     }} 
                     defaultValue={field.value}
@@ -234,7 +259,7 @@ export function GiveStudentRemarkForm() {
                   <Select 
                     onValueChange={(value) => {
                        field.onChange(value);
-                       setRemarkAlreadySubmittedThisMonth(false); // Reset on subject change
+                       setRemarkAlreadySubmittedThisMonth(false); 
                     }} 
                     defaultValue={field.value as string}
                   >
@@ -325,6 +350,9 @@ export function GiveStudentRemarkForm() {
             </Button>
             {studentsList.length === 0 && !isLoadingStudents && (
                  <p className="text-sm text-destructive text-center">No students found. Cannot submit remarks.</p>
+            )}
+             {currentTeacherName === "Teacher" && !isLoadingStudents && (
+                 <p className="text-sm text-orange-500 text-center">Loading teacher details for remark validation...</p>
             )}
           </form>
         </Form>
