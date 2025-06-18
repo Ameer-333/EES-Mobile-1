@@ -15,31 +15,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MessageSquarePlus, Loader2, Send, BookOpen, Smile, Frown, Meh, Info, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { auth, firestore } from '@/lib/firebase'; 
+import { auth, firestore } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, updateDoc, arrayUnion, query, orderBy, DocumentReference, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useAppContext } from '@/app/(protected)/layout';
-
-
-const STUDENT_DATA_ROOT_COLLECTION = 'student_data_by_class';
-const PROFILES_SUBCOLLECTION_NAME = 'profiles';
-const USERS_COLLECTION = 'users'; // For fetching teacher's name
-
-// Helper function to get the path to a class's profiles subcollection
-const getStudentProfilesCollectionPath = (classId: string): string => {
-  if (!classId) {
-     console.warn("Attempted to get student profiles collection path with undefined classId for remarks");
-    return `${STUDENT_DATA_ROOT_COLLECTION}/unknown_class/${PROFILES_SUBCOLLECTION_NAME}`;
-  }
-  return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}`;
-};
-
-// Helper function to get the path to a student's document
-const getStudentDocRef = (classId: string, studentProfileId: string): DocumentReference => {
-  if (!classId || !studentProfileId) throw new Error("classId and studentProfileId are required to get student document reference for remarks");
-  const path = `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}/${studentProfileId}`;
-  return doc(firestore, path);
-};
+import { getStudentProfilesCollectionPath, getStudentDocPath as getStudentDocRefFromUtil } from '@/lib/firestore-paths';
 
 
 const remarkSchema = z.object({
@@ -59,10 +39,10 @@ export function GiveStudentRemarkForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
   const [isLoadingRemarkCheck, setIsLoadingRemarkCheck] = useState(false);
-  
+
   const [allAssignedStudents, setAllAssignedStudents] = useState<Student[]>([]);
-  const [selectedStudentData, setSelectedStudentData] = useState<Student | null>(null); // Full student data for the selected one
-  
+  const [selectedStudentData, setSelectedStudentData] = useState<Student | null>(null);
+
   const [remarkAlreadySubmittedThisMonth, setRemarkAlreadySubmittedThisMonth] = useState(false);
   const [currentTeacherName, setCurrentTeacherName] = useState<string>("Teacher");
 
@@ -86,7 +66,7 @@ export function GiveStudentRemarkForm() {
     },
   });
 
-  const watchedStudentId = form.watch('studentId'); // This is studentProfileId
+  const watchedStudentId = form.watch('studentId');
   const watchedSubject = form.watch('teacherSubject');
 
   useEffect(() => {
@@ -115,10 +95,10 @@ export function GiveStudentRemarkForm() {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
           const studentData = {
-            id: change.doc.id, // studentProfileId
+            id: change.doc.id,
             ...change.doc.data(),
           } as Student;
-          
+
           if (change.type === "added" || change.type === "modified") {
             fetchedStudentsMap.set(studentData.id, studentData);
           } else if (change.type === "removed") {
@@ -154,27 +134,22 @@ export function GiveStudentRemarkForm() {
     const checkExistingRemark = async () => {
       if (!watchedStudentId || !watchedSubject || !currentTeacherName || currentTeacherName === "Teacher") {
         setRemarkAlreadySubmittedThisMonth(false);
-        setSelectedStudentData(null); 
-        form.setValue("classId", "");
+        // No need to reset selectedStudentData here, as it's set by studentId watcher
+        // form.setValue("classId", ""); // classId is set by studentId watcher
         return;
       }
-      
+
       const studentFromList = allAssignedStudents.find(s => s.id === watchedStudentId);
-      if (!studentFromList) {
-        setSelectedStudentData(null);
-        form.setValue("classId", "");
+      if (!studentFromList) { // This case should ideally not happen if studentId is from the dropdown
         setRemarkAlreadySubmittedThisMonth(false);
         return;
       }
-      
-      setSelectedStudentData(studentFromList); // Set full student data
-      form.setValue("classId", studentFromList.classId); // Ensure classId is set in form for submission
+      // selectedStudentData is already set by the other useEffect for watchedStudentId
 
       setIsLoadingRemarkCheck(true);
-      setRemarkAlreadySubmittedThisMonth(false); 
+      setRemarkAlreadySubmittedThisMonth(false);
 
       try {
-        // The studentFromList already has remarks, no need to fetch again unless it's stale
         const existingRemarks = studentFromList.remarks || [];
         const currentDate = new Date();
         const currentMonth = currentDate.getMonth();
@@ -183,7 +158,7 @@ export function GiveStudentRemarkForm() {
         const hasRemark = existingRemarks.some(remark => {
           const remarkDate = new Date(remark.date);
           return remark.teacherSubject === watchedSubject &&
-                 remark.teacherName === currentTeacherName && 
+                 remark.teacherName === currentTeacherName &&
                  remarkDate.getMonth() === currentMonth &&
                  remarkDate.getFullYear() === currentYear;
         });
@@ -195,19 +170,32 @@ export function GiveStudentRemarkForm() {
       setIsLoadingRemarkCheck(false);
     };
 
-    if (currentTeacherName !== "Teacher" && allAssignedStudents.length > 0) {
+    if (currentTeacherName !== "Teacher" && allAssignedStudents.length > 0 && selectedStudentData) {
       checkExistingRemark();
     }
-  }, [watchedStudentId, watchedSubject, currentTeacherName, toast, allAssignedStudents, form]);
+  }, [watchedStudentId, watchedSubject, currentTeacherName, toast, allAssignedStudents, form, selectedStudentData]);
 
-  // Filter subjects based on teacher's role and assignments for the selected student
+   useEffect(() => {
+    if (watchedStudentId) {
+        const student = allAssignedStudents.find(s => s.id === watchedStudentId);
+        setSelectedStudentData(student || null);
+        if (student) form.setValue("classId", student.classId);
+        else form.setValue("classId", "");
+    } else {
+        setSelectedStudentData(null);
+        form.setValue("classId", "");
+    }
+  }, [watchedStudentId, allAssignedStudents, form]);
+
+
   const availableSubjectsForSelectedStudent = useMemo(() => {
-    if (!selectedStudentData || !teacherAssignments) return subjectNamesArray;
+    if (!selectedStudentData || !teacherAssignments || teacherAssignments.length === 0) return [];
 
     let relevantSubjects: Set<SubjectName> = new Set();
     teacherAssignments.forEach(assignment => {
-      if (assignment.classId === selectedStudentData.classId && 
-          (!assignment.sectionId || assignment.sectionId === selectedStudentData.sectionId)) {
+      if (assignment.classId === selectedStudentData.classId &&
+          (!assignment.sectionId || assignment.sectionId === selectedStudentData.sectionId) &&
+          (!assignment.groupId || assignment.groupId === selectedStudentData.groupId)) {
         if (assignment.type === 'mother_teacher' || assignment.type === 'class_teacher') {
           subjectNamesArray.forEach(s => relevantSubjects.add(s));
         } else if (assignment.type === 'subject_teacher' && assignment.subjectId) {
@@ -217,7 +205,7 @@ export function GiveStudentRemarkForm() {
         }
       }
     });
-    return Array.from(relevantSubjects).length > 0 ? Array.from(relevantSubjects) : subjectNamesArray;
+    return Array.from(relevantSubjects);
   }, [selectedStudentData, teacherAssignments]);
 
 
@@ -240,29 +228,29 @@ export function GiveStudentRemarkForm() {
     }
 
     setIsSubmitting(true);
-    
+
     const newRemark: StudentRemark = {
       id: `remark_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       teacherName: currentTeacherName,
       teacherSubject: values.teacherSubject,
       remark: values.remarkText,
-      date: new Date().toISOString().split('T')[0], 
+      date: new Date().toISOString().split('T')[0],
       sentiment: values.sentiment,
     };
 
     try {
-      const studentDocRef = getStudentDocRef(values.classId, values.studentId); // values.studentId is studentProfileId
+      const studentDocRef = getStudentDocRefFromUtil(values.classId, values.studentId);
       await updateDoc(studentDocRef, {
         remarks: arrayUnion(newRemark)
       });
-      
+
       toast({
         title: 'Remark Submitted Successfully!',
         description: `Your ${values.sentiment} remark for ${selectedStudentData.name} regarding ${values.teacherSubject} has been saved.`,
       });
       form.reset({studentId: '', classId: '', teacherSubject: undefined, remarkText: '', sentiment: 'neutral'});
-      setSelectedStudentData(null); 
-      setRemarkAlreadySubmittedThisMonth(false); 
+      setSelectedStudentData(null);
+      setRemarkAlreadySubmittedThisMonth(false);
     } catch (error) {
       console.error("Error saving remark to Firestore:", error);
       toast({
@@ -275,7 +263,8 @@ export function GiveStudentRemarkForm() {
     }
   }
 
-  const isFormDisabled = isSubmitting || isLoadingRemarkCheck || remarkAlreadySubmittedThisMonth || currentTeacherName === "Teacher";
+  const isFormDisabled = isSubmitting || isLoadingRemarkCheck || remarkAlreadySubmittedThisMonth || currentTeacherName === "Teacher" || !selectedStudentData;
+  const noStudentsAssigned = allAssignedStudents.length === 0 && !isLoadingStudents;
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg rounded-lg border-primary/20">
@@ -284,6 +273,7 @@ export function GiveStudentRemarkForm() {
           <MessageSquarePlus className="mr-3 h-7 w-7" /> Provide Student Remark
         </CardTitle>
         <CardDescription>Select a student, subject, sentiment, and write your feedback. Remarks are limited to one per subject, per student, per month by the same teacher ({currentTeacherName}).</CardDescription>
+        {noStudentsAssigned && <p className="text-sm text-destructive mt-2">You are not currently assigned to any students. Please contact an administrator.</p>}
       </CardHeader>
       <CardContent className="pt-6">
         {isLoadingStudents ? (
@@ -296,31 +286,29 @@ export function GiveStudentRemarkForm() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
-              name="studentId" // This is studentProfileId
+              name="studentId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Select Student</FormLabel>
-                  <Select 
+                  <Select
                     onValueChange={(value) => {
                       field.onChange(value);
-                      const student = allAssignedStudents.find(s => s.id === value);
-                      setSelectedStudentData(student || null); 
-                      form.setValue("classId", student?.classId || "");
-                      form.setValue("teacherSubject", undefined); // Reset subject
+                      // selectedStudentData and classId will be updated by the useEffect for watchedStudentId
+                      form.setValue("teacherSubject", undefined);
                       setRemarkAlreadySubmittedThisMonth(false);
-                    }} 
+                    }}
                     defaultValue={field.value}
-                    disabled={allAssignedStudents.length === 0}
+                    disabled={noStudentsAssigned}
                   >
                     <FormControl>
                       <SelectTrigger className="bg-background">
-                        <SelectValue placeholder={allAssignedStudents.length === 0 ? "No assigned students found" : "Choose a student..."} />
+                        <SelectValue placeholder={noStudentsAssigned ? "No students assigned" : "Choose a student..."} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {allAssignedStudents.map(student => (
                         <SelectItem key={student.id} value={student.id}>
-                          {student.name} ({student.className} {student.sectionId || ''} - {student.satsNumber})
+                          {student.name} ({student.className} {student.sectionId || ''} - SATS: {student.satsNumber})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -335,17 +323,17 @@ export function GiveStudentRemarkForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center"><BookOpen className="mr-2 h-4 w-4 text-muted-foreground"/>Subject of Remark</FormLabel>
-                  <Select 
+                  <Select
                     onValueChange={(value) => {
                        field.onChange(value);
-                       setRemarkAlreadySubmittedThisMonth(false); 
-                    }} 
+                       setRemarkAlreadySubmittedThisMonth(false);
+                    }}
                     value={field.value || ''}
-                    disabled={!selectedStudentData}
+                    disabled={!selectedStudentData || availableSubjectsForSelectedStudent.length === 0}
                   >
                     <FormControl>
                       <SelectTrigger className="bg-background">
-                        <SelectValue placeholder={!selectedStudentData ? "Select student first" : "Select subject"} />
+                        <SelectValue placeholder={!selectedStudentData ? "Select student first" : (availableSubjectsForSelectedStudent.length === 0 ? "No subjects assigned for this student" : "Select subject")} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -366,10 +354,10 @@ export function GiveStudentRemarkForm() {
               </div>
             )}
 
-            {remarkAlreadySubmittedThisMonth && !isLoadingRemarkCheck && (
+            {remarkAlreadySubmittedThisMonth && !isLoadingRemarkCheck && selectedStudentData && (
               <div className="flex items-center text-sm text-destructive p-3 border border-destructive/50 bg-destructive/10 rounded-md">
                 <AlertTriangle className="h-5 w-5 mr-2" />
-                A remark for {form.getValues('teacherSubject')} for {selectedStudentData?.name || 'this student'} has already been submitted this month by you.
+                A remark for {form.getValues('teacherSubject')} for {selectedStudentData?.name} has already been submitted this month by you.
               </div>
             )}
 
@@ -384,7 +372,7 @@ export function GiveStudentRemarkForm() {
                       onValueChange={field.onChange}
                       defaultValue={field.value}
                       className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 pt-1"
-                      disabled={isFormDisabled}
+                      disabled={isFormDisabled || !selectedStudentData}
                     >
                       <FormItem className="flex items-center space-x-2 space-y-0">
                         <FormControl><RadioGroupItem value="good" id="good" /></FormControl>
@@ -415,14 +403,14 @@ export function GiveStudentRemarkForm() {
                       placeholder="Enter your remark here (e.g., academic progress, behavior, participation)..."
                       className="min-h-[120px] bg-background"
                       {...field}
-                      disabled={isFormDisabled}
+                      disabled={isFormDisabled || !selectedStudentData}
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" disabled={isFormDisabled || allAssignedStudents.length === 0} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button type="submit" disabled={isFormDisabled || noStudentsAssigned || !selectedStudentData || availableSubjectsForSelectedStudent.length === 0} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
               {isSubmitting || isLoadingRemarkCheck ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -430,10 +418,7 @@ export function GiveStudentRemarkForm() {
               )}
               {isSubmitting ? 'Submitting...' : isLoadingRemarkCheck ? 'Checking...' : 'Submit Remark'}
             </Button>
-            {allAssignedStudents.length === 0 && !isLoadingStudents && (
-                 <p className="text-sm text-destructive text-center">No assigned students found. Cannot submit remarks.</p>
-            )}
-             {currentTeacherName === "Teacher" && !isLoadingStudents && (
+             {currentTeacherName === "Teacher" && !isLoadingStudents && !noStudentsAssigned && (
                  <p className="text-sm text-orange-500 text-center">Loading teacher details for remark validation...</p>
             )}
           </form>
@@ -443,6 +428,3 @@ export function GiveStudentRemarkForm() {
     </Card>
   );
 }
-    
-
-    
