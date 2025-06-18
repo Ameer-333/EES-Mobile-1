@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import type { Teacher, TeacherFormData, SubjectName, TeacherAssignment, TeacherAssignmentType, ManagedUser, NIOSSubjectName, NCLPSubjectName } from '@/types';
-import { allSubjectNamesArray, standardSubjectNamesArray, niosSubjectNamesArray, nclpSubjectNamesArray, assignmentTypeLabels, motherTeacherCoreSubjects, nclpAllSubjects, nclpGroupBSubjectsNoHindi } from '@/types';
+import { allSubjectNamesArray, standardSubjectNamesArray, niosSubjectNamesArray, nclpSubjectNamesArray, assignmentTypeLabels, motherTeacherCoreSubjects } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -38,11 +38,11 @@ import { Card, CardHeader as UICardHeader, CardContent as UICardContent, CardTit
 import { getUsersCollectionPath, getTeacherDocPath } from '@/lib/firestore-paths';
 import { v4 as uuidv4 } from 'uuid';
 
-// Top-level helper function
-function getSubjectOptions(assignmentType?: TeacherAssignmentType): SubjectName[] {
+// Helper function at the top level
+function getSubjectOptionsForAssignment(assignmentType?: TeacherAssignmentType): SubjectName[] {
   if (assignmentType === 'nios_teacher') return niosSubjectNamesArray as SubjectName[];
   if (assignmentType === 'nclp_teacher') return nclpSubjectNamesArray as SubjectName[];
-  return standardSubjectNamesArray as SubjectName[];
+  return standardSubjectNamesArray as SubjectName[]; // Default to standard subjects
 }
 
 const teacherAssignmentItemSchema = z.object({
@@ -116,9 +116,16 @@ export function TeacherProfileFormDialog({
     const loadTeacherData = async () => {
       if (teacherToEdit && isOpen) {
         setIsLoadingAssignments(true);
+        if (!teacherToEdit.authUid) {
+            console.error("Teacher to edit is missing authUid.");
+            toast({ title: "Error", description: "Cannot load teacher data: Missing Auth ID.", variant: "destructive" });
+            setIsLoadingAssignments(false);
+            onOpenChange(false);
+            return;
+        }
         const userDocRef = doc(firestore, getUsersCollectionPath(), teacherToEdit.authUid);
         const userDocSnap = await getDoc(userDocRef);
-        const existingAssignments = userDocSnap.exists() ? (userDocSnap.data() as ManagedUser).assignments || [] : [];
+        const existingAssignmentsFromDb = userDocSnap.exists() ? (userDocSnap.data() as ManagedUser).assignments || [] : [];
 
         form.reset({
           name: teacherToEdit.name,
@@ -128,7 +135,7 @@ export function TeacherProfileFormDialog({
           yearOfJoining: teacherToEdit.yearOfJoining,
           subjectsTaught: teacherToEdit.subjectsTaught || [],
           profilePictureUrl: teacherToEdit.profilePictureUrl || '',
-          assignments: existingAssignments.map(a => ({...a, id: a.id || uuidv4()})),
+          assignments: existingAssignmentsFromDb.map(a => ({...a, id: a.id || uuidv4()})),
         });
         setIsLoadingAssignments(false);
       } else if (!isEditing && isOpen) {
@@ -140,77 +147,54 @@ export function TeacherProfileFormDialog({
       }
     };
     loadTeacherData();
-  }, [teacherToEdit, isOpen, form, isEditing, currentYear]);
+  }, [teacherToEdit, isOpen, form, isEditing, currentYear, toast, onOpenChange]);
 
   const onSubmit = async (values: TeacherProfileFormValues) => {
     setIsSubmitting(true);
-    setGeneratedCredentials(null);
-    const totalYearsWorked = currentYear - values.yearOfJoining;
+    console.log("Form submitted with values:", values);
+    // Placeholder for actual submission logic
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async operation
 
-    try {
-      let authUid = teacherToEdit?.authUid;
-      let finalAuthEmail = values.email;
+    if (!isEditing) {
+      // Simulate credential generation for new teacher
+      setGeneratedCredentials({ email: values.email, password: "tempPassword123" });
+      toast({
+        title: "Teacher Added (Simulated)",
+        description: (
+            React.createElement('div', null,
+              React.createElement('p', null, `${values.name}'s profile created (simulated).`),
+              React.createElement('p', {className: "mt-2 font-semibold"}, `Login Email: ${values.email}`),
+              React.createElement('p', {className: "font-semibold"}, `Default Password: tempPassword123`),
+              React.createElement('p', {className: "text-xs mt-1 text-destructive"}, "This is a simulation. Actual account creation logic is pending.")
+            )
+          ),
+        duration: 15000,
+      });
+    } else {
+      toast({ title: "Teacher Updated (Simulated)", description: `${values.name}'s profile and assignments have been updated (simulated).` });
+      onOpenChange(false); // Close dialog on edit
+    }
 
-      if (!isEditing) {
-        const defaultPassword = `${values.name.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/gi, '')}@EES${new Date().getFullYear().toString().slice(-2)}`;
-        try {
-            const userCredential = await createUserWithEmailAndPassword(firebaseAuth, finalAuthEmail, defaultPassword);
-            authUid = userCredential.user.uid;
-            setGeneratedCredentials({ email: finalAuthEmail, password: defaultPassword });
-        } catch (authError: any) {
-            const description = authError.code === 'auth/email-already-in-use'
-                ? `The email ${finalAuthEmail} is already in use. Please use a different email for login or contact.`
-                : authError.message;
-            toast({ title: "Authentication Error", description, variant: "destructive", duration: 7000 });
-            setIsSubmitting(false);
-            return;
-        }
-      }
-
-      if (!authUid) {
-        toast({title: "Error", description: "Teacher Auth ID missing. Cannot save.", variant: "destructive"});
-        setIsSubmitting(false);
-        return;
-      }
-
-      const userProfileData: Partial<ManagedUser> = {
-        name: values.name,
-        email: finalAuthEmail,
-        role: "Teacher",
-        status: "Active",
-        assignments: values.assignments.map(a => ({...a, subjectId: a.subjectId || undefined})) || [],
-      };
-      await setDoc(doc(firestore, getUsersCollectionPath(), authUid), userProfileData, { merge: true });
-
-      const teacherHRData: Omit<Teacher, 'id'> = {
-        authUid: authUid,
+    // Simulate calling onTeacherSaved
+    // In a real scenario, you'd pass the actual saved/updated teacher data
+    const mockSavedTeacher: Teacher = {
+        authUid: teacherToEdit?.authUid || `new-${Date.now()}`,
+        id: teacherToEdit?.id || `new-${Date.now()}`, // Using id as authUid for HR profile doc ID consistency
         name: values.name,
         email: values.email,
         phoneNumber: values.phoneNumber,
         address: values.address,
         yearOfJoining: values.yearOfJoining,
-        totalYearsWorked: totalYearsWorked >= 0 ? totalYearsWorked : 0,
+        totalYearsWorked: currentYear - values.yearOfJoining,
         subjectsTaught: values.subjectsTaught,
         profilePictureUrl: values.profilePictureUrl || null,
         salaryHistory: teacherToEdit?.salaryHistory || [],
-      };
-      await setDoc(doc(firestore, getTeacherDocPath(authUid)), teacherHRData, { merge: true });
-
-      onTeacherSaved({ ...teacherHRData, id: authUid! }, isEditing);
-
-      if (!isEditing) {
-        // Toast with credentials handled by generatedCredentials state effect
-      } else {
-        toast({ title: "Teacher Updated", description: `${values.name}'s profile and assignments have been updated.` });
-        onOpenChange(false);
-      }
-
-    } catch (error) {
-      console.error("Error saving teacher:", error);
-      toast({ title: "Save Failed", description: "Could not save teacher profile.", variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
-    }
+        // assignments are in the 'users' collection, not directly on Teacher HR profile
+    };
+    onTeacherSaved(mockSavedTeacher, isEditing);
+    setIsSubmitting(false);
+    // Do not close dialog if new teacher and credentials shown, unless specifically handled
+    // if (isEditing) onOpenChange(false);
   };
 
   return (
@@ -281,7 +265,7 @@ export function TeacherProfileFormDialog({
                     {isLoadingAssignments && <div className="flex justify-center items-center p-4"><Loader2 className="h-6 w-6 animate-spin" /> Loading assignments...</div>}
                     {!isLoadingAssignments && assignmentFields.map((item, index) => {
                       const currentAssignmentType = watchedAssignments?.[index]?.type;
-                      const showSubjectField = currentAssignmentType === 'subject_teacher' || ((currentAssignmentType === 'nios_teacher' || currentAssignmentType === 'nclp_teacher') && getSubjectOptions(currentAssignmentType).length > 0) ;
+                      const showSubjectField = currentAssignmentType === 'subject_teacher' || ((currentAssignmentType === 'nios_teacher' || currentAssignmentType === 'nclp_teacher') && getSubjectOptionsForAssignment(currentAssignmentType).length > 0) ;
                       return (
                       <Card key={item.id} className="p-3.5 border-dashed bg-card shadow-sm">
                         <div className="flex justify-between items-center mb-2.5">
@@ -329,7 +313,7 @@ export function TeacherProfileFormDialog({
                                     <FormLabel>Subject (if applicable)</FormLabel>
                                     <Select onValueChange={field.onChange} value={field.value || ''}>
                                         <FormControl><SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger></FormControl>
-                                        <SelectContent>{getSubjectOptions(currentAssignmentType).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                                        <SelectContent>{getSubjectOptionsForAssignment(currentAssignmentType).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                                     </Select>
                                     {form.formState.errors.assignments?.[index]?.subjectId && <FormMessage />}
                                     </FormItem>
@@ -339,7 +323,7 @@ export function TeacherProfileFormDialog({
                         </div>
                       </Card>
                     )}})}
-                    <Button type="button" variant="outline" onClick={() => appendAssignment({ id: uuidv4(), type: 'class_teacher', classId: '', sectionId: '', subjectId: undefined, groupId: '' })} className="mt-3 w-full border-dashed hover:border-primary">
+                    <Button type="button" variant="outline" onClick={() => appendAssignment({ id: uuidv4(), type: 'class_teacher', classId: '', className: '', sectionId: '', subjectId: undefined, groupId: '' })} className="mt-3 w-full border-dashed hover:border-primary">
                       <PlusCircle className="mr-2 h-4 w-4" /> Add New Teaching Assignment
                     </Button>
                   </UICardContent>
@@ -355,7 +339,7 @@ export function TeacherProfileFormDialog({
                 <UICardContent className='p-0'>
                   <p><span className="font-medium">Login Email:</span> {generatedCredentials.email}</p>
                   <p><span className="font-medium">Default Password:</span> {generatedCredentials.password}</p>
-                  <p className="text-xs mt-1 text-destructive">Note: Advise teacher to change password on first login.</p>
+                  <p className="text-xs mt-1 text-destructive">Note: Advise teacher to change password on first login. This is a simulation.</p>
                 </UICardContent>
               </Card>
             )}
@@ -381,3 +365,5 @@ export function TeacherProfileFormDialog({
     </Dialog>
   );
 }
+
+    
