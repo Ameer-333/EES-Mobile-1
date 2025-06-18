@@ -4,7 +4,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // --- Helper Functions ---
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -14,161 +14,126 @@ service cloud.firestore {
     }
 
     function isAdmin(userId) {
-      let userDoc = getUserData(userId);
-      return isAuthenticated() && userDoc.role == 'Admin';
+      return isAuthenticated() && getUserData(userId).role == 'Admin';
     }
 
-    function isTeacher(userId) {
-      let userDoc = getUserData(userId);
-      return isAuthenticated() && userDoc.role == 'Teacher';
+    // Checks if a teacher is assigned to a specific class (used for listing students in a class)
+    function isTeacherAssignedToClass(teacherAssignments, targetClassId) {
+      return teacherAssignments != null &&
+             teacherAssignments.filter(assignment => assignment.classId == targetClassId).size() > 0;
     }
 
-    function isStudent(userId) {
-      let userDoc = getUserData(userId);
-      return isAuthenticated() && userDoc.role == 'Student';
+    // Checks if a teacher is assigned to a specific student's class, section, or group
+    // teacherAssignments: The 'assignments' array from the teacher's user document.
+    // targetStudentClassId: The classId of the student resource being accessed.
+    // targetStudentSectionId: The sectionId of the student resource being accessed.
+    // targetStudentGroupId: The groupId of the student resource being accessed.
+    function isTeacherAssignedToStudentClass(teacherAssignments, targetStudentClassId, targetStudentSectionId, targetStudentGroupId) {
+      return teacherAssignments != null &&
+             teacherAssignments.filter(assignment =>
+                assignment.classId == targetStudentClassId &&
+                (
+                  // Mother Teacher or Class Teacher for the class/section
+                  ( (assignment.type == 'mother_teacher' || assignment.type == 'class_teacher') &&
+                    (assignment.sectionId == null || assignment.sectionId == '' || assignment.sectionId == targetStudentSectionId)
+                  ) ||
+                  // Subject Teacher for the class/section
+                  ( assignment.type == 'subject_teacher' &&
+                    (assignment.sectionId == null || assignment.sectionId == '' || assignment.sectionId == targetStudentSectionId)
+                    // For profile read/update, specific subject matching is not strictly enforced here.
+                    // Granular subject-based write control (e.g., for marks) would need more specific rules
+                    // or be handled by Cloud Functions for complex validation.
+                  ) ||
+                  // NIOS/NCLP Teacher for the class/group
+                  ( (assignment.type == 'nios_teacher' || assignment.type == 'nclp_teacher') &&
+                    (assignment.groupId == null || assignment.groupId == '' || assignment.groupId == targetStudentGroupId)
+                  )
+                )
+             ).size() > 0;
     }
 
-    // Check if a teacher is assigned to the specific class, section, or group of a student
-    function isTeacherAssignedToStudentClass(teacherUserId, studentClassId, studentSectionId, studentGroupId) {
-      if (!isTeacher(teacherUserId)) {
-        return false;
-      }
-      let teacherUserDoc = getUserData(teacherUserId);
-      let assignments = teacherUserDoc.assignments;
-
-      // Loop through teacher's assignments
-      for (let i = 0; i < assignments.length; i++) {
-        let assignment = assignments[i];
-        if (assignment.classId == studentClassId) {
-          // Mother Teacher or Class Teacher for the specific class (and section if specified)
-          if ((assignment.type == 'mother_teacher' || assignment.type == 'class_teacher')) {
-            if (assignment.sectionId == null || assignment.sectionId == '' || assignment.sectionId == studentSectionId) {
-              return true;
-            }
-          }
-          // Subject Teacher for the specific class (and section if specified)
-          // (Subject-specific check would be more granular, e.g., when updating marks for a specific subject)
-          else if (assignment.type == 'subject_teacher') {
-             if (assignment.sectionId == null || assignment.sectionId == '' || assignment.sectionId == studentSectionId) {
-              return true; // For now, allows if assigned to class/section, further checks for subject can be in request validation
-            }
-          }
-          // NIOS/NCLP Teacher for the specific class (and group if specified)
-          else if ((assignment.type == 'nios_teacher' || assignment.type == 'nclp_teacher')) {
-            if (assignment.groupId == null || assignment.groupId == '' || assignment.groupId == studentGroupId) {
-              return true;
-            }
-          }
-        }
-      }
-      return false;
-    }
-
-    // --- /users/{userId} ---
-    // Stores core user data: name, email, role, status, assignments (for teachers), classId/studentProfileId (for students)
+    // --- User Profiles ---
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin(request.auth.uid));
-      allow list: if isAdmin(request.auth.uid); // Only admins can list all users
-      allow create: if isAdmin(request.auth.uid) || 
-                       // Allow creation if it's a new teacher/student being created by an admin/teacher through app logic
-                       // This requires checking the role being set in the request.resource.data
-                       (isAuthenticated() && 
-                         ( (isTeacher(request.auth.uid) && request.resource.data.role == 'Student') || // Teacher creating student user link
-                           (isAdmin(request.auth.uid) && (request.resource.data.role == 'Teacher' || request.resource.data.role == 'Student' || request.resource.data.role == 'Admin') )
-                         ) &&
-                         request.resource.data.keys().hasAll(['name', 'email', 'role', 'status']) // Ensure required fields
-                       );
+      allow create: if isAdmin(request.auth.uid); // Admins can create user entries
       allow update: if isAdmin(request.auth.uid) ||
-                       // Allow users to update specific fields of their own profile
-                       (request.auth.uid == userId && 
-                        request.resource.data.keys().hasOnly(['name', 'photoURL', 'lastLogin', 'status', 'assignments', 'classId', 'studentProfileId']) && // Define editable fields
-                        request.resource.data.role == resource.data.role && // Role cannot be changed by user
-                        request.resource.data.email == resource.data.email   // Auth Email cannot be changed by user
-                       );
+                       // Users can update their own name, other fields protected
+                       (request.auth.uid == userId && request.resource.data.keys().hasOnly(['name', 'email', 'role', 'status', 'lastLogin', 'classId', 'studentProfileId', 'assignments']) && request.resource.data.role == resource.data.role && request.resource.data.email == resource.data.email);
       allow delete: if isAdmin(request.auth.uid);
     }
 
-    // --- /teachers/{teacherId} ---
-    // Stores HR-specific details for teachers (contact, qualifications, salary)
-    // Document ID {teacherId} should be the authUid of the teacher
+    // --- Teacher HR Profiles ---
     match /teachers/{teacherId} {
       allow read: if isAuthenticated() && (request.auth.uid == teacherId || isAdmin(request.auth.uid));
       allow list: if isAdmin(request.auth.uid); // Only admins can list all teacher HR profiles
-      allow create: if isAdmin(request.auth.uid) && request.resource.data.authUid == teacherId; // Admin creating teacher HR profile, ensure authUid matches
-      allow update: if isAdmin(request.auth.uid);
-      allow delete: if isAdmin(request.auth.uid);
+      allow create, update, delete: if isAdmin(request.auth.uid);
     }
 
-    // --- /student_data_by_class/{classId}/profiles/{studentProfileId} ---
-    // Stores detailed student profiles, sub-collection under each class
+    // --- Student Data (Organized by Class ID, then Profiles subcollection) ---
     match /student_data_by_class/{classId}/profiles/{studentProfileId} {
+      let studentResourceData = resource.data; // For existing doc on read/update/delete
+      let requestStudentData = request.resource.data; // For incoming doc on create/update
+
+      // Admin Access
+      allow read, write: if isAdmin(request.auth.uid);
+
+      // Student Access
       allow read: if isAuthenticated() &&
-                     (
-                       isAdmin(request.auth.uid) ||
-                       // Student reading their own profile
-                       (isStudent(request.auth.uid) &&
-                        getUserData(request.auth.uid).classId == classId &&
-                        getUserData(request.auth.uid).studentProfileId == studentProfileId &&
-                        resource.data.authUid == request.auth.uid
-                       ) ||
-                       // Teacher reading a student's profile if assigned to their class/section/group
-                       (isTeacher(request.auth.uid) &&
-                        isTeacherAssignedToStudentClass(request.auth.uid, classId, resource.data.sectionId, resource.data.groupId)
-                       )
-                     );
+                     let userData = getUserData(request.auth.uid);
+                     userData.role == 'Student' &&
+                     userData.classId == classId &&
+                     userData.studentProfileId == studentProfileId &&
+                     studentResourceData.authUid == request.auth.uid;
 
-      // Listing profiles within a class
-      allow list: if isAuthenticated() &&
-                    (
-                      isAdmin(request.auth.uid) ||
-                      // Teacher listing students if assigned to that classId (further client-side filtering by section/group needed)
-                      (isTeacher(request.auth.uid) && getUserData(request.auth.uid).assignments.hasAny('classId', [classId]))
-                    );
-                    
+      // Teacher Access (Read individual profile)
+      allow read: if isAuthenticated() &&
+                     let teacherData = getUserData(request.auth.uid);
+                     teacherData.role == 'Teacher' &&
+                     isTeacherAssignedToStudentClass(teacherData.assignments, classId, studentResourceData.sectionId, studentResourceData.groupId);
+
+      // Teacher Access (Create student profile)
+      // Ensure classId in the path matches classId in the data, and authUid is set.
       allow create: if isAuthenticated() &&
-                      (
-                        isAdmin(request.auth.uid) ||
-                        // Teacher creating a student profile if assigned to that classId
-                        // More specific section/group checks could be added if needed
-                        (isTeacher(request.auth.uid) && getUserData(request.auth.uid).assignments.hasAny('classId', [classId]))
-                      ) &&
-                      request.resource.data.authUid != null && // Ensure authUid is provided
-                      request.resource.data.classId == classId; // Ensure classId in data matches path
+                       let teacherData = getUserData(request.auth.uid);
+                       teacherData.role == 'Teacher' &&
+                       isTeacherAssignedToClass(teacherData.assignments, requestStudentData.classId) && // Teacher assigned to the class they are adding to
+                       requestStudentData.classId == classId && // Path classId must match data classId
+                       requestStudentData.authUid != null;     // Ensure new student has an authUid
 
+      // Teacher Access (Update student profile)
+      // - Can only update if assigned to the student's class/section/group.
+      // - Cannot change the student's authUid.
+      // - If classId is changed in data, it reflects here but doesn't move the doc (UI warns about this).
       allow update: if isAuthenticated() &&
-                      (
-                        isAdmin(request.auth.uid) ||
-                        // Teacher updating a student's profile if assigned to their class/section/group
-                        (isTeacher(request.auth.uid) &&
-                         isTeacherAssignedToStudentClass(request.auth.uid, classId, resource.data.sectionId, resource.data.groupId)
-                        )
-                      ) &&
-                      // Prevent changing authUid. Prevent student from changing their own grades/remarks (teachers/admins do this).
-                      request.resource.data.authUid == resource.data.authUid &&
-                      request.resource.data.classId == resource.data.classId; // Prevent moving doc to another class via update, this should be a controlled process
+                       let teacherData = getUserData(request.auth.uid);
+                       teacherData.role == 'Teacher' &&
+                       isTeacherAssignedToStudentClass(teacherData.assignments, classId, studentResourceData.sectionId, studentResourceData.groupId) &&
+                       requestStudentData.authUid == studentResourceData.authUid; // authUid cannot be changed
 
-      allow delete: if isAdmin(request.auth.uid); // Only Admins can delete student profiles directly
+      // Delete access is admin-only for student profiles from specific class collections.
+      // The main user link in /users/{userId} is also deleted by admin UI.
+      allow delete: if false; // Teachers cannot delete student profiles directly from here, Admins use their broader write.
     }
 
-    // --- /app_settings/{settingId} ---
-    // For global app settings like appName, logoUrl
+    // Teacher Access (List students in a class they are assigned to)
+    match /student_data_by_class/{classId}/profiles/{document=**} {
+       allow list: if isAuthenticated() &&
+                      let teacherData = getUserData(request.auth.uid);
+                      (teacherData.role == 'Teacher' && isTeacherAssignedToClass(teacherData.assignments, classId)) || isAdmin(request.auth.uid);
+    }
+
+
+    // --- App Settings ---
     match /app_settings/{settingId} {
-      allow read: if isAuthenticated(); // All authenticated users can read settings
-      allow list: if isAuthenticated();
-      allow create, update, delete: if isAdmin(request.auth.uid); // Only Admins can change settings
+      allow read: if isAuthenticated();
+      allow write: if isAdmin(request.auth.uid);
     }
 
-    // --- /hall_of_fame_items/{itemId} ---
-    // For Hall of Fame entries
+    // --- Hall of Fame ---
     match /hall_of_fame_items/{itemId} {
-      allow read: if isAuthenticated(); // All authenticated users can view Hall of Fame
+      allow read: if isAuthenticated(); // Or allow unauthenticated if it's public
       allow list: if isAuthenticated();
-      allow create, update, delete: if isAdmin(request.auth.uid); // Only Admins can manage Hall of Fame
-    }
-
-    // Default deny for any other paths not explicitly matched
-    match /{document=**} {
-      allow read, write: if false;
+      allow create, update, delete: if isAdmin(request.auth.uid);
     }
   }
 }
