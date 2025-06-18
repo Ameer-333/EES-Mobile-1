@@ -10,15 +10,11 @@ import { firestore } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAppContext } from '@/app/(protected)/layout'; 
+import { getStudentDocPath } from '@/lib/firestore-paths';
 
-const STUDENT_DATA_ROOT_COLLECTION = 'student_data_by_class';
-const PROFILES_SUBCOLLECTION_NAME = 'profiles';
 
 // Helper function to get the path to a student's document
-const getStudentDocPath = (classId: string, studentProfileId: string): string => {
-  if (!classId || !studentProfileId) throw new Error("classId and studentProfileId are required to determine student document path");
-  return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}/${studentProfileId}`;
-};
+// Moved to lib/firestore-paths.ts
 
 function processRawAttendance(rawRecords: RawAttendanceRecord[] | undefined): StudentSubjectAttendance[] {
   if (!rawRecords || rawRecords.length === 0) {
@@ -82,8 +78,8 @@ export default function StudentAttendancePage() {
 
       setIsLoadingPageData(true);
       try {
-        const studentDocPath = getStudentDocPath(userProfile.classId, userProfile.studentProfileId);
-        const studentDocRef = doc(firestore, studentDocPath);
+        const studentDocFirestorePath = getStudentDocPath(userProfile.classId, userProfile.studentProfileId);
+        const studentDocRef = doc(firestore, studentDocFirestorePath);
         const studentDocSnap = await getDoc(studentDocRef);
 
         if (studentDocSnap.exists()) {
@@ -92,12 +88,12 @@ export default function StudentAttendancePage() {
           const processedAttendance = processRawAttendance(studentDataFromDb.rawAttendanceRecords);
           setAttendanceData(processedAttendance);
         } else {
-          toast({ title: "No Student Record", description: "Student profile not found in their class collection.", variant: "destructive" });
+          toast({ title: "No Student Record", description: "Your student profile was not found in the class records.", variant: "destructive" });
           setAttendanceData(processRawAttendance(undefined));
         }
       } catch (error) {
         console.error("Error fetching student attendance:", error);
-        toast({ title: "Error", description: "Could not fetch attendance records.", variant: "destructive" });
+        toast({ title: "Error", description: "Could not fetch your attendance records.", variant: "destructive" });
         setAttendanceData(processRawAttendance(undefined));
       }
       setIsLoadingPageData(false);

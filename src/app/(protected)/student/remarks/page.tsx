@@ -9,15 +9,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { Loader2, MessageSquareText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAppContext } from '@/app/(protected)/layout'; 
-
-const STUDENT_DATA_ROOT_COLLECTION = 'student_data_by_class';
-const PROFILES_SUBCOLLECTION_NAME = 'profiles';
-
-// Helper function to get the path to a student's document
-const getStudentDocPath = (classId: string, studentProfileId: string): string => {
-  if (!classId || !studentProfileId) throw new Error("classId and studentProfileId are required to determine student document path");
-  return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}/${studentProfileId}`;
-};
+import { getStudentDocPath } from '@/lib/firestore-paths';
 
 
 export default function StudentRemarksPage() {
@@ -48,8 +40,8 @@ export default function StudentRemarksPage() {
 
       setIsLoadingPageData(true);
       try {
-        const studentDocPath = getStudentDocPath(userProfile.classId, userProfile.studentProfileId);
-        const studentDocRef = doc(firestore, studentDocPath);
+        const studentDocFirestorePath = getStudentDocPath(userProfile.classId, userProfile.studentProfileId);
+        const studentDocRef = doc(firestore, studentDocFirestorePath);
         const studentDocSnap = await getDoc(studentDocRef);
 
         if (studentDocSnap.exists()) {
@@ -58,13 +50,13 @@ export default function StudentRemarksPage() {
           setStudentName(studentDataFromDb.name);
           setProfilePictureUrl(studentDataFromDb.profilePictureUrl || null);
         } else {
-          toast({ title: "No Student Record", description: "Student profile not found in their class collection.", variant: "destructive" });
+          toast({ title: "No Student Record", description: "Your student profile was not found in the class records.", variant: "destructive" });
           setRemarks([]);
           setProfilePictureUrl(null);
         }
       } catch (error) {
         console.error("Error fetching student remarks:", error);
-        toast({ title: "Error", description: "Could not fetch remarks.", variant: "destructive" });
+        toast({ title: "Error", description: "Could not fetch your remarks.", variant: "destructive" });
         setRemarks([]);
         setProfilePictureUrl(null);
       }
