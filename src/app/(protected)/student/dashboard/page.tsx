@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Home, LogIn, BarChartHorizontalBig, CalendarCheck, Award as AwardIcon, CalendarClock, BookOpen, Edit3, Users, MessageSquareHeart } from 'lucide-react';
 import Image from 'next/image';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { StudentBackgroundDisplay } from '@/components/student/student-background-display';
 import type { Student, StudentRemark, Scholarship, ReligionType, SubjectName } from '@/types';
 import { Separator } from '@/components/ui/separator';
