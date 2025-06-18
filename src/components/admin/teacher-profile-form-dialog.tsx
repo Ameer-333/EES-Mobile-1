@@ -6,7 +6,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import type { Teacher, TeacherFormData, SubjectName, TeacherAssignment, TeacherAssignmentType, ManagedUser, NIOSSubjectName, NCLPSubjectName } from '@/types';
-import { allSubjectNamesArray, standardSubjectNamesArray, niosSubjectNamesArray, nclpSubjectNamesArray, assignmentTypeLabels, motherTeacherCoreSubjects, nclpGroupBSubjectsNoHindi } from '@/types'; // Removed unused niosSubjectsForAssignment
+import { allSubjectNamesArray, standardSubjectNamesArray, niosSubjectNamesArray, nclpSubjectNamesArray, assignmentTypeLabels, motherTeacherCoreSubjects, nclpGroupBSubjectsNoHindi } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -38,7 +38,7 @@ import { Card, CardHeader as UICardHeader, CardContent as UICardContent, CardTit
 import { getUsersCollectionPath, getTeacherDocPath } from '@/lib/firestore-paths';
 import { v4 as uuidv4 } from 'uuid';
 
-// Moved getSubjectOptions outside the component
+// Top-level helper function
 function getSubjectOptions(assignmentType?: TeacherAssignmentType): SubjectName[] {
   if (assignmentType === 'nios_teacher') return niosSubjectNamesArray as SubjectName[];
   if (assignmentType === 'nclp_teacher') return nclpSubjectNamesArray as SubjectName[];
@@ -49,7 +49,7 @@ const teacherAssignmentItemSchema = z.object({
   id: z.string().default(() => uuidv4()),
   type: z.custom<TeacherAssignmentType>(val => Object.keys(assignmentTypeLabels).includes(val as TeacherAssignmentType), 'Assignment type is required.'),
   classId: z.string().min(1, 'Class ID or Program ID is required (e.g., LKG, 9, NIOS_A, NCLP_B).'),
-  className: z.string().optional().or(z.literal('')), 
+  className: z.string().optional().or(z.literal('')),
   sectionId: z.string().optional().or(z.literal('')),
   subjectId: z.custom<SubjectName>(val => allSubjectNamesArray.includes(val as SubjectName)).optional(),
   groupId: z.string().optional().or(z.literal('')),
@@ -196,7 +196,7 @@ export function TeacherProfileFormDialog({
       };
       await setDoc(doc(firestore, getTeacherDocPath(authUid)), teacherHRData, { merge: true });
       
-      onTeacherSaved({ ...teacherHRData, id: authUid }, isEditing);
+      onTeacherSaved({ ...teacherHRData, id: authUid! }, isEditing);
 
       if (!isEditing) {
         // Toast with credentials handled by generatedCredentials state effect
@@ -212,7 +212,7 @@ export function TeacherProfileFormDialog({
       setIsSubmitting(false);
     }
   }
-  
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) { 
@@ -381,5 +381,3 @@ export function TeacherProfileFormDialog({
     </Dialog>
   );
 }
-
-    
