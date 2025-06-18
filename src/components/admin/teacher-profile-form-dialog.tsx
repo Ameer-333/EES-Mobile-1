@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Teacher, TeacherFormData, SubjectName, TeacherAssignment, TeacherAssignmentType } from '@/types';
+import type { Teacher, TeacherFormData, SubjectName, TeacherAssignment, TeacherAssignmentType, ManagedUser } from '@/types';
 import { subjectNamesArray } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,11 +32,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Save, PlusCircle, Trash2, AlertTriangle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { firestore, auth as firebaseAuth } from '@/lib/firebase';
-import { doc, setDoc, addDoc, collection, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardHeader as UICardHeader, CardContent as UICardContent, CardTitle as UICardTitle } from '@/components/ui/card';
 
-const TEACHERS_COLLECTION = 'teachers';
-const USERS_COLLECTION = 'users';
+
+const TEACHERS_COLLECTION = 'teachers'; // For HR specific data
+const USERS_COLLECTION = 'users'; // For auth supplemental data, roles, assignments
 const currentYear = new Date().getFullYear();
 
 const teacherAssignmentItemSchema = z.object({
@@ -47,12 +50,12 @@ const teacherAssignmentItemSchema = z.object({
   groupId: z.string().optional().or(z.literal('')),
 }).refine(data => {
   if (data.type === 'subject_teacher' && !data.subjectId) {
-    return false; 
+    return false;
   }
   return true;
 }, {
   message: "Subject is required for 'Subject Teacher' assignment type.",
-  path: ["subjectId"], 
+  path: ["subjectId"],
 });
 
 const teacherProfileSchema = z.object({
@@ -72,7 +75,7 @@ type TeacherProfileFormValues = z.infer<typeof teacherProfileSchema>;
 interface TeacherProfileFormDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onTeacherSaved: (teacherData: Teacher, isEditing: boolean) => void; 
+  onTeacherSaved: (teacherData: Teacher, isEditing: boolean) => void;
   teacherToEdit?: Teacher | null;
 }
 
@@ -124,13 +127,13 @@ export function TeacherProfileFormDialog({
 
         // Fetch assignments from 'users' collection
         // teacherToEdit.id is the authUid if teachers collection is keyed by authUid
-        const authUidToFetch = teacherToEdit.authUid || teacherToEdit.id; 
+        const authUidToFetch = teacherToEdit.authUid || teacherToEdit.id;
         if (authUidToFetch) {
           try {
             const userDocRef = doc(firestore, USERS_COLLECTION, authUidToFetch);
             const userDocSnap = await getDoc(userDocRef);
             if (userDocSnap.exists()) {
-              const userData = userDocSnap.data() as ManagedUser;
+              const userData = userDocSnap.data() as ManagedUser; // Assuming ManagedUser has assignments
               form.setValue('assignments', userData.assignments || []);
             }
           } catch (e) {
@@ -157,23 +160,21 @@ export function TeacherProfileFormDialog({
 
     try {
       let authUid = teacherToEdit?.authUid || teacherToEdit?.id; // If id is authUid
-      let finalAuthEmail = teacherToEdit ? (await getDoc(doc(firestore, USERS_COLLECTION, authUid!))).data()?.email : '';
+      let finalAuthEmail = isEditing && authUid ? (await getDoc(doc(firestore, USERS_COLLECTION, authUid))).data()?.email : '';
 
 
       if (!isEditing) { // Adding new teacher
         // 1. Create Firebase Auth user
-        // Use form email for auth by default, ensure it's unique.
-        // Or derive one: e.g. const derivedAuthEmail = `${values.name.toLowerCase().replace(/\s+/g, '.')}.teacher@eesedu.com`;
-        finalAuthEmail = values.email; // Using contact email as auth email for simplicity, can be changed
-        const defaultPassword = `${values.name.split(' ')[0]}@EES${new Date().getFullYear().toString().slice(-2)}`;
-        
+        finalAuthEmail = values.email; // Using contact email as auth email for new teachers for simplicity
+        const defaultPassword = `${values.name.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/gi, '')}@EES${new Date().getFullYear().toString().slice(-2)}`;
+
         try {
             const userCredential = await createUserWithEmailAndPassword(firebaseAuth, finalAuthEmail, defaultPassword);
             authUid = userCredential.user.uid;
             setGeneratedCredentials({ email: finalAuthEmail, password: defaultPassword });
         } catch (authError: any) {
             if (authError.code === 'auth/email-already-in-use') {
-                toast({ title: "Authentication Error", description: `The email ${finalAuthEmail} is already in use for authentication. Please use a different contact email or it will be used for login.`, variant: "destructive", duration: 7000 });
+                toast({ title: "Authentication Error", description: `The email ${finalAuthEmail} is already in use for authentication. Please use a different contact email or ensure uniqueness.`, variant: "destructive", duration: 7000 });
             } else {
                 toast({ title: "Authentication Error", description: authError.message, variant: "destructive" });
             }
@@ -194,7 +195,7 @@ export function TeacherProfileFormDialog({
         // 3. Create 'teachers' collection document (HR details)
         // Document ID is authUid for consistency
         const teacherHRData: Omit<Teacher, 'id'> = {
-          authUid: authUid,
+          authUid: authUid, // Store authUid here as well
           name: values.name,
           email: values.email, // Contact email from form
           phoneNumber: values.phoneNumber,
@@ -206,19 +207,10 @@ export function TeacherProfileFormDialog({
           salaryHistory: [], // Initialize
         };
         await setDoc(doc(firestore, TEACHERS_COLLECTION, authUid!), teacherHRData);
-        
+
         onTeacherSaved({ ...teacherHRData, id: authUid! }, false);
-        toast({
-          title: "Teacher Added & Account Created!",
-          description: (
-            <div>
-              <p>{values.name}'s profile and auth account created.</p>
-              <p className="mt-2 font-semibold">Login Email: {finalAuthEmail}</p>
-              <p className="font-semibold">Default Password: {defaultPassword}</p>
-            </div>
-          ),
-          duration: 15000,
-        });
+        // Toast for success is handled by the appearance of the generatedCredentials block
+        // This is preferred so Admin can copy credentials before closing.
 
       } else { // Editing existing teacher
         if (!authUid) {
@@ -236,6 +228,7 @@ export function TeacherProfileFormDialog({
           totalYearsWorked: totalYearsWorked >= 0 ? totalYearsWorked : 0,
           subjectsTaught: values.subjectsTaught,
           profilePictureUrl: values.profilePictureUrl || null,
+          // authUid field in 'teachers' collection should already exist and not be changed.
         };
         await setDoc(doc(firestore, TEACHERS_COLLECTION, authUid), teacherHRDataToUpdate, { merge: true });
 
@@ -243,15 +236,13 @@ export function TeacherProfileFormDialog({
         const userProfileUpdates: Partial<ManagedUser> = {
             name: values.name, // Keep name in sync if changed
             assignments: values.assignments || [],
+            // email (auth email) and role typically don't change often via this form
         };
         await setDoc(doc(firestore, USERS_COLLECTION, authUid), userProfileUpdates, { merge: true });
 
         onTeacherSaved({ ...teacherToEdit!, ...teacherHRDataToUpdate, id: authUid }, true);
         toast({ title: "Teacher Updated", description: `${values.name}'s profile and assignments have been updated.` });
-      }
-      
-      if (!generatedCredentials) { // Close dialog if not showing credentials
-          onOpenChange(false);
+        onOpenChange(false); // Close dialog on successful edit
       }
 
     } catch (error) {
@@ -272,17 +263,17 @@ export function TeacherProfileFormDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open) {
-        form.reset();
-        setGeneratedCredentials(null);
+      if (!open) { // When dialog is about to close
+        form.reset(); // Reset form state
+        setGeneratedCredentials(null); // Clear any displayed credentials
       }
-      onOpenChange(open);
+      onOpenChange(open); // Propagate open state change
     }}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Teacher Profile & Assignments" : "Add New Teacher & Assign Roles"}</DialogTitle>
           <DialogDescription>
-            {isEditing ? "Modify details and assignments." : "Enter details, assign roles/classes. Login credentials will be generated."}
+            {isEditing ? "Modify details and assignments." : "Enter details, assign roles/classes. Login credentials will be generated using contact email."}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -297,7 +288,7 @@ export function TeacherProfileFormDialog({
                   <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. Priya Sharma" {...field} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Contact Email</FormLabel><FormControl><Input type="email" placeholder="e.g. priya.sharma@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Contact Email (used for login if new teacher)</FormLabel><FormControl><Input type="email" placeholder="e.g. priya.sharma@example.com" {...field} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={form.control} name="phoneNumber" render={({ field }) => (
                   <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
@@ -372,26 +363,26 @@ export function TeacherProfileFormDialog({
             </Tabs>
 
             {generatedCredentials && (
-              <Card className="mt-4 p-4 border-green-500 bg-green-50 rounded-md text-sm shadow-md">
-                <CardHeader className='p-0 pb-2'>
-                  <CardTitle className="text-md font-semibold text-green-700 flex items-center"><Info className="h-5 w-5 mr-2"/>Credentials Generated</CardTitle>
-                </CardHeader>
-                <CardContent className='p-0'>
+              <Card className="mt-4 p-4 border-green-500 bg-green-50/80 rounded-md text-sm shadow-md">
+                <UICardHeader className='p-0 pb-2'>
+                  <UICardTitle className="text-md font-semibold text-green-700 flex items-center"><Info className="h-5 w-5 mr-2"/>Credentials Generated</UICardTitle>
+                </UICardHeader>
+                <UICardContent className='p-0'>
                   <p><span className="font-medium">Login Email:</span> {generatedCredentials.email}</p>
                   <p><span className="font-medium">Default Password:</span> {generatedCredentials.password}</p>
                   <p className="text-xs mt-1 text-destructive">Note: Advise teacher to change password on first login.</p>
-                </CardContent>
+                </UICardContent>
               </Card>
             )}
-            
+
             <DialogFooter className="pt-6">
-              <DialogClose asChild><Button type="button" variant="outline" disabled={isSubmitting} onClick={() => {
-                form.reset(); 
+              <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => {
+                form.reset();
                 setGeneratedCredentials(null);
                 onOpenChange(false);
               }}>
                 {generatedCredentials ? "Close" : "Cancel"}
-              </Button></DialogClose>
+              </Button>
               {!generatedCredentials && (
                 <Button type="submit" disabled={isSubmitting || isLoadingAssignments}>
                   {isSubmitting || isLoadingAssignments ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}

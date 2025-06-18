@@ -14,18 +14,18 @@ export type TeacherAssignmentType = 'mother_teacher' | 'class_teacher' | 'subjec
 
 export interface TeacherAssignment {
   type: TeacherAssignmentType;
-  classId: string; 
+  classId: string;
   sectionId?: string;
-  subjectId?: SubjectName; 
-  groupId?: string; 
+  subjectId?: SubjectName;
+  groupId?: string;
 }
 
 export interface StudentRemark {
   id: string;
-  teacherName: string; 
+  teacherName: string;
   teacherSubject: SubjectName;
   remark: string;
-  date: string; 
+  date: string;
   sentiment: 'good' | 'bad' | 'neutral';
 }
 
@@ -33,12 +33,12 @@ export interface UpcomingEvent {
   id: string;
   name: string;
   date: string; // YYYY-MM-DD
-  time: string; 
-  day: string; 
-  note?: string; 
+  time: string;
+  day: string;
+  note?: string;
   location?: string;
-  imageUrl?: string; 
-  dataAiHint?: string; 
+  imageUrl?: string;
+  dataAiHint?: string;
 }
 
 export interface Scholarship {
@@ -67,26 +67,27 @@ export interface RawAttendanceRecord {
 }
 
 export interface Student {
-  id: string; 
+  id: string;
   name: string;
   satsNumber: string;
-  
-  className: string; 
-  classId: string;   
-  sectionId?: string; 
-  groupId?: string;  
 
-  class: string; 
-  section: string; 
+  className: string; // e.g., "10th Grade", "LKG" (for display)
+  classId: string;   // e.g., "10", "LKG" (for logic)
+  sectionId?: string; // e.g., "A", "B"
+  groupId?: string;   // e.g., "NIOS-Alpha", "NCLP-Batch1" (for special groupings)
 
-  dateOfBirth?: string; 
+  // Old fields, kept for now for smoother transition, ideally phased out.
+  class: string; // To be replaced by className/classId
+  section: string; // To be replaced by sectionId
+
+  dateOfBirth?: string;
   fatherName?: string;
   motherName?: string;
   fatherOccupation?: string;
   motherOccupation?: string;
-  parentsAnnualIncome?: number; 
+  parentsAnnualIncome?: number;
   parentContactNumber?: string;
-  email?: string;
+  email?: string; // Student's personal email, optional
   caste: string;
   religion: ReligionType;
   address: string;
@@ -97,18 +98,18 @@ export interface Student {
   examRecords?: ExamRecord[];
   rawAttendanceRecords?: RawAttendanceRecord[];
   backgroundInfo?: string;
-  authUid?: string; 
+  authUid?: string; // Firebase Auth UID
 }
 
 
 export type GradeType = 'Distinction' | 'First Class' | 'Second Class' | 'Pass Class' | 'Not Completed';
 
 export interface AttendanceRecord {
-  date: string; 
+  date: string;
   status: 'Present' | 'Absent';
 }
 
-export interface StudentSubjectAttendance { 
+export interface StudentSubjectAttendance {
   subjectName: SubjectName;
   records: AttendanceRecord[];
   totalClasses: number;
@@ -116,30 +117,30 @@ export interface StudentSubjectAttendance {
 }
 
 export interface ManagedUser {
-  id: string; 
+  id: string; // Firestore document ID (usually authUid)
   name: string;
-  email: string;
+  email: string; // Auth email
   role: UserRole;
   status: 'Active' | 'Inactive' | 'Pending';
-  lastLogin: string; 
-  studentProfileId?: string; 
-  assignments?: TeacherAssignment[]; 
+  lastLogin?: string; // Optional, might not always be available or up-to-date
+  studentProfileId?: string; // If role is Student, links to their doc in 'students' collection
+  assignments?: TeacherAssignment[]; // If role is Teacher
 }
 
 export interface StudentFormData {
   name: string;
   satsNumber: string;
-  
-  className: string; 
-  classId: string;   
-  sectionId?: string; 
+
+  className: string;
+  classId: string;
+  sectionId?: string;
   groupId?: string;
 
   caste: string;
   religion: ReligionType;
   address: string;
   profilePictureUrl?: string;
-  authUid?: string; 
+  // authUid?: string; // This is typically assigned after Firebase Auth creation
   dateOfBirth?: string;
   fatherName?: string;
   motherName?: string;
@@ -147,23 +148,23 @@ export interface StudentFormData {
   motherOccupation?: string;
   parentsAnnualIncome?: number;
   parentContactNumber?: string;
-  email?: string;
+  email?: string; // Student's personal email
   siblingReference?: string;
   backgroundInfo?: string;
 }
 
 export interface TeacherSalaryRecord {
   id: string;
-  monthYear: string; 
-  dateIssued: string; 
+  monthYear: string;
+  dateIssued: string;
   amountIssued: number;
   amountDeducted: number;
   daysAbsent: number;
   reasonForAbsence?: string;
 }
 export interface Teacher {
-  id: string; 
-  authUid?: string; // To link with Firebase Auth UID and users collection
+  id: string; // Firestore document ID (should be authUid for teachers moving forward)
+  authUid?: string; // Explicitly storing Firebase Auth UID
   name: string;
   email: string; // Contact email, may differ from auth email
   phoneNumber: string;
@@ -173,20 +174,22 @@ export interface Teacher {
   subjectsTaught: SubjectName[]; // General subjects qualified for
   profilePictureUrl?: string | null;
   salaryHistory?: TeacherSalaryRecord[];
-  daysPresentThisMonth?: number; 
+  daysPresentThisMonth?: number;
   daysAbsentThisMonth?: number;
+  // assignments are now primarily managed in the 'users' collection doc for the teacher
 }
 
-// Updated to include assignments
-export interface TeacherFormData { 
+// This type is for the form where an Admin creates/edits a teacher's HR profile
+// and their system assignments.
+export interface TeacherFormData {
   name: string;
-  email: string;
+  email: string; // Contact email (will also be used for auth if new teacher)
   phoneNumber: string;
   address: string;
   yearOfJoining: number;
-  subjectsTaught: SubjectName[];
+  subjectsTaught: SubjectName[]; // General subject qualifications
   profilePictureUrl?: string;
-  assignments?: TeacherAssignment[]; // Added assignments
+  assignments?: TeacherAssignment[]; // Assignments to classes/subjects/roles
 }
 
 
@@ -197,13 +200,13 @@ export interface AppMessage {
   senderRole: UserRole;
   receiverRole: UserRole;
   content: string;
-  timestamp: string; 
+  timestamp: string;
   read: boolean;
   messageType: 'app';
 }
 
 export interface HallOfFameItem {
-  id: string; 
+  id: string;
   category: 'founder' | 'co-founder' | 'principal' | 'school-award' | 'founder-award' | 'student-achievement';
   name: string;
   title?: string;

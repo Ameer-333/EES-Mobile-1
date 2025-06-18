@@ -26,11 +26,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { firestore } from '@/lib/firebase';
 import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData } from 'firebase/firestore';
 
-const TEACHERS_COLLECTION = 'teachers';
-const USERS_COLLECTION = 'users'; // For deleting corresponding user record
+const TEACHERS_COLLECTION = 'teachers'; // Collection for HR-specific teacher data
+const USERS_COLLECTION = 'users'; // Collection for auth supplemental data (roles, assignments)
 
 export function ManageTeacherProfiles() {
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]); // Stores data from 'teachers' collection
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -40,12 +40,12 @@ export function ManageTeacherProfiles() {
   useEffect(() => {
     setIsLoading(true);
     // Listen to 'teachers' collection (HR profiles)
-    // Document IDs in 'teachers' should ideally be the authUid
+    // Document IDs in 'teachers' are now the authUid
     const teachersCollectionRef = collection(firestore, TEACHERS_COLLECTION);
-    
+
     const unsubscribe = onSnapshot(teachersCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
       const fetchedTeachers = snapshot.docs.map(docSnapshot => ({
-        id: docSnapshot.id, // This ID should be the authUid
+        id: docSnapshot.id, // This ID is the authUid
         ...docSnapshot.data(),
       } as Teacher));
       setTeachers(fetchedTeachers);
@@ -80,23 +80,35 @@ export function ManageTeacherProfiles() {
   };
 
   const handleEditTeacher = (teacher: Teacher) => {
-    setTeacherToEdit(teacher); // teacher.id here is expected to be the authUid
+    // teacher.id here is the authUid, which is the doc ID in 'teachers' collection
+    // teacherToEdit.authUid is also the same for clarity if needed in the form.
+    setTeacherToEdit(teacher);
     setIsFormOpen(true);
   };
 
-  const handleDeleteTeacher = async (teacherId: string, teacherName: string) => {
-    // teacherId is the authUid
+  const handleDeleteTeacher = async (teacherAuthUid: string, teacherName: string) => {
+    // teacherAuthUid is the ID for both 'teachers' and 'users' documents.
     try {
       // 1. Delete from 'teachers' (HR profiles) collection
-      const teacherDocRef = doc(firestore, TEACHERS_COLLECTION, teacherId);
+      const teacherDocRef = doc(firestore, TEACHERS_COLLECTION, teacherAuthUid);
       await deleteDoc(teacherDocRef);
 
       // 2. Delete from 'users' (auth supplemental data, roles, assignments) collection
-      const userDocRef = doc(firestore, USERS_COLLECTION, teacherId);
+      const userDocRef = doc(firestore, USERS_COLLECTION, teacherAuthUid);
       await deleteDoc(userDocRef);
-      
+
       // Note: Deleting Firebase Auth user needs Admin SDK or Cloud Function, not done client-side.
-      toast({ title: "Teacher Records Deleted", description: `HR profile and user data for ${teacherName} removed from Firestore. Auth account needs manual deletion if required.` });
+      // This should be communicated to the admin.
+      toast({
+          title: "Teacher Records Deleted",
+          description: (
+            React.createElement('div', null,
+              React.createElement('p', null, `HR profile and user data for `, React.createElement('strong', null, teacherName), ` removed from Firestore.`),
+              React.createElement('p', {className: "text-xs mt-1 text-destructive"}, `Firebase Authentication account needs manual deletion from the Firebase console if required.`)
+            )
+          ),
+          duration: 10000,
+      });
     } catch (error) {
       console.error("Error deleting teacher records from Firestore:", error);
       toast({
@@ -108,9 +120,14 @@ export function ManageTeacherProfiles() {
   };
 
   const handleTeacherSaved = (savedTeacher: Teacher, isEditing: boolean) => {
-    setIsFormOpen(false);
+    // Firestore onSnapshot will handle UI updates.
+    // The form dialog now handles its own closing for new teacher credential display.
+    // If it's an edit, we can close it here.
+    if (isEditing) {
+      setIsFormOpen(false);
+    }
   };
-  
+
   if (isLoading) {
     return (
       <Card className="w-full shadow-lg rounded-lg border-accent/50 mt-8">
@@ -194,7 +211,7 @@ export function ManageTeacherProfiles() {
               </TableHeader>
               <TableBody>
                 {filteredTeachers.length > 0 ? filteredTeachers.map((teacher) => (
-                  <TableRow key={teacher.id}>
+                  <TableRow key={teacher.id}> {/* teacher.id is now authUid */}
                     <TableCell>
                       <Image
                         src={teacher.profilePictureUrl || `https://placehold.co/40x40.png?text=${teacher.name.charAt(0)}`}
@@ -205,7 +222,7 @@ export function ManageTeacherProfiles() {
                         data-ai-hint="teacher avatar"
                       />
                     </TableCell>
-                    <TableCell className="font-medium truncate max-w-[100px]">{teacher.id}</TableCell> {/* Displaying Auth UID as ID */}
+                    <TableCell className="font-medium truncate max-w-[100px]">{teacher.id}</TableCell>
                     <TableCell>{teacher.name}</TableCell>
                     <TableCell className="text-muted-foreground">{teacher.email}</TableCell>
                     <TableCell>
@@ -229,7 +246,7 @@ export function ManageTeacherProfiles() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the HR profile and user data (assignments, role) for <strong>{teacher.name}</strong> from Firestore. The Firebase Authentication account will need to be deleted manually from the Firebase console if required.
+                              This action cannot be undone. This will permanently delete the HR profile and user data (assignments, role) for <strong>{teacher.name}</strong> (Auth ID: {teacher.id}) from Firestore. The Firebase Authentication account will need to be deleted manually from the Firebase console if required.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
