@@ -6,7 +6,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import type { Teacher, TeacherFormData, SubjectName, TeacherAssignment, TeacherAssignmentType, ManagedUser, NIOSSubjectName, NCLPSubjectName } from '@/types';
-import { allSubjectNamesArray, standardSubjectNamesArray, niosSubjectNamesArray, nclpSubjectNamesArray, assignmentTypeLabels, motherTeacherCoreSubjects, nclpAllSubjects, nclpGroupBSubjectsNoHindi } from '@/types';
+import { allSubjectNamesArray, standardSubjectNamesArray, niosSubjectNamesArray, nclpSubjectNamesArray, assignmentTypeLabels, motherTeacherCoreSubjects, nclpAllSubjects, nclpGroupBSubjectsNoHindi, niosSubjectsForAssignment } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -196,50 +196,54 @@ export function TeacherProfileFormDialog({
     }
   };
 
-  useEffect(() => {
-    (async () => {
-      if (isOpen) {
-        if (teacherToEdit) {
-          setIsLoadingAssignments(true);
-          if (!teacherToEdit.authUid) {
-              console.error("Teacher to edit is missing authUid.");
-              toast({ title: "Error", description: "Cannot load teacher data: Missing Auth ID.", variant: "destructive" });
-              setIsLoadingAssignments(false);
-              onOpenChange(false);
-              return;
-          }
-          try {
-              const userDocRef = doc(firestore, getUsersCollectionPath(), teacherToEdit.authUid);
-              const userDocSnap = await getDoc(userDocRef);
-              const existingAssignmentsFromDb = userDocSnap.exists() ? (userDocSnap.data() as ManagedUser).assignments || [] : [];
-
-              form.reset({
-                name: teacherToEdit.name,
-                email: teacherToEdit.email,
-                phoneNumber: teacherToEdit.phoneNumber,
-                address: teacherToEdit.address,
-                yearOfJoining: teacherToEdit.yearOfJoining,
-                subjectsTaught: teacherToEdit.subjectsTaught || [],
-                profilePictureUrl: teacherToEdit.profilePictureUrl || '',
-                assignments: existingAssignmentsFromDb.map(a => ({...a, id: a.id || Date.now().toString() + Math.random().toString(36).substring(2,9) })),
-              });
-              setGeneratedCredentials(null);
-          } catch (error) {
-              console.error("Error in useEffect fetching teacher assignments:", error);
-              toast({ title: "Data Load Error", description: "Could not load teacher's assignment details.", variant: "destructive"});
-          } finally {
-              setIsLoadingAssignments(false);
-          }
-        } else {
-              form.reset({
-                name: '', email: '', phoneNumber: '', address: '',
-                yearOfJoining: currentYear, subjectsTaught: [], profilePictureUrl: '', assignments: [],
-              });
-              setGeneratedCredentials(null);
-              setIsLoadingAssignments(false);
-        }
+  // Define loadTeacherData before useEffect that calls it
+  const loadTeacherData = async () => {
+    if (teacherToEdit) {
+      setIsLoadingAssignments(true);
+      if (!teacherToEdit.authUid) {
+          console.error("Teacher to edit is missing authUid.");
+          toast({ title: "Error", description: "Cannot load teacher data: Missing Auth ID.", variant: "destructive" });
+          setIsLoadingAssignments(false);
+          onOpenChange(false);
+          return;
       }
-    })();
+      try {
+          const userDocRef = doc(firestore, getUsersCollectionPath(), teacherToEdit.authUid);
+          const userDocSnap = await getDoc(userDocRef);
+          const existingAssignmentsFromDb = userDocSnap.exists() ? (userDocSnap.data() as ManagedUser).assignments || [] : [];
+
+          form.reset({
+            name: teacherToEdit.name,
+            email: teacherToEdit.email,
+            phoneNumber: teacherToEdit.phoneNumber,
+            address: teacherToEdit.address,
+            yearOfJoining: teacherToEdit.yearOfJoining,
+            subjectsTaught: teacherToEdit.subjectsTaught || [],
+            profilePictureUrl: teacherToEdit.profilePictureUrl || '',
+            assignments: existingAssignmentsFromDb.map(a => ({...a, id: a.id || Date.now().toString() + Math.random().toString(36).substring(2,9) })),
+          });
+          setGeneratedCredentials(null);
+      } catch (error) {
+          console.error("Error in useEffect fetching teacher assignments:", error);
+          toast({ title: "Data Load Error", description: "Could not load teacher's assignment details.", variant: "destructive"});
+      } finally {
+          setIsLoadingAssignments(false);
+      }
+    } else {
+          form.reset({
+            name: '', email: '', phoneNumber: '', address: '',
+            yearOfJoining: currentYear, subjectsTaught: [], profilePictureUrl: '', assignments: [],
+          });
+          setGeneratedCredentials(null);
+          setIsLoadingAssignments(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      loadTeacherData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teacherToEdit, isOpen, form, isEditing, currentYear, toast, onOpenChange]);
 
   return (
