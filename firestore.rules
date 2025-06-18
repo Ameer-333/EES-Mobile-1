@@ -5,7 +5,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Helper Functions
-    function isAuthenticated() {
+    function isAuthenticated(request) {
       return request.auth != null;
     }
 
@@ -19,114 +19,135 @@ service cloud.firestore {
     }
 
     function isAdmin(userId) {
-      return isAuthenticated() && isUserRole(userId, 'Admin');
+      return isAuthenticated(request) && isUserRole(userId, 'Admin');
     }
 
     function isTeacher(userId) {
-      return isAuthenticated() && isUserRole(userId, 'Teacher');
+      return isAuthenticated(request) && isUserRole(userId, 'Teacher');
     }
 
     function isStudent(userId) {
-      return isAuthenticated() && isUserRole(userId, 'Student');
+      return isAuthenticated(request) && isUserRole(userId, 'Student');
     }
 
-    // Checks if a teacher is assigned to a specific class (ignoring section/group)
+    // Checks if a teacher is assigned to a specific class (any section/group/subject within it)
     function isTeacherAssignedToClass(teacherAssignments, targetClassId) {
-      return teacherAssignments.filter(assignment =>
-        assignment.classId == targetClassId
-      ).size() > 0;
+      return teacherAssignments.filter(assignment => assignment.classId == targetClassId).size() > 0;
     }
 
-    // Checks if a teacher's assignments match a specific student's class, section, and group
+    // Checks if a teacher's assignments cover a specific student's class, section, and group
     function isTeacherAssignedToStudentClass(teacherAssignments, studentClassId, studentSectionId, studentGroupId) {
       return teacherAssignments.filter(assignment =>
         assignment.classId == studentClassId &&
-        ( (assignment.type == 'mother_teacher' || assignment.type == 'class_teacher' || assignment.type == 'subject_teacher') ?
-            (assignment.sectionId == null || assignment.sectionId == '' || assignment.sectionId == studentSectionId) :
-          (assignment.type == 'nios_teacher' || assignment.type == 'nclp_teacher') ?
-            (assignment.groupId == null || assignment.groupId == '' || assignment.groupId == studentGroupId) :
-          false
-        )
+        (assignment.sectionId == null || assignment.sectionId == "" || assignment.sectionId == studentSectionId) &&
+        (assignment.groupId == null || assignment.groupId == "" || assignment.groupId == studentGroupId)
       ).size() > 0;
     }
-
+    
     // Rules for the 'users' collection
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin(request.auth.uid));
-      allow create: if isAdmin(request.auth.uid) || request.auth.uid == userId; // Allow user self-creation for signup
-      allow update: if isAdmin(request.auth.uid) ||
-                       (request.auth.uid == userId && (
-                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'displayName', 'photoURL', 'lastLogin'])
-                       ));
-      allow delete: if isAdmin(request.auth.uid);
+      allow read: if isAuthenticated(request) && (request.auth.uid == userId || isAdmin(request.auth.uid));
+      allow create: if isAuthenticated(request) && isAdmin(request.auth.uid); // Admins can create user records
+      allow update: if isAuthenticated(request) && (
+                      (request.auth.uid == userId && request.resource.data.keys().hasOnly(['name', 'displayName', 'photoURL', 'lastLogin'])) || // User can update specific fields
+                      isAdmin(request.auth.uid) // Admins can update anything
+                    );
+      allow delete: if isAuthenticated(request) && isAdmin(request.auth.uid);
     }
 
-    // Rules for the 'teachers' collection (HR Profiles)
+    // Rules for the 'teachers' (HR profiles) collection
     match /teachers/{teacherId} {
-      allow read: if isAuthenticated() && (request.auth.uid == teacherId || isAdmin(request.auth.uid));
-      allow list: if isAdmin(request.auth.uid);
-      allow create, update, delete: if isAdmin(request.auth.uid);
+      // teacherId here is expected to be an authUid
+      allow read: if isAuthenticated(request) && (request.auth.uid == teacherId || isAdmin(request.auth.uid));
+      allow create, update: if isAuthenticated(request) && isAdmin(request.auth.uid);
+      allow delete: if isAuthenticated(request) && isAdmin(request.auth.uid);
     }
 
-    // Rules for student data, organized by class, then profiles subcollection
+    // Rules for student_data_by_class and its subcollections
     match /student_data_by_class/{classId} {
       // Rules for the class document itself (e.g., student_data_by_class/LKG)
-      // Allow admins to manage these class container documents if needed.
-      allow read, write: if isAdmin(request.auth.uid);
+      // These documents currently act as containers. Allow admin read/write.
+      allow read, write: if isAuthenticated(request) && isAdmin(request.auth.uid);
 
-      // Nested match for the 'profiles' subcollection within each class document
+      // Nested match for the 'profiles' subcollection
       match /profiles/{studentProfileId} {
-        let studentResource = resource.data; // Existing data for read/update/delete
-        let studentRequest = request.resource.data; // Incoming data for create/update
-        let requestUserDoc = getUserData(request.auth.uid);
+        let studentResourceData = resource.data; // Data of the existing document (for read, update, delete)
+        let studentRequestData = request.resource.data; // Data of the incoming document (for create, update)
+        let requesterAuthUid = request.auth.uid;
+        let requesterUserData = getUserData(requesterAuthUid);
 
-        allow read: if isAuthenticated() &&
-                      ( isAdmin(request.auth.uid) ||
-                        ( isStudent(request.auth.uid) &&
-                          requestUserDoc.classId == classId &&
-                          requestUserDoc.studentProfileId == studentProfileId &&
-                          studentResource.authUid == request.auth.uid
-                        ) ||
-                        ( isTeacher(request.auth.uid) &&
-                          isTeacherAssignedToStudentClass(requestUserDoc.assignments, classId, studentResource.sectionId, studentResource.groupId)
-                        )
-                      );
+        // Allow READ if:
+        // 1. Requester is an Admin.
+        // OR
+        // 2. Requester is the Student themselves (matching authUid in profile, and classId/studentProfileId from their users doc).
+        // OR
+        // 3. Requester is a Teacher assigned to this student's class/section/group.
+        allow read: if isAuthenticated(request) && (
+                      isAdmin(requesterAuthUid) ||
+                      (
+                        isStudent(requesterAuthUid) &&
+                        requesterUserData.classId == classId &&
+                        requesterUserData.studentProfileId == studentProfileId &&
+                        studentResourceData.authUid == requesterAuthUid
+                      ) ||
+                      (
+                        isTeacher(requesterAuthUid) &&
+                        isTeacherAssignedToStudentClass(requesterUserData.assignments, studentResourceData.classId, studentResourceData.sectionId, studentResourceData.groupId)
+                      )
+                    );
+        
+        // Allow LIST if: (list is a type of read query on the collection)
+        // 1. Requester is an Admin.
+        // OR
+        // 2. Requester is a Teacher assigned to this classId (they can list students in classes they teach).
+        allow list: if isAuthenticated(request) && (
+                      isAdmin(requesterAuthUid) ||
+                      (
+                        isTeacher(requesterAuthUid) &&
+                        isTeacherAssignedToClass(requesterUserData.assignments, classId)
+                      )
+                    );
 
-        // Allow teachers assigned to the class (or admins) to list students in that class
-        allow list: if isAuthenticated() &&
-                      ( isAdmin(request.auth.uid) ||
-                        (isTeacher(request.auth.uid) && isTeacherAssignedToClass(requestUserDoc.assignments, classId))
-                      );
+        // Allow CREATE if:
+        // 1. Requester is an Admin.
+        // OR
+        // 2. Requester is a Teacher assigned to the class the student is being added to.
+        // AND
+        // 3. The classId in the new student data matches the path.
+        // 4. The new student data includes an authUid.
+        allow create: if isAuthenticated(request) &&
+                        (isAdmin(requesterAuthUid) || (isTeacher(requesterAuthUid) && isTeacherAssignedToClass(requesterUserData.assignments, studentRequestData.classId))) &&
+                        studentRequestData.classId == classId &&
+                        studentRequestData.authUid != null;
 
-        allow create: if isAuthenticated() &&
-                        (isAdmin(request.auth.uid) || isTeacher(request.auth.uid)) &&
-                        isTeacherAssignedToClass(requestUserDoc.assignments, classId) && // Teacher must be assigned to the class they are adding to
-                        studentRequest.classId == classId && // Ensure data consistency
-                        studentRequest.authUid != null; // Student must have an authUid
+        // Allow UPDATE if:
+        // 1. Requester is an Admin.
+        // OR
+        // 2. Requester is a Teacher assigned to this student's class/section/group.
+        // AND
+        // 3. The authUid field is not being changed.
+        // 4. The classId in the path is not being changed by this update (class moves are complex).
+        allow update: if isAuthenticated(request) &&
+                        (isAdmin(requesterAuthUid) || (isTeacher(requesterAuthUid) && isTeacherAssignedToStudentClass(requesterUserData.assignments, studentResourceData.classId, studentResourceData.sectionId, studentResourceData.groupId))) &&
+                        studentRequestData.authUid == studentResourceData.authUid &&
+                        studentRequestData.classId == classId; // Prevent changing classId via simple update; this should be a more controlled "move" operation.
 
-        allow update: if isAuthenticated() &&
-                        (isAdmin(request.auth.uid) ||
-                          ( isTeacher(request.auth.uid) &&
-                            isTeacherAssignedToStudentClass(requestUserDoc.assignments, classId, studentResource.sectionId, studentResource.groupId)
-                          )
-                        ) &&
-                        studentRequest.authUid == studentResource.authUid; // Prevent changing the linked authUid
 
-        allow delete: if isAdmin(request.auth.uid);
+        // Allow DELETE only by Admins.
+        allow delete: if isAuthenticated(request) && isAdmin(requesterAuthUid);
       }
     }
 
-    // Rules for 'app_settings'
+    // Rules for app_settings
     match /app_settings/{settingId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin(request.auth.uid);
+      allow read: if isAuthenticated(request);
+      allow write: if isAuthenticated(request) && isAdmin(request.auth.uid);
     }
 
-    // Rules for 'hall_of_fame_items'
+    // Rules for Hall of Fame
     match /hall_of_fame_items/{itemId} {
-      allow read: if isAuthenticated(); // Or make public: allow read: if true;
-      allow list: if isAuthenticated(); // Or make public: allow list: if true;
-      allow create, update, delete: if isAdmin(request.auth.uid);
+      allow read: if isAuthenticated(request);
+      allow write: if isAuthenticated(request) && isAdmin(request.auth.uid);
     }
   }
 }
