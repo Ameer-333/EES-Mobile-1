@@ -2,7 +2,7 @@
 'use client';
 
 import type { SubjectMarks, SubjectName, ExamRecord, ExamName, GradeType } from '@/types';
-import { subjectNamesArray, examNamesArray } from '@/types';
+import { subjectNamesArray } from '@/types'; // Removed examNamesArray as it's not used here
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
@@ -55,47 +55,6 @@ const gradeStyles: Record<GradeType, { color: string; icon: React.ElementType; b
   'Pass Class': { color: 'text-orange-600 dark:text-orange-400', icon: CheckCircle, badgeVariant: 'outline' },
   'Not Completed': { color: 'text-red-600 dark:text-red-400', icon: CircleSlash, badgeVariant: 'destructive' },
 };
-
-// Helper to generate mock marks for one exam
-const generateExamMarks = (examName: ExamName): SubjectMarks[] => {
-  return subjectNamesArray.map(subjectName => {
-    const maxMarks = 100;
-    let marks;
-    if (examName === 'SA2' && (subjectName === 'Maths' || subjectName === 'Science')) {
-      marks = Math.floor(Math.random() * 10) + 25; // 25-34 (likely fail)
-    } else if (examName === 'SA1' && subjectName === 'English') {
-      marks = Math.floor(Math.random() * 15) + 85; // 85-100 (Distinction)
-    } else {
-      marks = Math.floor(Math.random() * 50) + 40; // 40-89 (Covers various pass grades)
-    }
-    return { subjectName, marks, maxMarks };
-  });
-};
-
-// Generate mock data for all exams
-const mockExamRecordsInitial: ExamRecord[] = examNamesArray.map(examName => ({
-  examName,
-  subjectMarks: generateExamMarks(examName),
-}));
-
-// Ensure SA2 has a specific scenario for testing "Detained"
-const sa2Index = mockExamRecordsInitial.findIndex(e => e.examName === 'SA2');
-if (sa2Index !== -1) {
-    // Check if all subjects are already passing (or at least >35) to avoid overwriting a good scenario
-    const sa2InitialCalc = calculateGradeAndOverallPercentage(mockExamRecordsInitial[sa2Index].subjectMarks);
-    if (sa2InitialCalc.failingSubjects.length < 2) { // Only modify if it's not already a clear fail in multiple subjects
-        mockExamRecordsInitial[sa2Index].subjectMarks = subjectNamesArray.map(subjectName => {
-            const maxMarks = 100;
-            let marks;
-            if (subjectName === 'Maths') marks = 30; // Fail
-            else if (subjectName === 'Science') marks = 34; // Fail
-            else if (subjectName === 'English') marks = 70; // Pass
-            else marks = Math.floor(Math.random() * 30) + 50; // Pass (50-79)
-            return { subjectName, marks, maxMarks };
-        });
-    }
-}
-
 
 const chartConfig = {
   marks: { label: "Marks Obtained", color: "hsl(var(--chart-1))" },
@@ -154,9 +113,10 @@ function MarksTable({ marks, examName, failingSubjects }: MarksTableProps) {
 
 interface StudentRecordsProps {
   examRecords?: ExamRecord[];
+  studentName?: string; // Added to potentially display name
 }
 
-export function StudentRecords({ examRecords = mockExamRecordsInitial }: StudentRecordsProps) {
+export function StudentRecords({ examRecords = [], studentName }: StudentRecordsProps) { // Default to empty array
   const overallAverageMarksData = subjectNamesArray.map(subjectName => {
     let totalMarks = 0;
     let count = 0;
@@ -175,7 +135,7 @@ export function StudentRecords({ examRecords = mockExamRecordsInitial }: Student
 
   const sa2Record = examRecords.find(er => er.examName === 'SA2');
   let sa2GradeResult: ReturnType<typeof calculateGradeAndOverallPercentage> | null = null;
-  let promotionStatus: 'Promoted to Next Class' | 'Detained' = 'Detained'; // Default to Detained
+  let promotionStatus: 'Promoted to Next Class' | 'Detained' = 'Detained'; 
   let promotionStatusDetails: { color: string; icon: React.ElementType; message: string } = {
     color: 'text-red-600 dark:text-red-400',
     icon: ShieldAlert,
@@ -202,7 +162,7 @@ export function StudentRecords({ examRecords = mockExamRecordsInitial }: Student
         <div className="text-center py-10">
             <BookCheck className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
             <h1 className="text-2xl font-semibold text-primary mb-2">No Academic Records Found</h1>
-            <p className="text-muted-foreground">There are currently no marks or exam records available.</p>
+            <p className="text-muted-foreground">There are currently no marks or exam records available for {studentName || 'this student'}.</p>
         </div>
     );
   }
@@ -298,33 +258,32 @@ export function StudentRecords({ examRecords = mockExamRecordsInitial }: Student
         </Card>
       )}
 
-      <Card className="shadow-xl rounded-lg border-accent/50">
-        <CardHeader>
-          <CardTitle className="text-2xl font-headline text-primary flex items-center">
-            <Layers className="mr-3 h-7 w-7"/> Overall Academic Summary
-          </CardTitle>
-          <CardDescription>Average performance across all subjects and exams.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfig} className="h-[350px] w-full">
-           <ResponsiveContainer width="100%" height="100%">
-            <RechartsBarChart data={overallAverageMarksData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="name" tickMargin={10} angle={-15} textAnchor="end" height={50} interval={0} />
-              <YAxis domain={[0, 100]} />
-              <RechartsChartTooltip content={<RechartsChartTooltipContent />} />
-              <RechartsChartLegend content={<RechartsChartLegendContent />} />
-              <Bar dataKey="averageMarks" fill="var(--color-averageMarks)" radius={[4, 4, 0, 0]} barSize={30}>
-                <LabelList dataKey="averageMarks" position="top" offset={5} fontSize={12} formatter={(value: number) => value.toFixed(2)} />
-              </Bar>
-            </RechartsBarChart>
-           </ResponsiveContainer>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+      {examRecords.length > 0 && (
+        <Card className="shadow-xl rounded-lg border-accent/50">
+          <CardHeader>
+            <CardTitle className="text-2xl font-headline text-primary flex items-center">
+              <Layers className="mr-3 h-7 w-7"/> Overall Academic Summary
+            </CardTitle>
+            <CardDescription>Average performance across all subjects and exams.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[350px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsBarChart data={overallAverageMarksData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tickMargin={10} angle={-15} textAnchor="end" height={50} interval={0} />
+                <YAxis domain={[0, 100]} />
+                <RechartsChartTooltip content={<RechartsChartTooltipContent />} />
+                <RechartsChartLegend content={<RechartsChartLegendContent />} />
+                <Bar dataKey="averageMarks" fill="var(--color-averageMarks)" radius={[4, 4, 0, 0]} barSize={30}>
+                  <LabelList dataKey="averageMarks" position="top" offset={5} fontSize={12} formatter={(value: number) => value.toFixed(2)} />
+                </Bar>
+              </RechartsBarChart>
+            </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
-      
-
-    

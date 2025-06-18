@@ -31,6 +31,23 @@ export interface Scholarship {
 export type ReligionType = 'Hindu' | 'Muslim' | 'Christian' | 'Sikh' | 'Jain' | 'Buddhist' | 'Other';
 export const religionOptions: ReligionType[] = ['Hindu', 'Muslim', 'Christian', 'Sikh', 'Jain', 'Buddhist', 'Other'];
 
+export type SubjectName = 'English' | 'Kannada' | 'Hindi' | 'Science' | 'Maths' | 'Social Science';
+export const subjectNamesArray: SubjectName[] = ['English', 'Kannada', 'Hindi', 'Science', 'Maths', 'Social Science'];
+
+export type ExamName = 'FA1' | 'FA2' | 'SA1' | 'FA3' | 'FA4' | 'SA2';
+export const examNamesArray: ExamName[] = ['FA1', 'FA2', 'SA1', 'FA3', 'FA4', 'SA2'];
+
+export interface SubjectMarks {
+  subjectName: SubjectName;
+  marks: number;
+  maxMarks: number;
+}
+
+export interface ExamRecord {
+  examName: ExamName;
+  subjectMarks: SubjectMarks[];
+}
+
 export interface Student {
   id: string; 
   name: string;
@@ -52,26 +69,11 @@ export interface Student {
   profilePictureUrl?: string | null;
   remarks?: StudentRemark[];
   scholarships?: Scholarship[];
+  examRecords?: ExamRecord[]; // Added for storing student marks
   backgroundInfo?: string;
   authUid?: string; 
 }
 
-export type SubjectName = 'English' | 'Kannada' | 'Hindi' | 'Science' | 'Maths' | 'Social Science';
-export const subjectNamesArray: SubjectName[] = ['English', 'Kannada', 'Hindi', 'Science', 'Maths', 'Social Science'];
-
-export type ExamName = 'FA1' | 'FA2' | 'SA1' | 'FA3' | 'FA4' | 'SA2';
-export const examNamesArray: ExamName[] = ['FA1', 'FA2', 'SA1', 'FA3', 'FA4', 'SA2'];
-
-export interface SubjectMarks {
-  subjectName: SubjectName;
-  marks: number;
-  maxMarks: number;
-}
-
-export interface ExamRecord {
-  examName: ExamName;
-  subjectMarks: SubjectMarks[];
-}
 
 export type GradeType = 'Distinction' | 'First Class' | 'Second Class' | 'Pass Class' | 'Not Completed';
 
