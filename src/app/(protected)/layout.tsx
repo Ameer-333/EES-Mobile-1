@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, createContext, useContext } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, LogOut, UserCircle, Award, Loader2, SettingsIcon } from 'lucide-react';
@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import type { UserRole } from '@/types';
+import type { UserRole, TeacherAssignment } from '@/types'; // Added TeacherAssignment
 import { auth, firestore } from '@/lib/firebase';
 import { signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -27,6 +27,37 @@ import Image from 'next/image';
 
 const APP_SETTINGS_COLLECTION = 'app_settings';
 const GENERAL_SETTINGS_DOC_ID = 'general';
+const USERS_COLLECTION = 'users';
+
+
+interface UserProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL?: string | null;
+  role: UserRole | null;
+  assignments?: TeacherAssignment[]; // Added for teachers
+}
+
+interface AppContextType {
+  authUser: FirebaseUser | null;
+  userProfile: UserProfile | null;
+  isLoadingAuth: boolean;
+  currentAppName: string;
+  currentLogoUrl: string | null;
+  logout: () => Promise<void>;
+}
+
+const AppContext = createContext<AppContextType | null>(null);
+
+export const useAppContext = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useAppContext must be used within an AppProvider');
+  }
+  return context;
+};
+
 
 function getExpectedRoleFromPathname(pathname: string): UserRole | null {
   if (pathname.startsWith('/student/')) return 'Student';
@@ -63,19 +94,14 @@ function getDashboardTitle(pathname: string, actualRole: UserRole | null, appNam
 }
 
 
-export default function ProtectedLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
 
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [currentAppName, setCurrentAppName] = useState('EES Education');
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
   
@@ -94,103 +120,106 @@ export default function ProtectedLayout({
         }
       } catch (error) {
         console.error("Error fetching app settings for layout:", error);
-        setCurrentAppName('EES Education'); 
-        setCurrentLogoUrl(null);
+        // Defaults already set
       }
     };
-
     fetchAppSettings(); 
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setIsLoading(true); 
+      setIsLoadingAuth(true); 
       if (user) {
         setAuthUser(user);
-        const userDocRef = doc(firestore, 'users', user.uid);
+        const userDocRef = doc(firestore, USERS_COLLECTION, user.uid);
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
           const roleFromDb = userData.role as UserRole;
           const nameFromDb = userData.name as string || user.displayName || user.email?.split('@')[0] || "User";
+          const assignmentsFromDb = userData.assignments as TeacherAssignment[] || [];
+
+          const profile: UserProfile = {
+            uid: user.uid,
+            email: user.email,
+            displayName: nameFromDb,
+            photoURL: user.photoURL,
+            role: roleFromDb,
+            assignments: roleFromDb === 'Teacher' ? assignmentsFromDb : undefined,
+          };
+          setUserProfile(profile);
 
           if (roleFromDb && ['Admin', 'Teacher', 'Student'].includes(roleFromDb)) {
-            setUserRole(roleFromDb);
-            setUserDisplayName(nameFromDb); // Set display name for all roles
-
             const expectedRole = getExpectedRoleFromPathname(pathname);
-
             if (pathname.startsWith('/hall-of-fame') && !expectedRole) {
-               setIsLoading(false);
+               setIsLoadingAuth(false);
                return; 
             }
-
             if (expectedRole && roleFromDb !== expectedRole) {
               toast({ title: "Access Denied", description: `Your role (${roleFromDb}) does not permit access to this ${expectedRole} page.`, variant: "destructive" });
               router.push('/'); 
             } else if (!expectedRole && !pathname.startsWith('/hall-of-fame') && !pathname.startsWith('/login') && pathname !== '/') {
                toast({ title: "Page Not Found", description: `The page (${pathname}) you are trying to access is not valid for your role.`, variant: "destructive" });
                router.push('/');
-            } else {
-              setIsLoading(false);
             }
           } else {
-            toast({ title: "Access Denied", description: `Your user role ('${roleFromDb || 'Not Set'}') is not configured correctly in the database. Please contact admin.`, variant: "destructive" });
+            toast({ title: "Access Denied", description: `Your user role ('${roleFromDb || 'Not Set'}') is not configured correctly. Contact admin.`, variant: "destructive" });
             await signOut(auth); 
-            setAuthUser(null);
-            setUserRole(null);
-            setUserDisplayName(null);
+            setAuthUser(null); setUserProfile(null);
             router.push('/'); 
           }
         } else {
-          toast({ title: "Access Denied", description: "User role not found in database. Please contact admin.", variant: "destructive" });
+          toast({ title: "Access Denied", description: "User profile not found. Contact admin.", variant: "destructive" });
           await signOut(auth);
-          setAuthUser(null);
-          setUserRole(null);
-          setUserDisplayName(null);
+          setAuthUser(null); setUserProfile(null);
           router.push('/'); 
         }
       } else {
-        setAuthUser(null);
-        setUserRole(null);
-        setUserDisplayName(null);
+        setAuthUser(null); setUserProfile(null);
         if (!pathname.startsWith('/login') && pathname !== '/') { 
             router.push('/'); 
-        } else {
-          setIsLoading(false); 
         }
       }
-       setTimeout(() => setIsLoading(false), 150); // Adjusted timeout slightly
+      setIsLoadingAuth(false);
     });
-
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [pathname, router, toast]); 
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      toast({
-        title: 'Logged Out',
-        description: 'You have been successfully logged out.',
-      });
-      setAuthUser(null);
-      setUserRole(null);
-      setUserDisplayName(null);
+      toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+      setAuthUser(null); setUserProfile(null);
       router.push('/'); 
     } catch (error) {
       console.error('Logout Error:', error);
-      toast({
-        title: 'Logout Failed',
-        description: 'Could not log you out. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Logout Failed', description: 'Could not log you out.', variant: 'destructive' });
     }
   };
   
-  const pageTitle = getDashboardTitle(pathname, userRole, currentAppName);
+  return (
+    <AppContext.Provider value={{ authUser, userProfile, isLoadingAuth, currentAppName, currentLogoUrl, logout: handleLogout }}>
+      {children}
+    </AppContext.Provider>
+  );
+}
 
-  if (isLoading) {
+
+export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AppProvider>
+      <ProtectedLayoutContent>{children}</ProtectedLayoutContent>
+    </AppProvider>
+  );
+}
+
+function ProtectedLayoutContent({ children }: { children: React.ReactNode; }) {
+  const { authUser, userProfile, isLoadingAuth, currentAppName, currentLogoUrl, logout } = useAppContext();
+  const router = useRouter();
+  const pathname = usePathname();
+  
+  const pageTitle = getDashboardTitle(pathname, userProfile?.role || null, currentAppName);
+
+  if (isLoadingAuth) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
@@ -208,18 +237,18 @@ export default function ProtectedLayout({
       );
   }
   
-  const canRenderChildren = authUser && userRole && 
+  const canRenderChildren = authUser && userProfile?.role && 
                            ( (getExpectedRoleFromPathname(pathname) === null && pathname.startsWith('/hall-of-fame')) || 
-                             (getExpectedRoleFromPathname(pathname) === userRole) );
+                             (getExpectedRoleFromPathname(pathname) === userProfile?.role) );
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr] bg-muted/30">
       <div className="hidden border-r bg-sidebar text-sidebar-foreground md:block shadow-md">
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-[60px] items-center border-b border-sidebar-border px-4 lg:px-6">
-            <Link href={userRole ? `/${userRole.toLowerCase()}/dashboard` : "/"} className="flex items-center gap-3 font-semibold text-primary">
+            <Link href={userProfile?.role ? `/${userProfile.role.toLowerCase()}/dashboard` : "/"} className="flex items-center gap-3 font-semibold text-primary">
               {currentLogoUrl ? (
-                 <Image src={currentLogoUrl} alt="Logo" width={32} height={32} className="object-contain rounded-md" data-ai-hint="school logo custom small" onError={() => setCurrentLogoUrl(null)} />
+                 <Image src={currentLogoUrl} alt="Logo" width={32} height={32} className="object-contain rounded-md" data-ai-hint="school logo custom small" onError={() => { /* Handle error if needed, e.g., revert to LogoIcon */ }} />
               ) : (
                 <LogoIcon className="h-7 w-7 text-sidebar-primary" />
               )}
@@ -228,7 +257,7 @@ export default function ProtectedLayout({
           </div>
           <div className="flex-1 py-4">
             <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
-              {authUser && userRole && <SidebarNav />}
+              {authUser && userProfile?.role && <SidebarNav />}
             </nav>
           </div>
           <div className="mt-auto p-4 border-t border-sidebar-border">
@@ -240,11 +269,7 @@ export default function ProtectedLayout({
         <header className="flex h-[60px] items-center gap-4 border-b bg-background px-4 lg:px-6 shadow-sm">
           <Sheet>
             <SheetTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="shrink-0 md:hidden border-border/70 hover:bg-accent"
-              >
+              <Button variant="outline" size="icon" className="shrink-0 md:hidden border-border/70 hover:bg-accent">
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Toggle navigation menu</span>
               </Button>
@@ -252,19 +277,17 @@ export default function ProtectedLayout({
             <SheetContent side="left" className="flex flex-col p-0 bg-sidebar text-sidebar-foreground">
               <div className="flex h-[60px] items-center border-b border-sidebar-border px-4">
                 <Link
-                    href={userRole ? `/${userRole.toLowerCase()}/dashboard` : "/"}
+                    href={userProfile?.role ? `/${userProfile.role.toLowerCase()}/dashboard` : "/"}
                     className="flex items-center gap-3 text-lg font-semibold text-sidebar-primary"
                 >
                     {currentLogoUrl ? (
-                        <Image src={currentLogoUrl} alt="Logo" width={28} height={28} className="object-contain rounded-md" data-ai-hint="school logo custom small" onError={() => setCurrentLogoUrl(null)} />
-                    ) : (
-                        <LogoIcon className="h-6 w-6" />
-                    )}
+                        <Image src={currentLogoUrl} alt="Logo" width={28} height={28} className="object-contain rounded-md" data-ai-hint="school logo custom small" onError={() => {/* Revert to icon or hide */}} />
+                    ) : ( <LogoIcon className="h-6 w-6" /> )}
                     <span className="font-headline">{currentAppName}</span>
                 </Link>
               </div>
               <nav className="grid gap-2 text-lg font-medium p-4">
-                {authUser && userRole && <SidebarNav />}
+                {authUser && userProfile?.role && <SidebarNav />}
               </nav>
                <div className="mt-auto p-4 border-t border-sidebar-border">
                  <p className="text-xs text-sidebar-foreground/60 text-center">&copy; {new Date().getFullYear()} {currentAppName}</p>
@@ -272,18 +295,18 @@ export default function ProtectedLayout({
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-            {userDisplayName && (
-              <p className="text-sm text-muted-foreground">Hello, {userDisplayName}!</p>
+            {userProfile?.displayName && (
+              <p className="text-sm text-muted-foreground">Hello, {userProfile.displayName}!</p>
             )}
             <h1 className="font-semibold text-lg text-foreground">{pageTitle}</h1>
           </div>
-          {authUser && userRole && (
+          {authUser && userProfile?.role && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full w-10 h-10 hover:bg-accent">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={authUser.photoURL || `https://placehold.co/40x40.png?text=${userRole?.charAt(0)}`} alt="User Avatar" data-ai-hint="user avatar generic"/>
-                    <AvatarFallback className="bg-muted text-muted-foreground">{userRole?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                    <AvatarImage src={userProfile.photoURL || `https://placehold.co/40x40.png?text=${userProfile.role?.charAt(0)}`} alt="User Avatar" data-ai-hint="user avatar generic"/>
+                    <AvatarFallback className="bg-muted text-muted-foreground">{userProfile.role?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
                   </Avatar>
                   <span className="sr-only">Toggle user menu</span>
                 </Button>
@@ -291,19 +314,19 @@ export default function ProtectedLayout({
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{userDisplayName || authUser.email}</p>
+                    <p className="text-sm font-medium leading-none">{userProfile.displayName || userProfile.email}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {userRole}
+                      {userProfile.role}
                     </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {userRole && (userRole === 'Student' || userRole === 'Teacher') && (
-                  <DropdownMenuItem onClick={() => router.push(`/${userRole.toLowerCase()}/profile`)}>
+                {userProfile.role && (userProfile.role === 'Student' || userProfile.role === 'Teacher') && (
+                  <DropdownMenuItem onClick={() => router.push(`/${userProfile.role!.toLowerCase()}/profile`)}>
                     <UserCircle className="mr-2 h-4 w-4 text-muted-foreground" /> Profile
                   </DropdownMenuItem>
                 )}
-                 {userRole === 'Admin' && (
+                 {userProfile.role === 'Admin' && (
                   <DropdownMenuItem onClick={() => router.push(`/admin/settings`)}>
                      <SettingsIcon className="mr-2 h-4 w-4 text-muted-foreground" /> Settings
                   </DropdownMenuItem>
@@ -312,7 +335,7 @@ export default function ProtectedLayout({
                   <Award className="mr-2 h-4 w-4 text-muted-foreground" /> Hall of Fame
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                <DropdownMenuItem onClick={logout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout
                 </DropdownMenuItem>
@@ -321,23 +344,9 @@ export default function ProtectedLayout({
           )}
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-8 bg-background rounded-tl-lg md:rounded-none overflow-auto shadow-inner-top-left">
-          {!isLoading && canRenderChildren && children}
+          {!isLoadingAuth && canRenderChildren && children}
         </main>
       </div>
     </div>
   );
 }
-
-// Custom style for inner shadow on main content (optional, can be done via Tailwind if preferred)
-const GlobalStyles = () => (
-  <style jsx global>{`
-    .shadow-inner-top-left {
-      box-shadow: inset 2px 2px 5px rgba(0,0,0,0.03);
-    }
-    @media (max-width: 767px) {
-      .shadow-inner-top-left {
-        box-shadow: none;
-      }
-    }
-  `}</style>
-);

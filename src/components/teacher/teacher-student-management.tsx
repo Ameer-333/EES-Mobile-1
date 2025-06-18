@@ -1,13 +1,13 @@
 
 'use client';
 
-import type { Student } from '@/types';
+import type { Student, TeacherAssignment } from '@/types';
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Edit, Search, UserPlus, Trash2, Loader2 } from 'lucide-react';
+import { Edit, Search, UserPlus, Trash2, Loader2, Filter } from 'lucide-react';
 import Image from 'next/image';
 import {
   AlertDialog,
@@ -18,7 +18,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { AddStudentDialog } from '@/components/teacher/add-student-dialog';
@@ -26,11 +25,15 @@ import { EditStudentDialog } from '@/components/teacher/edit-student-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { firestore } from '@/lib/firebase';
 import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData } from 'firebase/firestore';
+import { useAppContext } from '@/app/(protected)/layout'; // Import the context
 
 const STUDENTS_COLLECTION = 'students';
 
 export function TeacherStudentManagement() {
-  const [students, setStudents] = useState<Student[]>([]);
+  const { userProfile } = useAppContext(); // Get userProfile from context
+  const teacherAssignments = userProfile?.role === 'Teacher' ? userProfile.assignments : [];
+
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
@@ -47,7 +50,7 @@ export function TeacherStudentManagement() {
         id: doc.id,
         ...doc.data(),
       } as Student));
-      setStudents(fetchedStudents);
+      setAllStudents(fetchedStudents);
       setIsLoading(false);
     }, (error) => {
       console.error("Error fetching students from Firestore:", error);
@@ -59,18 +62,45 @@ export function TeacherStudentManagement() {
       setIsLoading(false);
     });
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
+    return () => unsubscribe();
   }, [toast]);
 
-  const filteredStudents = useMemo(() => {
-    if (!searchTerm) return students;
-    return students.filter(
+  const filteredAndAssignedStudents = useMemo(() => {
+    let studentsToDisplay = allStudents;
+
+    // Filter by teacher assignments
+    if (userProfile?.role === 'Teacher' && teacherAssignments && teacherAssignments.length > 0) {
+      studentsToDisplay = allStudents.filter(student => {
+        return teacherAssignments.some(assignment => {
+          if (assignment.type === 'mother_teacher' || assignment.type === 'class_teacher' || assignment.type === 'subject_teacher') {
+            return student.classId === assignment.classId && 
+                   (assignment.sectionId ? student.sectionId === assignment.sectionId : true);
+          }
+          if (assignment.type === 'nios_teacher' || assignment.type === 'nclp_teacher') {
+            // Assuming NIOS/NCLP students are identified by classId="NIOS" or "NCLP"
+            // and potentially a groupId if further differentiation is needed.
+            return student.classId === assignment.classId && 
+                   (assignment.groupId ? student.groupId === assignment.groupId : true);
+          }
+          return false;
+        });
+      });
+    } else if (userProfile?.role === 'Teacher' && (!teacherAssignments || teacherAssignments.length === 0)) {
+      // If teacher has no assignments, show no students (or a message)
+      return [];
+    }
+    // Admins see all students, so no assignment filtering for them if this component were reused (it's not currently)
+
+    // Filter by search term
+    if (!searchTerm) return studentsToDisplay;
+    return studentsToDisplay.filter(
       (student) =>
         (student.name && student.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (student.id && student.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (student.satsNumber && student.satsNumber.toLowerCase().includes(searchTerm.toLowerCase()))
+        (student.satsNumber && student.satsNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (student.className && student.className.toLowerCase().includes(searchTerm.toLowerCase()))
     );
-  }, [students, searchTerm]);
+  }, [allStudents, searchTerm, userProfile, teacherAssignments]);
 
   const handleOpenEditDialog = (student: Student) => {
     setCurrentStudentToEdit(student);
@@ -81,7 +111,6 @@ export function TeacherStudentManagement() {
     try {
       const studentDocRef = doc(firestore, STUDENTS_COLLECTION, studentId);
       await deleteDoc(studentDocRef);
-      // The onSnapshot listener will automatically update the local state
       toast({ title: "Student Record Deleted", description: `Student ${studentName} has been removed from Firestore.` });
     } catch (error) {
       console.error("Error deleting student from Firestore:", error);
@@ -94,12 +123,10 @@ export function TeacherStudentManagement() {
   };
 
   const handleStudentAdded = (newStudent: Student) => {
-    // Firestore listener updates the table. Toast is in AddStudentDialog.
     setIsAddStudentDialogOpen(false);
   };
 
   const handleStudentEdited = (editedStudent: Student) => {
-    // Firestore listener updates the table. Toast is in EditStudentDialog.
     setIsEditStudentDialogOpen(false);
   };
 
@@ -120,23 +147,11 @@ export function TeacherStudentManagement() {
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {Array(7).fill(0).map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array(3).fill(0).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={7} className="p-4">
-                      <div className="flex items-center justify-center">
-                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                         <span className="ml-2">Loading students...</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+            <Table><TableHeader><TableRow>{Array(7).fill(0).map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}</TableRow></TableHeader>
+              <TableBody>{Array(3).fill(0).map((_, i) => (
+                  <TableRow key={i}><TableCell colSpan={7} className="p-4">
+                      <div className="flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /><span className="ml-2">Loading students...</span></div>
+                  </TableCell></TableRow>))}
               </TableBody>
             </Table>
           </div>
@@ -145,7 +160,6 @@ export function TeacherStudentManagement() {
     );
   }
 
-
   return (
     <>
     <Card className="w-full shadow-lg rounded-lg">
@@ -153,16 +167,20 @@ export function TeacherStudentManagement() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <CardTitle className="text-2xl font-headline text-primary">Student Management</CardTitle>
-            <CardDescription>View, search, and manage student records from Firestore.</CardDescription>
+            <CardDescription>
+              {userProfile?.role === 'Teacher' && (!teacherAssignments || teacherAssignments.length === 0) 
+                ? "You are not currently assigned to any classes. Please contact an administrator."
+                : "View, search, and manage records for students in your assigned classes."}
+            </CardDescription>
           </div>
-          <Button onClick={() => setIsAddStudentDialogOpen(true)}>
+          <Button onClick={() => setIsAddStudentDialogOpen(true)} disabled={userProfile?.role === 'Teacher' && (!teacherAssignments || teacherAssignments.length === 0)}>
             <UserPlus className="mr-2 h-4 w-4" /> Add New Student
           </Button>
         </div>
         <div className="mt-4 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
-            placeholder="Search by ID, name, or SATS number..."
+            placeholder="Search by ID, name, SATS, or class..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 w-full md:w-1/2"
@@ -184,7 +202,7 @@ export function TeacherStudentManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredStudents.length > 0 ? filteredStudents.map((student) => (
+              {filteredAndAssignedStudents.length > 0 ? filteredAndAssignedStudents.map((student) => (
                 <TableRow key={student.id}>
                   <TableCell>
                     <Image
@@ -199,8 +217,8 @@ export function TeacherStudentManagement() {
                   <TableCell className="font-medium truncate max-w-[100px]">{student.id}</TableCell>
                   <TableCell>{student.name || 'N/A'}</TableCell>
                   <TableCell>{student.satsNumber || 'N/A'}</TableCell>
-                  <TableCell>{student.class || 'N/A'}</TableCell>
-                  <TableCell>{student.section || 'N/A'}</TableCell>
+                  <TableCell>{student.className || student.classId || 'N/A'}</TableCell> {/* Display className or classId */}
+                  <TableCell>{student.sectionId || student.section || 'N/A'}</TableCell> {/* Display sectionId or old section */}
                   <TableCell className="text-right space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(student)}>
                       <Edit className="h-4 w-4 mr-1" /> Edit
@@ -232,16 +250,18 @@ export function TeacherStudentManagement() {
               )) : (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
-                    No students found matching your criteria or no students in Firestore.
+                    {userProfile?.role === 'Teacher' && (!teacherAssignments || teacherAssignments.length === 0)
+                      ? "No classes assigned."
+                      : "No students found matching your criteria or assignments."}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
-        {filteredStudents.length > 0 && (
+        {filteredAndAssignedStudents.length > 0 && (
           <div className="mt-4 text-right text-sm text-muted-foreground">
-            Showing {filteredStudents.length} of {students.length} students from Firestore.
+            Showing {filteredAndAssignedStudents.length} of {allStudents.length} total students (filtered by your assignments).
           </div>
         )}
       </CardContent>
@@ -260,4 +280,3 @@ export function TeacherStudentManagement() {
     </>
   );
 }
-
