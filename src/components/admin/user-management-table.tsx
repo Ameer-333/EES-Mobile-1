@@ -79,9 +79,9 @@ export function UserManagementTable() {
   const filteredUsers = useMemo(() => {
     return users.filter(
       (user) =>
-        (user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         user.id.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        ((user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+         (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+         (user.id || '').toLowerCase().includes(searchTerm.toLowerCase())) &&
         (roleFilter === 'All' || user.role === roleFilter)
     );
   }, [users, searchTerm, roleFilter]);
@@ -222,7 +222,7 @@ export function UserManagementTable() {
                     <TableCell className="text-muted-foreground">{user.email}</TableCell>
                     <TableCell>
                       <Badge variant={user.role === 'Admin' ? 'default' : 'secondary'} className="capitalize flex items-center gap-1">
-                        <RoleIcon className="h-3.5 w-3.5" />
+                        {RoleIcon && <RoleIcon className="h-3.5 w-3.5" />}
                         {user.role}
                       </Badge>
                     </TableCell>
@@ -257,7 +257,7 @@ export function UserManagementTable() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteUser(user.id, user.name)}>
+                            <AlertDialogAction onClick={() => handleDeleteUser(user.id, user.name || 'this user')}>
                               Yes, delete user profile
                             </AlertDialogAction>
                           </AlertDialogFooter>
