@@ -79,6 +79,15 @@ interface TeacherProfileFormDialogProps {
   teacherToEdit?: Teacher | null;
 }
 
+const assignmentTypeDescriptions: Record<TeacherAssignmentType, string> = {
+  mother_teacher: "For LKG-4th. Handles all subjects for the assigned class & section. Full access to student profiles, marks, attendance for that class.",
+  class_teacher: "For 5th-10th. Primary contact for the assigned class & section. Full access to student profiles, marks, attendance for that class.",
+  subject_teacher: "For 5th-10th. Teaches a specific subject to assigned class(es) & section(s). Access limited to their subject's data (marks, attendance, remarks).",
+  nios_teacher: "Teacher for National Institute of Open Schooling students. Access to assigned NIOS students/groups.",
+  nclp_teacher: "Teacher for National Child Labour Project students. Access to assigned NCLP students/groups.",
+};
+
+
 export function TeacherProfileFormDialog({
   isOpen,
   onOpenChange,
@@ -105,10 +114,13 @@ export function TeacherProfileFormDialog({
     },
   });
 
-  const { fields: assignmentFields, append: appendAssignment, remove: removeAssignment } = useFieldArray({
+  const { fields: assignmentFields, append: appendAssignment, remove: removeAssignment, update } = useFieldArray({
     control: form.control,
     name: "assignments",
   });
+  
+  const watchedAssignmentTypes = form.watch('assignments');
+
 
   useEffect(() => {
     const loadTeacherData = async () => {
@@ -125,15 +137,13 @@ export function TeacherProfileFormDialog({
           assignments: [], // Default to empty, will be fetched
         });
 
-        // Fetch assignments from 'users' collection
-        // teacherToEdit.id is the authUid if teachers collection is keyed by authUid
         const authUidToFetch = teacherToEdit.authUid || teacherToEdit.id;
         if (authUidToFetch) {
           try {
             const userDocRef = doc(firestore, USERS_COLLECTION, authUidToFetch);
             const userDocSnap = await getDoc(userDocRef);
             if (userDocSnap.exists()) {
-              const userData = userDocSnap.data() as ManagedUser; // Assuming ManagedUser has assignments
+              const userData = userDocSnap.data() as ManagedUser;
               form.setValue('assignments', userData.assignments || []);
             }
           } catch (e) {
@@ -159,13 +169,12 @@ export function TeacherProfileFormDialog({
     const totalYearsWorked = currentYear - values.yearOfJoining;
 
     try {
-      let authUid = teacherToEdit?.authUid || teacherToEdit?.id; // If id is authUid
+      let authUid = teacherToEdit?.authUid || teacherToEdit?.id;
       let finalAuthEmail = isEditing && authUid ? (await getDoc(doc(firestore, USERS_COLLECTION, authUid))).data()?.email : '';
 
 
-      if (!isEditing) { // Adding new teacher
-        // 1. Create Firebase Auth user
-        finalAuthEmail = values.email; // Using contact email as auth email for new teachers for simplicity
+      if (!isEditing) { 
+        finalAuthEmail = values.email; 
         const defaultPassword = `${values.name.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/gi, '')}@EES${new Date().getFullYear().toString().slice(-2)}`;
 
         try {
@@ -182,67 +191,58 @@ export function TeacherProfileFormDialog({
             return;
         }
 
-        // 2. Create 'users' collection document
         const userProfileData: Omit<ManagedUser, 'id' | 'lastLogin' | 'studentProfileId'> = {
           name: values.name,
-          email: finalAuthEmail, // Auth email
+          email: finalAuthEmail,
           role: "Teacher",
           status: "Active",
           assignments: values.assignments || [],
         };
         await setDoc(doc(firestore, USERS_COLLECTION, authUid!), userProfileData);
 
-        // 3. Create 'teachers' collection document (HR details)
-        // Document ID is authUid for consistency
         const teacherHRData: Omit<Teacher, 'id'> = {
-          authUid: authUid, // Store authUid here as well
+          authUid: authUid, 
           name: values.name,
-          email: values.email, // Contact email from form
+          email: values.email, 
           phoneNumber: values.phoneNumber,
           address: values.address,
           yearOfJoining: values.yearOfJoining,
           totalYearsWorked: totalYearsWorked >= 0 ? totalYearsWorked : 0,
           subjectsTaught: values.subjectsTaught,
           profilePictureUrl: values.profilePictureUrl || null,
-          salaryHistory: [], // Initialize
+          salaryHistory: [], 
         };
         await setDoc(doc(firestore, TEACHERS_COLLECTION, authUid!), teacherHRData);
 
         onTeacherSaved({ ...teacherHRData, id: authUid! }, false);
-        // Toast for success is handled by the appearance of the generatedCredentials block
-        // This is preferred so Admin can copy credentials before closing.
 
-      } else { // Editing existing teacher
+      } else { 
         if (!authUid) {
             toast({title: "Error", description: "Teacher Auth ID missing. Cannot update.", variant: "destructive"});
             setIsSubmitting(false);
             return;
         }
-        // 1. Update 'teachers' collection (HR details)
         const teacherHRDataToUpdate: Partial<Teacher> = {
           name: values.name,
-          email: values.email, // Contact email
+          email: values.email, 
           phoneNumber: values.phoneNumber,
           address: values.address,
           yearOfJoining: values.yearOfJoining,
           totalYearsWorked: totalYearsWorked >= 0 ? totalYearsWorked : 0,
           subjectsTaught: values.subjectsTaught,
           profilePictureUrl: values.profilePictureUrl || null,
-          // authUid field in 'teachers' collection should already exist and not be changed.
         };
         await setDoc(doc(firestore, TEACHERS_COLLECTION, authUid), teacherHRDataToUpdate, { merge: true });
 
-        // 2. Update 'users' collection (assignments, name if changed)
         const userProfileUpdates: Partial<ManagedUser> = {
-            name: values.name, // Keep name in sync if changed
+            name: values.name, 
             assignments: values.assignments || [],
-            // email (auth email) and role typically don't change often via this form
         };
         await setDoc(doc(firestore, USERS_COLLECTION, authUid), userProfileUpdates, { merge: true });
 
         onTeacherSaved({ ...teacherToEdit!, ...teacherHRDataToUpdate, id: authUid }, true);
         toast({ title: "Teacher Updated", description: `${values.name}'s profile and assignments have been updated.` });
-        onOpenChange(false); // Close dialog on successful edit
+        onOpenChange(false); 
       }
 
     } catch (error) {
@@ -263,11 +263,11 @@ export function TeacherProfileFormDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open) { // When dialog is about to close
-        form.reset(); // Reset form state
-        setGeneratedCredentials(null); // Clear any displayed credentials
+      if (!open) { 
+        form.reset(); 
+        setGeneratedCredentials(null); 
       }
-      onOpenChange(open); // Propagate open state change
+      onOpenChange(open); 
     }}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -319,43 +319,64 @@ export function TeacherProfileFormDialog({
               </TabsContent>
               <TabsContent value="assignments" className="space-y-4">
                 {isLoadingAssignments && <div className="flex justify-center items-center p-4"><Loader2 className="h-6 w-6 animate-spin" /> Loading assignments...</div>}
-                {!isLoadingAssignments && assignmentFields.map((item, index) => (
-                  <Card key={item.id} className="p-3 border-dashed">
+                {!isLoadingAssignments && assignmentFields.map((item, index) => {
+                  const currentAssignmentType = watchedAssignmentTypes?.[index]?.type;
+                  return (
+                  <Card key={item.id} className="p-3 border-dashed bg-muted/30">
                     <div className="flex justify-between items-center mb-2">
                       <FormLabel className="text-sm font-medium">Assignment {index + 1}</FormLabel>
                       <Button type="button" variant="ghost" size="sm" onClick={() => removeAssignment(index)} className="text-destructive hover:text-destructive/80">
                         <Trash2 className="h-4 w-4 mr-1" /> Remove
                       </Button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-3">
                       <FormField control={form.control} name={`assignments.${index}.type`} render={({ field }) => (
-                        <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormItem><FormLabel>Assignment Type</FormLabel><Select 
+                            onValueChange={(value) => {
+                                field.onChange(value);
+                                // Reset subjectId if type is not subject_teacher
+                                if (value !== 'subject_teacher') {
+                                  update(index, { ...form.getValues(`assignments.${index}`), subjectId: undefined, type: value as TeacherAssignmentType });
+                                } else {
+                                  update(index, { ...form.getValues(`assignments.${index}`), type: value as TeacherAssignmentType });
+                                }
+                            }} 
+                            defaultValue={field.value}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
                             <SelectContent>{assignmentTypeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
-                        </Select><FormMessage /></FormItem> )}/>
-                      <FormField control={form.control} name={`assignments.${index}.classId`} render={({ field }) => (
-                        <FormItem><FormLabel>Class ID</FormLabel><FormControl><Input placeholder="e.g., 5, LKG, NIOS" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                      <FormField control={form.control} name={`assignments.${index}.sectionId`} render={({ field }) => (
-                        <FormItem><FormLabel>Section ID (Opt.)</FormLabel><FormControl><Input placeholder="e.g., A, B" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                      <FormField control={form.control} name={`assignments.${index}.groupId`} render={({ field }) => (
-                        <FormItem><FormLabel>Group ID (Opt.)</FormLabel><FormControl><Input placeholder="e.g., Alpha" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                       <Controller
-                          control={form.control}
-                          name={`assignments.${index}.subjectId`}
-                          render={({ field }) => (
-                            <FormItem style={{ display: form.getValues(`assignments.${index}.type`) === 'subject_teacher' ? 'block' : 'none' }}>
-                              <FormLabel>Subject</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value || ''}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger></FormControl>
-                                <SelectContent>{subjectNamesArray.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                              </Select>
-                              {form.formState.errors.assignments?.[index]?.subjectId && <FormMessage />}
-                            </FormItem>
-                          )}
-                        />
+                        </Select>
+                        {currentAssignmentType && assignmentTypeDescriptions[currentAssignmentType] && (
+                            <p className="text-xs text-muted-foreground mt-1 px-1">{assignmentTypeDescriptions[currentAssignmentType]}</p>
+                        )}
+                        <FormMessage />
+                        </FormItem> )}/>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <FormField control={form.control} name={`assignments.${index}.classId`} render={({ field }) => (
+                            <FormItem><FormLabel>Class ID</FormLabel><FormControl><Input placeholder="e.g., 5, LKG, NIOS" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                        <FormField control={form.control} name={`assignments.${index}.sectionId`} render={({ field }) => (
+                            <FormItem><FormLabel>Section ID (Opt.)</FormLabel><FormControl><Input placeholder="e.g., A, B" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <FormField control={form.control} name={`assignments.${index}.groupId`} render={({ field }) => (
+                            <FormItem><FormLabel>Group ID (Opt. for NIOS/NCLP)</FormLabel><FormControl><Input placeholder="e.g., Alpha" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                        <Controller
+                            control={form.control}
+                            name={`assignments.${index}.subjectId`}
+                            render={({ field }) => (
+                                <FormItem style={{ display: currentAssignmentType === 'subject_teacher' ? 'block' : 'none' }}>
+                                <FormLabel>Subject</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value || ''}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger></FormControl>
+                                    <SelectContent>{subjectNamesArray.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                                </Select>
+                                {form.formState.errors.assignments?.[index]?.subjectId && <FormMessage />}
+                                </FormItem>
+                            )}
+                            />
+                        </div>
                     </div>
                   </Card>
-                ))}
+                )})}
                 <Button type="button" variant="outline" onClick={() => appendAssignment({type: 'class_teacher', classId: '', sectionId: '', subjectId: undefined, groupId: '' })} className="mt-2">
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Assignment
                 </Button>
@@ -396,3 +417,4 @@ export function TeacherProfileFormDialog({
     </Dialog>
   );
 }
+
