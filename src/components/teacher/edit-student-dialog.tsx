@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Student, ReligionType } from '@/types';
+import type { Student, ReligionType, StudentFormData } from '@/types';
 import { religionOptions } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,12 +35,17 @@ import { doc, setDoc } from 'firebase/firestore';
 
 const STUDENTS_COLLECTION = 'students';
 
+// Updated schema to use classId, className, sectionId, groupId
 const editStudentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   satsNumber: z.string().min(3, { message: 'SATS number must be at least 3 characters.' }),
-  class: z.string().min(1, { message: 'Class is required.' }),
-  section: z.string().min(1, { message: 'Section is required (e.g., A, B).' }).max(2),
-  dateOfBirth: z.string().optional().or(z.literal('')), // YYYY-MM-DD or empty
+
+  className: z.string().min(1, { message: 'Class Name (e.g., 10th Grade, LKG) is required.' }),
+  classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG) is required.' }),
+  sectionId: z.string().min(1, { message: 'Section ID (e.g., A, B) is required.' }).max(2).optional().or(z.literal('')),
+  groupId: z.string().optional().or(z.literal('')), // For NIOS/NCLP specific groups
+
+  dateOfBirth: z.string().optional().or(z.literal('')), 
   fatherName: z.string().optional().or(z.literal('')),
   motherName: z.string().optional().or(z.literal('')),
   fatherOccupation: z.string().optional().or(z.literal('')),
@@ -78,8 +83,12 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
       form.reset({
         name: studentToEdit.name,
         satsNumber: studentToEdit.satsNumber,
-        class: studentToEdit.class,
-        section: studentToEdit.section,
+        
+        className: studentToEdit.className,
+        classId: studentToEdit.classId,
+        sectionId: studentToEdit.sectionId || '',
+        groupId: studentToEdit.groupId || '',
+
         dateOfBirth: studentToEdit.dateOfBirth || '',
         fatherName: studentToEdit.fatherName || '',
         motherName: studentToEdit.motherName || '',
@@ -105,11 +114,20 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
     try {
       const studentDocRef = doc(firestore, STUDENTS_COLLECTION, studentToEdit.id);
       
-      const studentDataToUpdate: Partial<Student> = {
+      // Map form values to the Student structure, ensuring undefined for empty optionals
+      const studentDataToUpdate: Partial<Omit<Student, 'id'>> = {
         name: values.name,
         satsNumber: values.satsNumber,
-        class: values.class,
-        section: values.section,
+
+        className: values.className,
+        classId: values.classId,
+        sectionId: values.sectionId || undefined,
+        groupId: values.groupId || undefined,
+        
+        // Update old fields for compatibility if necessary, or derive
+        class: values.className, 
+        section: values.sectionId || 'N/A',
+
         dateOfBirth: values.dateOfBirth || undefined,
         fatherName: values.fatherName || undefined,
         motherName: values.motherName || undefined,
@@ -124,13 +142,20 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
         siblingReference: values.siblingReference || undefined,
         profilePictureUrl: values.profilePictureUrl || null,
         backgroundInfo: values.backgroundInfo || undefined,
+        // authUid is not editable here
       };
 
       await setDoc(studentDocRef, studentDataToUpdate, { merge: true });
       
       const updatedStudentForCallback: Student = {
         ...studentToEdit, 
-        ...studentDataToUpdate, 
+        ...studentDataToUpdate,
+        // Ensure all fields from Student type are present
+        authUid: studentToEdit.authUid,
+        remarks: studentToEdit.remarks || [],
+        scholarships: studentToEdit.scholarships || [],
+        examRecords: studentToEdit.examRecords || [],
+        rawAttendanceRecords: studentToEdit.rawAttendanceRecords || [],
       };
       onStudentEdited(updatedStudentForCallback);
 
@@ -173,17 +198,27 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
             <FormField control={form.control} name="satsNumber" render={({ field }) => (
               <FormItem><FormLabel>SATS Number</FormLabel><FormControl><Input placeholder="e.g. SAT00123" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
-             <FormField control={form.control} name="email" render={({ field }) => (
-              <FormItem><FormLabel>Student Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="student@example.com" {...field} /></FormControl><FormMessage /></FormItem>
-            )}/>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField control={form.control} name="class" render={({ field }) => (
-                <FormItem><FormLabel>Class (e.g., 10th)</FormLabel><FormControl><Input placeholder="e.g. 10th" {...field} /></FormControl><FormMessage /></FormItem>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField control={form.control} name="className" render={({ field }) => (
+                <FormItem><FormLabel>Class Name (Display)</FormLabel><FormControl><Input placeholder="e.g. 10th Grade, LKG" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
-              <FormField control={form.control} name="section" render={({ field }) => (
-                <FormItem><FormLabel>Section</FormLabel><FormControl><Input placeholder="e.g. A" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormField control={form.control} name="classId" render={({ field }) => (
+                <FormItem><FormLabel>Class ID (for system)</FormLabel><FormControl><Input placeholder="e.g. 10, LKG, NIOS" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField control={form.control} name="sectionId" render={({ field }) => (
+                <FormItem><FormLabel>Section ID (Optional)</FormLabel><FormControl><Input placeholder="e.g. A, B" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField control={form.control} name="groupId" render={({ field }) => (
+                <FormItem><FormLabel>Group ID (Optional, for NIOS/NCLP)</FormLabel><FormControl><Input placeholder="e.g. Alpha, Batch1" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+            </div>
+            
+             <FormField control={form.control} name="email" render={({ field }) => (
+              <FormItem><FormLabel>Student Personal Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="student.personal@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
             <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
               <FormItem><FormLabel>Date of Birth (Optional, YYYY-MM-DD)</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
@@ -246,3 +281,5 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
     </Dialog>
   );
 }
+
+    

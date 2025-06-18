@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Student, ReligionType } from '@/types';
+import type { Student, ReligionType, StudentFormData } from '@/types';
 import { religionOptions } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,12 +36,17 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 const STUDENTS_COLLECTION = 'students';
 
+// Updated schema to use classId, className, sectionId, groupId
 const addStudentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   satsNumber: z.string().min(3, { message: 'SATS number must be at least 3 characters.' }).regex(/^[a-zA-Z0-9]+$/, "SATS number should be alphanumeric."),
-  class: z.string().min(1, { message: 'Class is required.' }),
-  section: z.string().min(1, { message: 'Section is required (e.g., A, B).' }).max(2),
-  dateOfBirth: z.string().optional().or(z.literal('')), // YYYY-MM-DD or empty
+  
+  className: z.string().min(1, { message: 'Class Name (e.g., 10th Grade, LKG) is required.' }),
+  classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG) is required.' }),
+  sectionId: z.string().min(1, { message: 'Section ID (e.g., A, B) is required.' }).max(2).optional().or(z.literal('')),
+  groupId: z.string().optional().or(z.literal('')), // For NIOS/NCLP specific groups
+
+  dateOfBirth: z.string().optional().or(z.literal('')), 
   fatherName: z.string().optional().or(z.literal('')),
   motherName: z.string().optional().or(z.literal('')),
   fatherOccupation: z.string().optional().or(z.literal('')),
@@ -75,8 +80,10 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     defaultValues: {
       name: '',
       satsNumber: '',
-      class: '',
-      section: '',
+      className: '',
+      classId: '',
+      sectionId: '',
+      groupId: '',
       dateOfBirth: '',
       fatherName: '',
       motherName: '',
@@ -105,11 +112,20 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, generatedLoginEmail, generatedPassword);
       const authUid = userCredential.user.uid;
       
+      // Ensure all fields from StudentFormData are included
       const fullStudentDataForFirestore: Omit<Student, 'id'> = {
         name: values.name,
         satsNumber: values.satsNumber,
-        class: values.class,
-        section: values.section,
+        
+        className: values.className,
+        classId: values.classId,
+        sectionId: values.sectionId || undefined,
+        groupId: values.groupId || undefined,
+        
+        // Old fields, to be phased out but included for now if needed by other parts
+        class: values.className, // Or derive appropriately
+        section: values.sectionId || 'N/A', // Or derive appropriately
+
         dateOfBirth: values.dateOfBirth || undefined,
         fatherName: values.fatherName || undefined,
         motherName: values.motherName || undefined,
@@ -126,7 +142,9 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
         backgroundInfo: values.backgroundInfo || undefined,
         authUid: authUid,
         remarks: [], 
-        scholarships: [], 
+        scholarships: [],
+        examRecords: [],
+        rawAttendanceRecords: [],
       };
       
       const docRef = await addDoc(collection(firestore, STUDENTS_COLLECTION), fullStudentDataForFirestore);
@@ -194,17 +212,27 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
             <FormField control={form.control} name="satsNumber" render={({ field }) => (
               <FormItem><FormLabel>SATS Number (Alphanumeric)</FormLabel><FormControl><Input placeholder="e.g. SAT00123" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
-             <FormField control={form.control} name="email" render={({ field }) => (
-              <FormItem><FormLabel>Student Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="student@example.com" {...field} /></FormControl><FormMessage /></FormItem>
-            )}/>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField control={form.control} name="class" render={({ field }) => (
-                <FormItem><FormLabel>Class (e.g., 10th)</FormLabel><FormControl><Input placeholder="e.g. 10th" {...field} /></FormControl><FormMessage /></FormItem>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField control={form.control} name="className" render={({ field }) => (
+                <FormItem><FormLabel>Class Name (Display)</FormLabel><FormControl><Input placeholder="e.g. 10th Grade, LKG" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
-              <FormField control={form.control} name="section" render={({ field }) => (
-                <FormItem><FormLabel>Section</FormLabel><FormControl><Input placeholder="e.g. A" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormField control={form.control} name="classId" render={({ field }) => (
+                <FormItem><FormLabel>Class ID (for system)</FormLabel><FormControl><Input placeholder="e.g. 10, LKG, NIOS" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField control={form.control} name="sectionId" render={({ field }) => (
+                <FormItem><FormLabel>Section ID (Optional)</FormLabel><FormControl><Input placeholder="e.g. A, B" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+              <FormField control={form.control} name="groupId" render={({ field }) => (
+                <FormItem><FormLabel>Group ID (Optional, for NIOS/NCLP)</FormLabel><FormControl><Input placeholder="e.g. Alpha, Batch1" {...field} /></FormControl><FormMessage /></FormItem>
+              )}/>
+            </div>
+
+             <FormField control={form.control} name="email" render={({ field }) => (
+              <FormItem><FormLabel>Student Personal Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="student.personal@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+            )}/>
              <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
               <FormItem><FormLabel>Date of Birth (Optional, YYYY-MM-DD)</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
@@ -283,3 +311,5 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     </Dialog>
   );
 }
+
+    
