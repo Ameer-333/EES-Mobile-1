@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'; // Added CardFooter
 import { LogoIcon } from '@/components/icons/logo-icon';
 import { ArrowRight, User, Briefcase, Shield } from 'lucide-react';
 import Image from 'next/image';
@@ -140,3 +140,4 @@ function LoginOptionCard({ role, description, href, icon: Icon }: LoginOptionCar
     </Card>
   );
 }
+
