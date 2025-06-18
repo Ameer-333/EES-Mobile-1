@@ -1,0 +1,147 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'Admin';
+    }
+
+    function isTeacher() {
+      return isAuthenticated() && getUserData().role == 'Teacher';
+    }
+
+    function isStudent() {
+      return isAuthenticated() && getUserData().role == 'Student';
+    }
+
+    // Check if the requesting user is the owner of the document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Check if a teacher is assigned to a specific student's class/section/group
+    function isTeacherAssignedToStudentClass(teacherAssignments, studentClassId, studentSectionId, studentGroupId) {
+      return teacherAssignments.hasAnyValueWhere(
+        assignment =>
+          assignment.classId == studentClassId &&
+          (
+            (assignment.type == 'mother_teacher' || assignment.type == 'class_teacher') &&
+            (assignment.sectionId == null || assignment.sectionId == '' || assignment.sectionId == studentSectionId)
+          ) ||
+          (
+            assignment.type == 'subject_teacher' &&
+            (assignment.sectionId == null || assignment.sectionId == '' || assignment.sectionId == studentSectionId)
+            // Further subject-specific checks might be needed here for writes,
+            // or handled by more complex rules/Cloud Functions if an array of subjects is taught.
+            // This rule allows read if assigned to the class/section as a subject teacher.
+          ) ||
+          (
+            (assignment.type == 'nios_teacher' || assignment.type == 'nclp_teacher') &&
+            (assignment.groupId == null || assignment.groupId == '' || assignment.groupId == studentGroupId)
+          )
+      );
+    }
+
+    // USERS collection (/users/{userId})
+    // Document ID is authUid
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isAdmin() || isOwner(userId));
+      allow list: if isAdmin(); // Only admins can list all users
+      allow create: if isAdmin(); // Allow admins to create user docs (e.g., for teachers)
+                      // Student user docs are created by AddStudentDialog logic which is triggered by a Teacher/Admin
+                      // This rule primarily protects direct creation, not app-driven creation where auth is involved.
+      allow update: if isAuthenticated() &&
+                      (
+                        isAdmin() ||
+                        (isOwner(userId) && request.resource.data.keys().hasOnly(['name', 'email', 'photoURL', 'lastLogin'])) // Users can update limited fields of their own profile
+                      );
+      allow delete: if isAdmin();
+    }
+
+    // TEACHERS collection (/teachers/{teacherId})
+    // Document ID is authUid
+    match /teachers/{teacherId} {
+      allow read: if isAuthenticated() && (isAdmin() || (isTeacher() && isOwner(teacherId)));
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin(); // Only admins manage HR teacher profiles directly
+    }
+
+    // STUDENT_DATA_BY_CLASS collection and PROFILES subcollection
+    // /student_data_by_class/{classId}/profiles/{studentProfileId}
+    match /student_data_by_class/{classId}/profiles/{studentProfileId} {
+      allow read: if isAuthenticated() && (
+                    isAdmin() ||
+                    (
+                      isStudent() &&
+                      resource.data.authUid == request.auth.uid && // Student is owner of this profile doc
+                      getUserData().classId == classId &&          // Student's user doc classId matches path
+                      getUserData().studentProfileId == studentProfileId // Student's user doc profileId matches path
+                    ) ||
+                    (
+                      isTeacher() &&
+                      isTeacherAssignedToStudentClass(getUserData().assignments, classId, resource.data.sectionId, resource.data.groupId)
+                    )
+                  );
+
+      // Allow teachers to list students only for classes they are assigned to.
+      // Admins can list all.
+      allow list: if isAuthenticated() && (
+                    isAdmin() ||
+                    (
+                      isTeacher() &&
+                      getUserData().assignments.hasAnyValueWhere(assignment => assignment.classId == classId)
+                    )
+                  );
+
+      allow create: if isAuthenticated() && (
+                      isAdmin() ||
+                      (
+                        isTeacher() &&
+                        isTeacherAssignedToStudentClass(getUserData().assignments, request.resource.data.classId, request.resource.data.sectionId, request.resource.data.groupId) &&
+                        request.resource.data.authUid != null // Ensure authUid is provided when creating
+                      )
+                    );
+
+      allow update: if isAuthenticated() && (
+                      isAdmin() ||
+                      (
+                        isTeacher() &&
+                        isTeacherAssignedToStudentClass(getUserData().assignments, classId, resource.data.sectionId, resource.data.groupId)
+                        // Add more granular field checks here if needed, e.g., subject teacher only updating marks for their subject.
+                        // For example, to allow teachers to only update remarks, examRecords, rawAttendanceRecords:
+                        // && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['remarks', 'examRecords', 'rawAttendanceRecords'])
+                        // For now, allows updating the whole doc if assigned to the class.
+                      )
+                    );
+      allow delete: if isAdmin(); // Only admins can delete student profiles.
+    }
+
+    // APP_SETTINGS collection (/app_settings/{settingId})
+    match /app_settings/{settingId} {
+      allow read: if isAuthenticated(); // All authenticated users can read settings (e.g., appName, logo)
+      allow write: if isAdmin(); // Only admins can change settings
+    }
+
+    // HALL_OF_FAME_ITEMS collection (/hall_of_fame_items/{itemId})
+    match /hall_of_fame_items/{itemId} {
+      allow read, list: if isAuthenticated(); // All authenticated users can view Hall of Fame
+      allow create, update, delete: if isAdmin(); // Only admins can manage Hall of Fame
+    }
+
+    // Default deny all other paths / operations
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
