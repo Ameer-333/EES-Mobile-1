@@ -4,56 +4,70 @@
 import { StudentRecords } from '@/components/student/student-records';
 import { useEffect, useState } from 'react';
 import type { Student, ExamRecord } from '@/types';
-import { auth, firestore } from '@/lib/firebase';
-import { collection, query, where, getDocs, DocumentData } from 'firebase/firestore';
+import { firestore } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { Loader2, BookCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAppContext } from '@/app/(protected)/layout'; // Import app context
 
-const STUDENTS_COLLECTION = 'students';
+// Helper function to generate student collection name
+const getStudentCollectionName = (classId: string): string => {
+  if (!classId) throw new Error("classId is required to determine collection name for student records");
+  return `students_${classId.toLowerCase().replace(/[^a-z0-9_]/gi, '_')}`;
+};
 
 export default function StudentRecordsPage() {
+  const { userProfile, isLoadingAuth } = useAppContext(); // Get userProfile from context
   const [examRecords, setExamRecords] = useState<ExamRecord[] | undefined>(undefined);
   const [studentName, setStudentName] = useState<string | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingPageData, setIsLoadingPageData] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchStudentData = async () => {
-      setIsLoading(true);
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        toast({ title: "Authentication Error", description: "Please log in to view records.", variant: "destructive" });
-        setIsLoading(false);
-        // Potentially redirect to login
+      if (isLoadingAuth || !userProfile || userProfile.role !== 'Student') {
+        if (!isLoadingAuth && userProfile && userProfile.role !== 'Student') {
+          toast({ title: "Access Denied", description: "Only students can view this page.", variant: "destructive" });
+        }
+        setIsLoadingPageData(false);
         return;
       }
 
+      if (!userProfile.classId || !userProfile.studentProfileId) {
+        toast({ title: "Error", description: "Student class or profile ID missing. Cannot fetch records.", variant: "destructive" });
+        setIsLoadingPageData(false);
+        setExamRecords([]);
+        return;
+      }
+      
+      setIsLoadingPageData(true);
       try {
-        const studentsRef = collection(firestore, STUDENTS_COLLECTION);
-        const q = query(studentsRef, where("authUid", "==", currentUser.uid));
-        const querySnapshot = await getDocs(q);
+        const studentCollection = getStudentCollectionName(userProfile.classId);
+        const studentDocRef = doc(firestore, studentCollection, userProfile.studentProfileId);
+        const studentDocSnap = await getDoc(studentDocRef);
 
-        if (!querySnapshot.empty) {
-          const studentDoc = querySnapshot.docs[0];
-          const studentData = studentDoc.data() as Student;
+        if (studentDocSnap.exists()) {
+          const studentData = studentDocSnap.data() as Student;
           setExamRecords(studentData.examRecords || []);
           setStudentName(studentData.name);
         } else {
-          toast({ title: "No Student Record", description: "No student profile found linked to your account.", variant: "destructive" });
-          setExamRecords([]); // Ensure it's an empty array if no records
+          toast({ title: "No Student Record", description: "Student profile not found in their class collection.", variant: "destructive" });
+          setExamRecords([]);
         }
       } catch (error) {
         console.error("Error fetching student records:", error);
         toast({ title: "Error", description: "Could not fetch academic records.", variant: "destructive" });
-        setExamRecords([]); // Fallback to empty array on error
+        setExamRecords([]);
       }
-      setIsLoading(false);
+      setIsLoadingPageData(false);
     };
 
-    fetchStudentData();
-  }, [toast]);
+    if (!isLoadingAuth) {
+        fetchStudentData();
+    }
+  }, [userProfile, isLoadingAuth, toast]);
 
-  if (isLoading) {
+  if (isLoadingAuth || isLoadingPageData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -76,3 +90,5 @@ export default function StudentRecordsPage() {
     </div>
   );
 }
+
+    

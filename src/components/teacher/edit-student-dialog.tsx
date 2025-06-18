@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Student, ReligionType, StudentFormData } from '@/types';
+import type { Student, ReligionType, StudentFormData, ManagedUser } from '@/types';
 import { religionOptions } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,21 +31,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { firestore } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore'; 
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
-const STUDENTS_COLLECTION = 'students';
+// Helper function to generate student collection name
+const getStudentCollectionName = (classId: string): string => {
+  if (!classId) throw new Error("classId is required to determine collection name");
+  return `students_${classId.toLowerCase().replace(/[^a-z0-9_]/gi, '_')}`;
+};
 
-// Updated schema to use classId, className, sectionId, groupId
+const USERS_COLLECTION = 'users';
+
 const editStudentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   satsNumber: z.string().min(3, { message: 'SATS number must be at least 3 characters.' }),
-
   className: z.string().min(1, { message: 'Class Name (e.g., 10th Grade, LKG) is required.' }),
-  classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG) is required.' }),
-  sectionId: z.string().min(1, { message: 'Section ID (e.g., A, B) is required.' }).max(2).optional().or(z.literal('')),
-  groupId: z.string().optional().or(z.literal('')), // For NIOS/NCLP specific groups
-
-  dateOfBirth: z.string().optional().or(z.literal('')), 
+  classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG, NIOS - used for collection name) is required.' }),
+  sectionId: z.string().max(2).optional().or(z.literal('')),
+  groupId: z.string().optional().or(z.literal('')),
+  dateOfBirth: z.string().optional().or(z.literal('')),
   fatherName: z.string().optional().or(z.literal('')),
   motherName: z.string().optional().or(z.literal('')),
   fatherOccupation: z.string().optional().or(z.literal('')),
@@ -57,7 +60,7 @@ const editStudentSchema = z.object({
   religion: z.custom<ReligionType>(val => religionOptions.includes(val as ReligionType), 'Religion is required.'),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
   siblingReference: z.string().optional().or(z.literal('')),
-  profilePictureUrl: z.string().url({ message: "Invalid URL format. Please enter a full URL (e.g., https://example.com/image.png)" }).optional().or(z.literal('')),
+  profilePictureUrl: z.string().url({ message: "Invalid URL format. Use https://placehold.co for placeholders." }).optional().or(z.literal('')),
   backgroundInfo: z.string().optional().or(z.literal('')),
 });
 
@@ -66,8 +69,9 @@ type EditStudentFormValues = z.infer<typeof editStudentSchema>;
 interface EditStudentDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onStudentEdited: (editedStudent: Student) => void; 
-  studentToEdit: Student | null;
+  onStudentEdited: (editedStudent: Student) => void;
+  studentToEdit: Student | null; // studentToEdit.id is the doc ID in the class-specific collection
+                                  // studentToEdit.classId is the original classId
 }
 
 export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, studentToEdit }: EditStudentDialogProps) {
@@ -83,12 +87,10 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
       form.reset({
         name: studentToEdit.name,
         satsNumber: studentToEdit.satsNumber,
-        
         className: studentToEdit.className,
         classId: studentToEdit.classId,
         sectionId: studentToEdit.sectionId || '',
         groupId: studentToEdit.groupId || '',
-
         dateOfBirth: studentToEdit.dateOfBirth || '',
         fatherName: studentToEdit.fatherName || '',
         motherName: studentToEdit.motherName || '',
@@ -108,26 +110,31 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
   }, [studentToEdit, isOpen, form]);
 
   async function onSubmit(values: EditStudentFormValues) {
-    if (!studentToEdit) return;
+    if (!studentToEdit || !studentToEdit.id || !studentToEdit.classId || !studentToEdit.authUid) {
+        toast({ title: "Error", description: "Student data is incomplete for editing.", variant: "destructive" });
+        return;
+    }
 
     setIsSubmitting(true);
+    const originalClassId = studentToEdit.classId;
+    const studentTargetCollection = getStudentCollectionName(originalClassId);
+    // IMPORTANT: This updates the student in their ORIGINAL collection.
+    // If classId in 'values' is different, this means the document's classId field will be updated,
+    // but the document itself IS NOT MOVED to a new collection.
+    // The 'users' collection document for this student will also need its classId updated.
+
     try {
-      const studentDocRef = doc(firestore, STUDENTS_COLLECTION, studentToEdit.id);
-      
-      // Map form values to the Student structure, ensuring undefined for empty optionals
-      const studentDataToUpdate: Partial<Omit<Student, 'id'>> = {
+      const studentDocRef = doc(firestore, studentTargetCollection, studentToEdit.id);
+
+      const studentDataToUpdate: Partial<Omit<Student, 'id' | 'authUid' | 'remarks' | 'scholarships' | 'examRecords' | 'rawAttendanceRecords'>> = {
         name: values.name,
         satsNumber: values.satsNumber,
-
         className: values.className,
-        classId: values.classId,
+        classId: values.classId, // This might be the new classId
         sectionId: values.sectionId || undefined,
         groupId: values.groupId || undefined,
-        
-        // Update old fields for compatibility if necessary, or derive
-        class: values.className, 
+        class: values.className,
         section: values.sectionId || 'N/A',
-
         dateOfBirth: values.dateOfBirth || undefined,
         fatherName: values.fatherName || undefined,
         motherName: values.motherName || undefined,
@@ -140,30 +147,44 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
         religion: values.religion,
         address: values.address,
         siblingReference: values.siblingReference || undefined,
-        profilePictureUrl: values.profilePictureUrl || null,
+        profilePictureUrl: values.profilePictureUrl || studentToEdit.profilePictureUrl || `https://placehold.co/150x150.png?text=${values.name.charAt(0)}`,
         backgroundInfo: values.backgroundInfo || undefined,
-        // authUid is not editable here
       };
 
       await setDoc(studentDocRef, studentDataToUpdate, { merge: true });
-      
+
+      // If classId changed, update the student's document in the 'users' collection
+      if (values.classId !== originalClassId || values.name !== studentToEdit.name) {
+        const userDocRef = doc(firestore, USERS_COLLECTION, studentToEdit.authUid);
+        const userUpdateData: Partial<ManagedUser> = {
+            name: values.name, // Update name in users collection as well
+        };
+        if (values.classId !== originalClassId) {
+            userUpdateData.classId = values.classId;
+            // studentProfileId remains the same as the document isn't moved, just its classId field.
+            // This is a simplification. A true move would require new studentProfileId if IDs are not authUids.
+        }
+        await setDoc(userDocRef, userUpdateData, { merge: true });
+         toast({
+            title: "Class ID Updated Notice",
+            description: `Student ${values.name}'s class was changed from ${originalClassId} to ${values.classId}. Their data record in Firestore is still in the collection for ${originalClassId} but the classId field is updated. A manual data migration might be needed if student has moved classes.`,
+            variant: "default",
+            duration: 10000,
+        });
+      }
+
       const updatedStudentForCallback: Student = {
-        ...studentToEdit, 
+        ...studentToEdit,
         ...studentDataToUpdate,
-        // Ensure all fields from Student type are present
-        authUid: studentToEdit.authUid,
-        remarks: studentToEdit.remarks || [],
-        scholarships: studentToEdit.scholarships || [],
-        examRecords: studentToEdit.examRecords || [],
-        rawAttendanceRecords: studentToEdit.rawAttendanceRecords || [],
+        classId: values.classId, // Ensure the callback receives the potentially new classId
       };
       onStudentEdited(updatedStudentForCallback);
 
       toast({
           title: "Student Updated",
-          description: `${values.name}'s details have been successfully updated in Firestore.`,
+          description: `${values.name}'s details have been successfully updated.`,
       });
-      onOpenChange(false); 
+      onOpenChange(false);
     } catch (error) {
       console.error("Error updating student in Firestore:", error);
       toast({
@@ -175,7 +196,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
       setIsSubmitting(false);
     }
   }
-  
+
   if (!studentToEdit) return null;
 
   return (
@@ -187,7 +208,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
         <DialogHeader>
           <DialogTitle>Edit Student: {studentToEdit.name}</DialogTitle>
           <DialogDescription>
-            Modify the student's details below. Click save when you're done.
+            Modify the student's details below. If Class ID is changed, the student's record in 'users' will be updated, but their data remains in the original class collection.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -198,13 +219,12 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
             <FormField control={form.control} name="satsNumber" render={({ field }) => (
               <FormItem><FormLabel>SATS Number</FormLabel><FormControl><Input placeholder="e.g. SAT00123" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <FormField control={form.control} name="className" render={({ field }) => (
                 <FormItem><FormLabel>Class Name (Display)</FormLabel><FormControl><Input placeholder="e.g. 10th Grade, LKG" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
               <FormField control={form.control} name="classId" render={({ field }) => (
-                <FormItem><FormLabel>Class ID (for system)</FormLabel><FormControl><Input placeholder="e.g. 10, LKG, NIOS" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Class ID (System, e.g., 10, LKG)</FormLabel><FormControl><Input placeholder="e.g. 10, LKG, NIOS" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -215,7 +235,6 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
                 <FormItem><FormLabel>Group ID (Optional, for NIOS/NCLP)</FormLabel><FormControl><Input placeholder="e.g. Alpha, Batch1" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
             </div>
-            
              <FormField control={form.control} name="email" render={({ field }) => (
               <FormItem><FormLabel>Student Personal Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="student.personal@example.com" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
@@ -259,7 +278,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
               <FormItem><FormLabel>Sibling Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., Sister: Ananya, Class 8B" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="profilePictureUrl" render={({ field }) => (
-              <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/student.png" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="backgroundInfo" render={({ field }) => (
               <FormItem><FormLabel>Background Info (Optional)</FormLabel><FormControl><Textarea placeholder="Any additional notes or background..." {...field} /></FormControl><FormMessage /></FormItem>

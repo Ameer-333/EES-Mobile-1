@@ -6,11 +6,16 @@ import type { Student, StudentSubjectAttendance, RawAttendanceRecord, SubjectNam
 import { subjectNamesArray } from '@/types';
 import { CalendarClock, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { auth, firestore } from '@/lib/firebase';
-import { collection, query, where, getDocs, DocumentData } from 'firebase/firestore';
+import { firestore } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { useAppContext } from '@/app/(protected)/layout'; // Import app context
 
-const STUDENTS_COLLECTION = 'students';
+// Helper function to generate student collection name
+const getStudentCollectionName = (classId: string): string => {
+  if (!classId) throw new Error("classId is required to determine collection name for student attendance");
+  return `students_${classId.toLowerCase().replace(/[^a-z0-9_]/gi, '_')}`;
+};
 
 // Helper function to process raw attendance records
 function processRawAttendance(rawRecords: RawAttendanceRecord[] | undefined): StudentSubjectAttendance[] {
@@ -36,8 +41,6 @@ function processRawAttendance(rawRecords: RawAttendanceRecord[] | undefined): St
       if (record.status === 'Present') {
         subjectData.attended++;
       }
-      // Storing daily records might be too verbose for the main display,
-      // but useful if we add a drill-down feature later.
       subjectData.dailyRecords.push({ date: record.date, status: record.status });
     }
   });
@@ -46,54 +49,65 @@ function processRawAttendance(rawRecords: RawAttendanceRecord[] | undefined): St
     subjectName,
     totalClasses: data.total,
     attendedClasses: data.attended,
-    records: data.dailyRecords, // Keep for potential future use, though StudentAttendanceDisplay mainly uses totals
+    records: data.dailyRecords,
   }));
 }
 
 
 export default function StudentAttendancePage() {
+  const { userProfile, isLoadingAuth } = useAppContext(); // Get userProfile from context
   const [attendanceData, setAttendanceData] = useState<StudentSubjectAttendance[] | undefined>(undefined);
   const [studentName, setStudentName] = useState<string | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingPageData, setIsLoadingPageData] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchStudentData = async () => {
-      setIsLoading(true);
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        toast({ title: "Authentication Error", description: "Please log in to view attendance.", variant: "destructive" });
-        setIsLoading(false);
+      if (isLoadingAuth || !userProfile || userProfile.role !== 'Student') {
+         if (!isLoadingAuth && userProfile && userProfile.role !== 'Student') {
+          toast({ title: "Access Denied", description: "Only students can view this page.", variant: "destructive" });
+        }
+        setIsLoadingPageData(false);
         return;
       }
 
-      try {
-        const studentsRef = collection(firestore, STUDENTS_COLLECTION);
-        const q = query(studentsRef, where("authUid", "==", currentUser.uid));
-        const querySnapshot = await getDocs(q);
+      if (!userProfile.classId || !userProfile.studentProfileId) {
+        toast({ title: "Error", description: "Student class or profile ID missing. Cannot fetch attendance.", variant: "destructive" });
+        setAttendanceData(processRawAttendance(undefined)); // Show empty state
+        setIsLoadingPageData(false);
+        return;
+      }
 
-        if (!querySnapshot.empty) {
-          const studentDoc = querySnapshot.docs[0];
-          const studentData = studentDoc.data() as Student;
-          setStudentName(studentData.name);
-          const processedAttendance = processRawAttendance(studentData.rawAttendanceRecords);
+      setIsLoadingPageData(true);
+      try {
+        const studentCollection = getStudentCollectionName(userProfile.classId);
+        const studentDocRef = doc(firestore, studentCollection, userProfile.studentProfileId);
+        const studentDocSnap = await getDoc(studentDocRef);
+
+        if (studentDocSnap.exists()) {
+          const studentDataFromDb = studentDocSnap.data() as Student;
+          setStudentName(studentDataFromDb.name);
+          const processedAttendance = processRawAttendance(studentDataFromDb.rawAttendanceRecords);
           setAttendanceData(processedAttendance);
         } else {
-          toast({ title: "No Student Record", description: "No student profile found linked to your account.", variant: "destructive" });
-          setAttendanceData(processRawAttendance(undefined)); // Show empty state
+          toast({ title: "No Student Record", description: "Student profile not found in their class collection.", variant: "destructive" });
+          setAttendanceData(processRawAttendance(undefined));
         }
       } catch (error) {
         console.error("Error fetching student attendance:", error);
         toast({ title: "Error", description: "Could not fetch attendance records.", variant: "destructive" });
-        setAttendanceData(processRawAttendance(undefined)); // Fallback to empty state
+        setAttendanceData(processRawAttendance(undefined));
       }
-      setIsLoading(false);
+      setIsLoadingPageData(false);
     };
+    
+    if (!isLoadingAuth) {
+        fetchStudentData();
+    }
 
-    fetchStudentData();
-  }, [toast]);
+  }, [userProfile, isLoadingAuth, toast]);
 
-  if (isLoading) {
+  if (isLoadingAuth || isLoadingPageData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -119,3 +133,5 @@ export default function StudentAttendancePage() {
     </div>
   );
 }
+
+    

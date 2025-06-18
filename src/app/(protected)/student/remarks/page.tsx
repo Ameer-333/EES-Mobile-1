@@ -4,43 +4,58 @@
 import { StudentRemarksDisplay } from '@/components/student/student-remarks-display';
 import type { Student, StudentRemark } from '@/types';
 import { useEffect, useState } from 'react';
-import { auth, firestore } from '@/lib/firebase';
-import { collection, query, where, getDocs, DocumentData } from 'firebase/firestore';
+import { firestore } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { Loader2, MessageSquareText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAppContext } from '@/app/(protected)/layout'; // Import app context
 
-const STUDENTS_COLLECTION = 'students';
+// Helper function to generate student collection name
+const getStudentCollectionName = (classId: string): string => {
+  if (!classId) throw new Error("classId is required to determine collection name for student remarks");
+  return `students_${classId.toLowerCase().replace(/[^a-z0-9_]/gi, '_')}`;
+};
+
 
 export default function StudentRemarksPage() {
+  const { userProfile, isLoadingAuth } = useAppContext(); // Get userProfile from context
   const [remarks, setRemarks] = useState<StudentRemark[] | undefined>(undefined);
   const [studentName, setStudentName] = useState<string | undefined>(undefined);
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingPageData, setIsLoadingPageData] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchStudentData = async () => {
-      setIsLoading(true);
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        toast({ title: "Authentication Error", description: "Please log in to view remarks.", variant: "destructive" });
-        setIsLoading(false);
+      if (isLoadingAuth || !userProfile || userProfile.role !== 'Student') {
+        if (!isLoadingAuth && userProfile && userProfile.role !== 'Student') {
+          toast({ title: "Access Denied", description: "Only students can view this page.", variant: "destructive" });
+        }
+        setIsLoadingPageData(false);
+        return;
+      }
+      
+      if (!userProfile.classId || !userProfile.studentProfileId) {
+        toast({ title: "Error", description: "Student class or profile ID missing. Cannot fetch remarks.", variant: "destructive" });
+        setRemarks([]);
+        setProfilePictureUrl(null);
+        setIsLoadingPageData(false);
         return;
       }
 
+      setIsLoadingPageData(true);
       try {
-        const studentsRef = collection(firestore, STUDENTS_COLLECTION);
-        const q = query(studentsRef, where("authUid", "==", currentUser.uid));
-        const querySnapshot = await getDocs(q);
+        const studentCollection = getStudentCollectionName(userProfile.classId);
+        const studentDocRef = doc(firestore, studentCollection, userProfile.studentProfileId);
+        const studentDocSnap = await getDoc(studentDocRef);
 
-        if (!querySnapshot.empty) {
-          const studentDoc = querySnapshot.docs[0];
-          const studentData = studentDoc.data() as Student;
-          setRemarks(studentData.remarks || []);
-          setStudentName(studentData.name);
-          setProfilePictureUrl(studentData.profilePictureUrl || null);
+        if (studentDocSnap.exists()) {
+          const studentDataFromDb = studentDocSnap.data() as Student;
+          setRemarks(studentDataFromDb.remarks || []);
+          setStudentName(studentDataFromDb.name);
+          setProfilePictureUrl(studentDataFromDb.profilePictureUrl || null);
         } else {
-          toast({ title: "No Student Record", description: "No student profile found linked to your account.", variant: "destructive" });
+          toast({ title: "No Student Record", description: "Student profile not found in their class collection.", variant: "destructive" });
           setRemarks([]);
           setProfilePictureUrl(null);
         }
@@ -50,13 +65,15 @@ export default function StudentRemarksPage() {
         setRemarks([]);
         setProfilePictureUrl(null);
       }
-      setIsLoading(false);
+      setIsLoadingPageData(false);
     };
 
-    fetchStudentData();
-  }, [toast]);
+    if(!isLoadingAuth) {
+        fetchStudentData();
+    }
+  }, [userProfile, isLoadingAuth, toast]);
 
-  if (isLoading) {
+  if (isLoadingAuth || isLoadingPageData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -83,3 +100,5 @@ export default function StudentRemarksPage() {
     </div>
   );
 }
+
+    

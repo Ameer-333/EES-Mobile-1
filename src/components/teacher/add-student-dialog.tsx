@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Student, ReligionType, StudentFormData } from '@/types';
+import type { Student, ReligionType, StudentFormData, ManagedUser } from '@/types';
 import { religionOptions } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,23 +30,26 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Info } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { firestore, auth as firebaseAuth } from '@/lib/firebase'; 
-import { collection, addDoc } from 'firebase/firestore';
+import { firestore, auth as firebaseAuth } from '@/lib/firebase';
+import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 
-const STUDENTS_COLLECTION = 'students';
+// Helper function to generate student collection name
+const getStudentCollectionName = (classId: string): string => {
+  if (!classId) throw new Error("classId is required to determine collection name");
+  return `students_${classId.toLowerCase().replace(/[^a-z0-9_]/gi, '_')}`;
+};
 
-// Updated schema to use classId, className, sectionId, groupId
+const USERS_COLLECTION = 'users';
+
 const addStudentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   satsNumber: z.string().min(3, { message: 'SATS number must be at least 3 characters.' }).regex(/^[a-zA-Z0-9]+$/, "SATS number should be alphanumeric."),
-  
   className: z.string().min(1, { message: 'Class Name (e.g., 10th Grade, LKG) is required.' }),
-  classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG) is required.' }),
-  sectionId: z.string().min(1, { message: 'Section ID (e.g., A, B) is required.' }).max(2).optional().or(z.literal('')),
-  groupId: z.string().optional().or(z.literal('')), // For NIOS/NCLP specific groups
-
-  dateOfBirth: z.string().optional().or(z.literal('')), 
+  classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG, NIOS - used for collection name) is required.' }),
+  sectionId: z.string().max(2).optional().or(z.literal('')),
+  groupId: z.string().optional().or(z.literal('')),
+  dateOfBirth: z.string().optional().or(z.literal('')),
   fatherName: z.string().optional().or(z.literal('')),
   motherName: z.string().optional().or(z.literal('')),
   fatherOccupation: z.string().optional().or(z.literal('')),
@@ -58,7 +61,7 @@ const addStudentSchema = z.object({
   religion: z.custom<ReligionType>(val => religionOptions.includes(val as ReligionType), 'Religion is required.'),
   address: z.string().min(5, { message: 'Address must be at least 5 characters.' }),
   siblingReference: z.string().optional().or(z.literal('')),
-  profilePictureUrl: z.string().url({ message: "Invalid URL format. Please enter a full URL (e.g., https://example.com/image.png)" }).optional().or(z.literal('')),
+  profilePictureUrl: z.string().url({ message: "Invalid URL format. Use https://placehold.co for placeholders." }).optional().or(z.literal('')),
   backgroundInfo: z.string().optional().or(z.literal('')),
 });
 
@@ -78,26 +81,10 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
   const form = useForm<AddStudentFormValues>({
     resolver: zodResolver(addStudentSchema),
     defaultValues: {
-      name: '',
-      satsNumber: '',
-      className: '',
-      classId: '',
-      sectionId: '',
-      groupId: '',
-      dateOfBirth: '',
-      fatherName: '',
-      motherName: '',
-      fatherOccupation: '',
-      motherOccupation: '',
-      parentsAnnualIncome: 0,
-      parentContactNumber: '',
-      email: '',
-      caste: '',
-      religion: 'Hindu',
-      address: '',
-      siblingReference: '',
-      profilePictureUrl: '',
-      backgroundInfo: '',
+      name: '', satsNumber: '', className: '', classId: '', sectionId: '', groupId: '',
+      dateOfBirth: '', fatherName: '', motherName: '', fatherOccupation: '', motherOccupation: '',
+      parentsAnnualIncome: 0, parentContactNumber: '', email: '', caste: '', religion: 'Hindu',
+      address: '', siblingReference: '', profilePictureUrl: '', backgroundInfo: '',
     },
   });
 
@@ -106,26 +93,25 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     setGeneratedCredentials(null);
 
     const generatedLoginEmail = `${values.satsNumber.toLowerCase().replace(/[^a-z0-9]/gi, '')}.student@eesedu.com`;
-    const generatedPassword = `${values.satsNumber.toUpperCase()}Default@123`; 
+    const generatedPassword = `${values.satsNumber.toUpperCase()}Default@123`;
+    const studentTargetCollection = getStudentCollectionName(values.classId);
 
     try {
+      // 1. Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, generatedLoginEmail, generatedPassword);
       const authUid = userCredential.user.uid;
-      
-      // Ensure all fields from StudentFormData are included
-      const fullStudentDataForFirestore: Omit<Student, 'id'> = {
+
+      // 2. Prepare and add student document to the class-specific collection
+      const studentProfileData: Omit<Student, 'id'> = {
+        authUid: authUid,
         name: values.name,
         satsNumber: values.satsNumber,
-        
         className: values.className,
         classId: values.classId,
         sectionId: values.sectionId || undefined,
         groupId: values.groupId || undefined,
-        
-        // Old fields, to be phased out but included for now if needed by other parts
-        class: values.className, // Or derive appropriately
-        section: values.sectionId || 'N/A', // Or derive appropriately
-
+        class: values.className, // For temp backward compatibility
+        section: values.sectionId || 'N/A', // For temp backward compatibility
         dateOfBirth: values.dateOfBirth || undefined,
         fatherName: values.fatherName || undefined,
         motherName: values.motherName || undefined,
@@ -138,49 +124,60 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
         religion: values.religion,
         address: values.address,
         siblingReference: values.siblingReference || undefined,
-        profilePictureUrl: values.profilePictureUrl || null,
+        profilePictureUrl: values.profilePictureUrl || `https://placehold.co/150x150.png?text=${values.name.charAt(0)}`,
         backgroundInfo: values.backgroundInfo || undefined,
-        authUid: authUid,
-        remarks: [], 
+        remarks: [],
         scholarships: [],
         examRecords: [],
         rawAttendanceRecords: [],
       };
-      
-      const docRef = await addDoc(collection(firestore, STUDENTS_COLLECTION), fullStudentDataForFirestore);
-      
-      const newStudentForCallback: Student = {
-        ...fullStudentDataForFirestore,
-        id: docRef.id,
+      const studentDocRef = await addDoc(collection(firestore, studentTargetCollection), studentProfileData);
+      const studentProfileId = studentDocRef.id; // This is the ID in the students_<classId> collection
+
+      // 3. Create/Update document in 'users' collection to link Auth UID to student profile
+      const userDocData: Omit<ManagedUser, 'id' | 'lastLogin' | 'assignments'> = {
+        name: values.name,
+        email: generatedLoginEmail,
+        role: 'Student',
+        status: 'Active',
+        classId: values.classId,
+        studentProfileId: studentProfileId,
       };
-      onStudentAdded(newStudentForCallback); 
-      
+      await setDoc(doc(firestore, USERS_COLLECTION, authUid), userDocData);
+
+      // For callback and UI update
+      const newStudentForCallback: Student = {
+        ...studentProfileData,
+        id: studentProfileId, // id is the doc ID from students_<classId>
+      };
+      onStudentAdded(newStudentForCallback);
+
       setGeneratedCredentials({ email: generatedLoginEmail, password: generatedPassword });
       toast({
           title: "Student Added Successfully!",
           description: (
-            <div>
-              <p>{values.name} has been added to Firestore and an authentication account created.</p>
-              <p className="mt-2 font-semibold">Generated Email: {generatedLoginEmail}</p>
-              <p className="font-semibold">Default Password: {generatedPassword}</p>
-              <p className="text-xs mt-1 text-destructive">Note: Advise student to change password on first login.</p>
-            </div>
+            React.createElement('div', null,
+              React.createElement('p', null, `${values.name} added to ${studentTargetCollection} and auth account created.`),
+              React.createElement('p', {className: "mt-2 font-semibold"}, `Login Email: ${generatedLoginEmail}`),
+              React.createElement('p', {className: "font-semibold"}, `Default Password: ${generatedPassword}`),
+              React.createElement('p', {className: "text-xs mt-1 text-destructive"}, "Advise student to change password on first login.")
+            )
           ),
-          duration: 15000, 
+          duration: 20000,
       });
       form.reset();
     } catch (error: any) {
       console.error("Error adding student or creating auth user:", error);
       let errorMessage = "Could not add student. Please check console for details.";
       if (error.code === 'auth/email-already-in-use') {
-        errorMessage = `The email ${generatedLoginEmail} is already in use. Please check the SATS number or contact an admin.`;
+        errorMessage = `The login email ${generatedLoginEmail} is already in use. This might happen if a student with the same SATS number was already created or if there's an issue with email generation uniqueness. Please verify.`;
       } else if (error.code === 'auth/weak-password') {
         errorMessage = "The generated password is too weak. This is a system issue, please contact an admin.";
       } else if (error.message) {
         errorMessage = error.message;
       }
       toast({
-        title: "Error",
+        title: "Error Adding Student",
         description: errorMessage,
         variant: "destructive",
       });
@@ -193,7 +190,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     <Dialog open={isOpen} onOpenChange={(open) => {
         if (!open) {
           form.reset();
-          setGeneratedCredentials(null); 
+          setGeneratedCredentials(null);
         }
         onOpenChange(open);
     }}>
@@ -201,7 +198,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
         <DialogHeader>
           <DialogTitle>Add New Student</DialogTitle>
           <DialogDescription>
-            Enter student details. An email and password will be auto-generated.
+            Enter student details. Login email & password will be auto-generated. Student data will be stored in a collection specific to their Class ID (e.g., students_lkg, students_10).
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -212,13 +209,12 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
             <FormField control={form.control} name="satsNumber" render={({ field }) => (
               <FormItem><FormLabel>SATS Number (Alphanumeric)</FormLabel><FormControl><Input placeholder="e.g. SAT00123" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <FormField control={form.control} name="className" render={({ field }) => (
                 <FormItem><FormLabel>Class Name (Display)</FormLabel><FormControl><Input placeholder="e.g. 10th Grade, LKG" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
               <FormField control={form.control} name="classId" render={({ field }) => (
-                <FormItem><FormLabel>Class ID (for system)</FormLabel><FormControl><Input placeholder="e.g. 10, LKG, NIOS" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Class ID (System, e.g., 10, LKG, NIOS)</FormLabel><FormControl><Input placeholder="e.g. 10, LKG, NIOS" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -229,7 +225,6 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                 <FormItem><FormLabel>Group ID (Optional, for NIOS/NCLP)</FormLabel><FormControl><Input placeholder="e.g. Alpha, Batch1" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
             </div>
-
              <FormField control={form.control} name="email" render={({ field }) => (
               <FormItem><FormLabel>Student Personal Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="student.personal@example.com" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
@@ -273,18 +268,18 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
               <FormItem><FormLabel>Sibling Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., Sister: Ananya, Class 8B" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="profilePictureUrl" render={({ field }) => (
-              <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/student.png" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="backgroundInfo" render={({ field }) => (
               <FormItem><FormLabel>Background Info (Optional)</FormLabel><FormControl><Textarea placeholder="Any additional notes or background..." {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
 
             {generatedCredentials && (
-              <div className="mt-4 p-3 border border-green-500 bg-green-50 rounded-md text-sm">
+              <div className="mt-4 p-3 border border-green-500 bg-green-50/80 rounded-md text-sm shadow">
                 <p className="font-semibold text-green-700 flex items-center"><Info className="h-4 w-4 mr-2"/>Credentials Generated:</p>
-                <p><span className="font-medium">Email:</span> {generatedCredentials.email}</p>
+                <p><span className="font-medium">Login Email:</span> {generatedCredentials.email}</p>
                 <p><span className="font-medium">Password:</span> {generatedCredentials.password}</p>
-                <p className="text-xs mt-1 text-destructive-foreground">Please share these with the student. They should change their password upon first login.</p>
+                <p className="text-xs mt-1 text-red-600">Please share these with the student. They should change their password upon first login.</p>
               </div>
             )}
 

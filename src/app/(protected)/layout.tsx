@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import type { UserRole, TeacherAssignment } from '@/types'; // Added TeacherAssignment
+import type { UserRole, TeacherAssignment, ManagedUser } from '@/types';
 import { auth, firestore } from '@/lib/firebase';
 import { signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -29,19 +29,16 @@ const APP_SETTINGS_COLLECTION = 'app_settings';
 const GENERAL_SETTINGS_DOC_ID = 'general';
 const USERS_COLLECTION = 'users';
 
-
-interface UserProfile {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL?: string | null;
-  role: UserRole | null;
-  assignments?: TeacherAssignment[]; // Added for teachers
+// UserProfile now aligns more with ManagedUser but for the logged-in user's context
+interface UserProfileContextData extends ManagedUser {
+  // ManagedUser already has id (authUid), email, displayName, role, assignments, classId, studentProfileId
+  photoURL?: string | null; // from FirebaseUser
 }
+
 
 interface AppContextType {
   authUser: FirebaseUser | null;
-  userProfile: UserProfile | null;
+  userProfile: UserProfileContextData | null; // Using the more comprehensive ManagedUser type
   isLoadingAuth: boolean;
   currentAppName: string;
   currentLogoUrl: string | null;
@@ -100,7 +97,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
 
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfileContextData | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [currentAppName, setCurrentAppName] = useState('EES Education');
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
@@ -120,7 +117,6 @@ function AppProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error("Error fetching app settings for layout:", error);
-        // Defaults already set
       }
     };
     fetchAppSettings(); 
@@ -133,20 +129,19 @@ function AppProvider({ children }: { children: React.ReactNode }) {
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          const roleFromDb = userData.role as UserRole;
-          const nameFromDb = userData.name as string || user.displayName || user.email?.split('@')[0] || "User";
-          const assignmentsFromDb = userData.assignments as TeacherAssignment[] || [];
-
-          const profile: UserProfile = {
-            uid: user.uid,
-            email: user.email,
-            displayName: nameFromDb,
-            photoURL: user.photoURL,
-            role: roleFromDb,
-            assignments: roleFromDb === 'Teacher' ? assignmentsFromDb : undefined,
+          const userDataFromFirestore = userDocSnap.data() as ManagedUser; // Explicitly type from Firestore
+          
+          const profile: UserProfileContextData = {
+            ...userDataFromFirestore, // Spread all fields from ManagedUser
+            id: user.uid, // Ensure id is authUid
+            email: user.email || userDataFromFirestore.email, // Prefer auth email, fallback to Firestore
+            displayName: userDataFromFirestore.name || user.displayName || user.email?.split('@')[0] || "User",
+            photoURL: user.photoURL, // Get from Firebase Auth user object
+            // role, assignments, classId, studentProfileId, status, etc., come from userDataFromFirestore
           };
           setUserProfile(profile);
+
+          const roleFromDb = profile.role;
 
           if (roleFromDb && ['Admin', 'Teacher', 'Student'].includes(roleFromDb)) {
             const expectedRole = getExpectedRoleFromPathname(pathname);
@@ -168,7 +163,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
             router.push('/'); 
           }
         } else {
-          toast({ title: "Access Denied", description: "User profile not found. Contact admin.", variant: "destructive" });
+          toast({ title: "Access Denied", description: "User profile not found in Firestore. Contact admin.", variant: "destructive" });
           await signOut(auth);
           setAuthUser(null); setUserProfile(null);
           router.push('/'); 
@@ -350,3 +345,5 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode; }) {
     </div>
   );
 }
+
+    

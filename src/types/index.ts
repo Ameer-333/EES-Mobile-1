@@ -14,10 +14,10 @@ export type TeacherAssignmentType = 'mother_teacher' | 'class_teacher' | 'subjec
 
 export interface TeacherAssignment {
   type: TeacherAssignmentType;
-  classId: string;
-  sectionId?: string;
-  subjectId?: SubjectName;
-  groupId?: string;
+  classId: string; // e.g., "LKG", "1", "10", "NIOS"
+  sectionId?: string; // e.g., "A", "B"
+  subjectId?: SubjectName; // Only for subject_teacher
+  groupId?: string; // e.g., "Alpha" (for NIOS/NCLP groups)
 }
 
 export interface StudentRemark {
@@ -66,17 +66,19 @@ export interface RawAttendanceRecord {
   status: 'Present' | 'Absent';
 }
 
+// This interface represents the data stored in class-specific collections like 'students_lkg', 'students_1', etc.
+// The 'id' field here is the document ID within that specific class collection.
 export interface Student {
-  id: string;
+  id: string; // Document ID in the class-specific collection (e.g., students_lkg)
   name: string;
   satsNumber: string;
 
   className: string; // e.g., "10th Grade", "LKG" (for display)
-  classId: string;   // e.g., "10", "LKG" (for logic)
+  classId: string;   // e.g., "10", "LKG", "NIOS" (for logic, determines collection)
   sectionId?: string; // e.g., "A", "B"
   groupId?: string;   // e.g., "NIOS-Alpha", "NCLP-Batch1" (for special groupings)
 
-  // Old fields, kept for now for smoother transition, ideally phased out.
+  // Old fields, kept for now for smoother transition, ideally phased out by ensuring all code uses new fields.
   class: string; // To be replaced by className/classId
   section: string; // To be replaced by sectionId
 
@@ -93,12 +95,12 @@ export interface Student {
   address: string;
   siblingReference?: string;
   profilePictureUrl?: string | null;
-  remarks?: StudentRemark[];
-  scholarships?: Scholarship[];
-  examRecords?: ExamRecord[];
-  rawAttendanceRecords?: RawAttendanceRecord[];
+  remarks: StudentRemark[]; // Should be initialized as []
+  scholarships: Scholarship[]; // Should be initialized as []
+  examRecords: ExamRecord[]; // Should be initialized as []
+  rawAttendanceRecords: RawAttendanceRecord[]; // Should be initialized as []
   backgroundInfo?: string;
-  authUid?: string; // Firebase Auth UID
+  authUid: string; // Firebase Auth UID, links to 'users' collection entry
 }
 
 
@@ -116,23 +118,29 @@ export interface StudentSubjectAttendance {
   attendedClasses: number;
 }
 
+// This interface is for documents in the 'users' collection
 export interface ManagedUser {
-  id: string; // Firestore document ID (usually authUid)
+  id: string; // Firestore document ID (which is the Firebase Auth UID)
   name: string;
   email: string; // Auth email
   role: UserRole;
   status: 'Active' | 'Inactive' | 'Pending';
-  lastLogin?: string; // Optional, might not always be available or up-to-date
-  studentProfileId?: string; // If role is Student, links to their doc in 'students' collection
-  assignments?: TeacherAssignment[]; // If role is Teacher
+  lastLogin?: string;
+
+  // Student-specific fields if role is 'Student'
+  classId?: string; // e.g., "LKG", "1", "NIOS" - helps find their collection
+  studentProfileId?: string; // The document ID of their profile in the 'students_<classId>' collection
+
+  // Teacher-specific fields if role is 'Teacher'
+  assignments?: TeacherAssignment[];
 }
 
 export interface StudentFormData {
   name: string;
   satsNumber: string;
 
-  className: string;
-  classId: string;
+  className: string; // e.g., "10th Grade"
+  classId: string;   // e.g., "10", "LKG" (used to determine collection)
   sectionId?: string;
   groupId?: string;
 
@@ -140,7 +148,6 @@ export interface StudentFormData {
   religion: ReligionType;
   address: string;
   profilePictureUrl?: string;
-  // authUid?: string; // This is typically assigned after Firebase Auth creation
   dateOfBirth?: string;
   fatherName?: string;
   motherName?: string;
@@ -148,7 +155,7 @@ export interface StudentFormData {
   motherOccupation?: string;
   parentsAnnualIncome?: number;
   parentContactNumber?: string;
-  email?: string; // Student's personal email
+  email?: string;
   siblingReference?: string;
   backgroundInfo?: string;
 }
@@ -162,34 +169,33 @@ export interface TeacherSalaryRecord {
   daysAbsent: number;
   reasonForAbsence?: string;
 }
+
+// This interface is for documents in the 'teachers' (HR) collection
 export interface Teacher {
-  id: string; // Firestore document ID (should be authUid for teachers moving forward)
-  authUid?: string; // Explicitly storing Firebase Auth UID
+  id: string; // Firestore document ID (should be authUid for teachers)
+  authUid: string; // Firebase Auth UID, links to 'users' collection entry
   name: string;
   email: string; // Contact email, may differ from auth email
   phoneNumber: string;
   address: string;
   yearOfJoining: number;
   totalYearsWorked?: number;
-  subjectsTaught: SubjectName[]; // General subjects qualified for
+  subjectsTaught: SubjectName[];
   profilePictureUrl?: string | null;
   salaryHistory?: TeacherSalaryRecord[];
   daysPresentThisMonth?: number;
   daysAbsentThisMonth?: number;
-  // assignments are now primarily managed in the 'users' collection doc for the teacher
 }
 
-// This type is for the form where an Admin creates/edits a teacher's HR profile
-// and their system assignments.
 export interface TeacherFormData {
   name: string;
-  email: string; // Contact email (will also be used for auth if new teacher)
+  email: string;
   phoneNumber: string;
   address: string;
   yearOfJoining: number;
-  subjectsTaught: SubjectName[]; // General subject qualifications
+  subjectsTaught: SubjectName[];
   profilePictureUrl?: string;
-  assignments?: TeacherAssignment[]; // Assignments to classes/subjects/roles
+  assignments?: TeacherAssignment[];
 }
 
 
@@ -215,3 +221,5 @@ export interface HallOfFameItem {
   year?: string | number;
   dataAiHint?: string;
 }
+
+    
