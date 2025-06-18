@@ -31,29 +31,28 @@ const CardHeader = React.forwardRef<
 CardHeader.displayName = "CardHeader"
 
 const CardTitle = React.forwardRef<
-  HTMLDivElement, // Corrected to HTMLDivElement as it's a div wrapper
-  React.HTMLAttributes<HTMLHeadingElement> // Props for an H-element semantic
+  HTMLHeadingElement, // Corrected: Ref type matches the h3 element
+  React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
-  // Changed to h3 for semantic correctness, but props are for div
   <h3
-    ref={ref as React.Ref<HTMLHeadingElement>} // Cast ref if needed, or use a div and style as h3
+    ref={ref} 
     className={cn(
       "text-xl md:text-2xl font-semibold leading-tight tracking-tight", // Adjusted sizes
       className
     )}
-    {...(props as React.HTMLAttributes<HTMLHeadingElement>)} // Cast props
+    {...props} 
   />
 ))
 CardTitle.displayName = "CardTitle"
 
 const CardDescription = React.forwardRef<
-  HTMLDivElement, // Corrected to HTMLDivElement
-  React.HTMLAttributes<HTMLParagraphElement> // Props for a p-element semantic
+  HTMLParagraphElement, // Corrected: Ref type matches the p element
+  React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
   <p
-    ref={ref as React.Ref<HTMLParagraphElement>} // Cast ref
+    ref={ref} 
     className={cn("text-sm text-muted-foreground", className)}
-    {...(props as React.HTMLAttributes<HTMLParagraphElement>)} // Cast props
+    {...props} 
   />
 ))
 CardDescription.displayName = "CardDescription"
@@ -79,3 +78,4 @@ const CardFooter = React.forwardRef<
 CardFooter.displayName = "CardFooter"
 
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+
