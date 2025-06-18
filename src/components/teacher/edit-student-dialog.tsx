@@ -32,16 +32,8 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { firestore } from '@/lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { getStudentDocPath as getStudentDocPathFromUtil, getUserDocPath, getStudentProfilesCollectionPath } from '@/lib/firestore-paths';
 
-const STUDENT_DATA_ROOT_COLLECTION = 'student_data_by_class';
-const PROFILES_SUBCOLLECTION_NAME = 'profiles';
-const USERS_COLLECTION = 'users';
-
-// Helper function to get the path to a student's document
-const getStudentDocPath = (classId: string, studentProfileId: string): string => {
-  if (!classId || !studentProfileId) throw new Error("classId and studentProfileId are required to determine student document path");
-  return `${STUDENT_DATA_ROOT_COLLECTION}/${classId}/${PROFILES_SUBCOLLECTION_NAME}/${studentProfileId}`;
-};
 
 const editStudentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -131,7 +123,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
 
     setIsSubmitting(true);
     const originalClassId = studentToEdit.classId;
-    const studentDocPath = getStudentDocPath(originalClassId, studentToEdit.id);
+    const studentDocPath = getStudentDocPathFromUtil(originalClassId, studentToEdit.id);
 
     try {
       const studentDocRef = doc(firestore, studentDocPath);
@@ -164,7 +156,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
       await setDoc(studentDocRef, studentDataToUpdate, { merge: true });
 
       if (values.classId !== originalClassId || values.name !== studentToEdit.name) {
-        const userDocRef = doc(firestore, USERS_COLLECTION, studentToEdit.authUid);
+        const userDocRef = doc(firestore, getUserDocPath(studentToEdit.authUid));
         const userUpdateData: Partial<ManagedUser> = {
             name: values.name, 
         };
@@ -176,9 +168,9 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
         if (values.classId !== originalClassId) {
             toast({
                 title: "Class ID Changed - Manual Migration Needed",
-                description: `Student ${values.name}'s class was changed from ${originalClassId} to ${values.classId}. Their profile data in Firestore has its classId field updated but the document itself HAS NOT been moved to the new class's subcollection. Please perform manual data migration if this student has fully moved classes.`,
+                description: `Student ${values.name}'s class was changed from ${originalClassId} to ${values.classId}. Their profile data in Firestore has its classId field updated but the document itself HAS NOT been moved to the new class's subcollection. Please perform manual data migration if this student has fully moved classes. This record will no longer appear under the original class for this teacher if their assignments don't cover the new classId.`,
                 variant: "destructive",
-                duration: 15000,
+                duration: 20000,
             });
         }
       }

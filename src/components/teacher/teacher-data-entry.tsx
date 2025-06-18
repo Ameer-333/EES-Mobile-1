@@ -107,10 +107,10 @@ export function TeacherDataEntry() {
                 setIsLoadingStudents(false); clearInterval(initialLoadCheck);
             }
         }, 500);
-         setTimeout(() => { if(isLoading) setIsLoadingStudents(false); clearInterval(initialLoadCheck);}, 5000);
+         setTimeout(() => { if(isLoadingStudents) setIsLoadingStudents(false); clearInterval(initialLoadCheck);}, 5000); // Changed isLoading to isLoadingStudents
     } else { setIsLoadingStudents(false); }
     return () => unsubscribers.forEach(unsub => unsub());
-  }, [userProfile, teacherAssignments, isLoading]);
+  }, [userProfile, teacherAssignments, isLoadingStudents]); // Added isLoadingStudents to dependency array
 
   const marksForm = useForm<z.infer<typeof marksSchema>>({
     resolver: zodResolver(marksSchema),
@@ -334,3 +334,4 @@ export function TeacherDataEntry() {
     </Card>
   );
 }
+

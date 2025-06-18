@@ -318,7 +318,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
             <FormField control={form.control} name="address" render={({ field }) => (
               <FormItem><FormLabel>Address</FormLabel><FormControl><Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" /></FormControl><FormMessage /></FormItem>
             )}/>
-            <FormField control={form.control} name="siblingReference" render={({ field }) => (
+             <FormField control={form.control} name="siblingReference" render={({ field }) => (
               <FormItem><FormLabel>Sibling Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., Sister: Ananya, Class 8B" {...field} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="profilePictureUrl" render={({ field }) => (
@@ -358,3 +358,4 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     </Dialog>
   );
 }
+

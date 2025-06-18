@@ -251,3 +251,4 @@ export const assignmentTypeLabels: Record<TeacherAssignmentType, string> = {
   nios_teacher: "NIOS Program Teacher",
   nclp_teacher: "NCLP Program Teacher",
 };
+
