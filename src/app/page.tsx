@@ -1,12 +1,15 @@
 
 'use client';
+
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { LogoIcon } from '@/components/icons/logo-icon';
-import { ArrowRight, User, Briefcase, Shield, Users as UsersIconLucide } from 'lucide-react'; // Changed ClipboardUser to UsersIconLucide
-import Image from 'next/image';
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter
+} from '@/components/ui/card';
+import { LogoIcon } from '@/components/icons/logo-icon';
+import { ArrowRight, User, Briefcase, Shield, Users } from 'lucide-react';
 import { firestore } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { getGeneralSettingsDocPath } from '@/lib/firestore-paths';
@@ -18,27 +21,20 @@ export default function LandingPage() {
 
   useEffect(() => {
     const fetchAppSettings = async () => {
-      setIsLoading(true);
       try {
-        const settingsDocPath = getGeneralSettingsDocPath();
-        const settingsDocRef = doc(firestore, settingsDocPath);
+        const settingsDocRef = doc(firestore, getGeneralSettingsDocPath());
         const settingsDocSnap = await getDoc(settingsDocRef);
         if (settingsDocSnap.exists()) {
           const appData = settingsDocSnap.data();
           setAppName(appData.appName || 'EES Education');
           setLogoUrl(appData.logoUrl || null);
-        } else {
-          setAppName('EES Education');
-          setLogoUrl(null);
         }
       } catch (error) {
-        console.error("Error fetching app settings for landing page:", error);
-        setAppName('EES Education');
-        setLogoUrl(null);
+        console.error("Error fetching app settings:", error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
-
     fetchAppSettings();
   }, []);
 
@@ -89,11 +85,11 @@ export default function LandingPage() {
           href="/login/teacher"
           icon={Briefcase}
         />
-         <LoginOptionCard
+        <LoginOptionCard
           role="Coordinator"
           description="Oversee student progress, manage teacher data, and coordinate activities."
           href="/login/coordinator"
-          icon={UsersIconLucide} // Changed from ClipboardUser to UsersIconLucide
+          icon={Users} 
         />
         <LoginOptionCard
           role="Admin"
@@ -120,34 +116,10 @@ interface LoginOptionCardProps {
 
 function LoginOptionCard({ role, description, href, icon: Icon }: LoginOptionCardProps) {
   if (!Icon) {
-    // This fallback can be removed if the primary issue is resolved.
-    console.error(`LoginOptionCard for role "${role}" received an undefined icon. This is likely the cause of the "Element type is invalid" error.`);
-    return (
-        <Card className="card-hover-effect flex flex-col group bg-card/80 backdrop-blur-sm border-border/50 rounded-xl">
-        <CardHeader className="items-center text-center pb-4">
-            <div className="p-4 bg-destructive/10 text-destructive rounded-full mb-4">
-                <ArrowRight className="h-8 w-8" /> 
-            </div>
-            <CardTitle className="text-2xl font-headline text-primary group-hover:text-primary/90 transition-colors">
-            {role} Portal (Icon Error)
-            </CardTitle>
-        </CardHeader>
-        <CardContent className="flex-grow text-center">
-            <CardDescription className="text-muted-foreground h-16 leading-relaxed">
-            {description}
-            </CardDescription>
-        </CardContent>
-        <CardFooter className="p-4 mt-auto">
-            <Button asChild className="w-full text-base py-3 group-hover:bg-primary/90 transition-colors duration-300">
-            <Link href={href}>
-                Login as {role}
-                <ArrowRight className="ml-2 h-5 w-5 transform transition-transform duration-300 group-hover:translate-x-1" />
-            </Link>
-            </Button>
-        </CardFooter>
-        </Card>
-    );
+    console.error(`LoginOptionCard for role "${role}" received an undefined icon.`);
+    return null;
   }
+
   return (
     <Card className="card-hover-effect flex flex-col group bg-card/80 backdrop-blur-sm border-border/50 rounded-xl">
       <CardHeader className="items-center text-center pb-4">
@@ -174,4 +146,3 @@ function LoginOptionCard({ role, description, href, icon: Icon }: LoginOptionCar
     </Card>
   );
 }
-
