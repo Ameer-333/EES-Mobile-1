@@ -14,7 +14,7 @@ const mockTeacherData: Teacher = {
   yearOfJoining: 2018,
   totalYearsWorked: 6, // Assuming current year is 2024
   subjectsTaught: ['English', 'Social Science'],
-  profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=PS',
+  profilePictureUrl: 'https://placehold.co/150x150.png',
   salaryHistory: [
     { id: 'sal1', monthYear: 'June 2024', dateIssued: '2024-07-01', amountIssued: 50000, amountDeducted: 1000, daysAbsent: 1, reasonForAbsence: 'Sick leave' },
     { id: 'sal2', monthYear: 'May 2024', dateIssued: '2024-06-01', amountIssued: 50000, amountDeducted: 0, daysAbsent: 0 },

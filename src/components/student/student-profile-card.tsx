@@ -29,7 +29,7 @@ const mockStudent: Student = {
   religion: 'Hindu',
   address: '123, Vidyanagar, Silicon City, Bangalore, Karnataka - 560001',
   siblingReference: 'Sister: Priya Sharma, Class 8B',
-  profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RS',
+  profilePictureUrl: 'https://placehold.co/150x150.png',
   remarks: [],
   scholarships: [],
   backgroundInfo: "A bright and inquisitive student with a passion for science and coding."
@@ -57,7 +57,7 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
         <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
           <div className="relative flex-shrink-0">
             <Image
-              src={student.profilePictureUrl || `https://placehold.co/120x120.png?text=${student.name ? student.name.charAt(0) : 'S'}`}
+              src={student.profilePictureUrl || `https://placehold.co/${isFullPage ? '140x140' : '100x100'}.png`}
               alt={`${student.name || 'Student'}'s Profile Picture`}
               width={isFullPage ? 140 : 100}
               height={isFullPage ? 140 : 100}

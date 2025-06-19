@@ -273,7 +273,7 @@ export function ManageTeacherProfiles() {
                   <TableRow key={teacher.authUid}>
                     <TableCell>
                       <Image
-                        src={teacher.profilePictureUrl || `https://placehold.co/40x40.png?text=${teacher.name.charAt(0)}`}
+                        src={teacher.profilePictureUrl || `https://placehold.co/40x40.png`}
                         alt={teacher.name}
                         width={40}
                         height={40}
@@ -369,4 +369,3 @@ export function ManageTeacherProfiles() {
   );
 }
     
-

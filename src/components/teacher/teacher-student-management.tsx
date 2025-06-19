@@ -196,7 +196,7 @@ export function TeacherStudentManagement() {
           <div className="rounded-md border">
             <Table><TableHeader><TableRow>{Array(7).fill(0).map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}</TableRow></TableHeader>
               <TableBody>{Array(3).fill(0).map((_, i) => (
-                  <TableRow key={`skel-stud-${i}`}><TableCell colSpan={7} className="p-4">
+                  <TableRow key={`skel-stud-${i}`}><TableCell colSpan={6} className="p-4">
                       <div className="flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /><span className="ml-2">Loading assigned students...</span></div>
                   </TableCell></TableRow>))}
               </TableBody>
@@ -262,7 +262,7 @@ export function TeacherStudentManagement() {
                 <TableRow key={student.id}> 
                   <TableCell>
                     <Image
-                      src={student.profilePictureUrl || `https://placehold.co/40x40.png?text=${student.name && student.name.length > 0 ? student.name.charAt(0) : 'S'}`}
+                      src={student.profilePictureUrl || `https://placehold.co/40x40.png`}
                       alt={student.name || 'Student'}
                       width={40}
                       height={40}
@@ -335,4 +335,3 @@ export function TeacherStudentManagement() {
     </>
   );
 }
-

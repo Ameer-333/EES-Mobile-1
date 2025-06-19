@@ -187,7 +187,7 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
                     />
                     <div className="flex items-start space-x-4">
                       <Avatar className="mt-1 h-12 w-12 border-2 border-primary/30 flex-shrink-0">
-                        <AvatarImage src={`https://placehold.co/48x48/${sentimentInfo.fill.substring(4,10)}/300130.png?text=${remark.teacherName.charAt(0)}`} alt={remark.teacherName} data-ai-hint="teacher avatar"/>
+                        <AvatarImage src={`https://placehold.co/48x48.png`} alt={remark.teacherName} data-ai-hint="teacher avatar"/>
                         <AvatarFallback>{remark.teacherName.charAt(0)}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
@@ -221,5 +221,3 @@ export function StudentRemarksDisplay({ remarks = mockRemarks, profilePictureUrl
     </div>
   );
 }
-
-    

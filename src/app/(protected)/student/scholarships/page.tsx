@@ -15,7 +15,7 @@ const mockStudentData: Student = {
   caste: 'General',
   religion: 'Hindu' as ReligionType,
   address: '123 Main Street, Bangalore, Karnataka',
-  profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RK',
+  profilePictureUrl: 'https://placehold.co/150x150.png',
   remarks: [
     { id: 'r1', teacherName: 'Ms. Priya Sharma', teacherSubject: 'English' as SubjectName, remark: 'Excellent improvement!', date: '2024-05-15', sentiment: 'good' },
   ],

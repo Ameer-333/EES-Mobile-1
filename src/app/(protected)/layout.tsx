@@ -303,7 +303,7 @@ function UserNav({ userProfile, signOut }: { userProfile: ManagedUser; signOut: 
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-auto px-2 space-x-2">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={userProfile.profilePictureUrl || `https://placehold.co/40x40.png?text=${userProfile.name.charAt(0)}`} alt={userProfile.name} data-ai-hint="user avatar small"/>
+            <AvatarImage src={userProfile.profilePictureUrl || `https://placehold.co/40x40.png`} alt={userProfile.name} data-ai-hint="user avatar small"/>
             <AvatarFallback>{userProfile.name.charAt(0)}</AvatarFallback>
           </Avatar>
           <div className="hidden sm:flex flex-col items-start">

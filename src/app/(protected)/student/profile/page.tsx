@@ -25,7 +25,7 @@ const mockStudentData: Student = {
   religion: 'Hindu' as ReligionType,
   address: '123, Vidyanagar, Silicon City, Bangalore, Karnataka - 560001',
   siblingReference: 'Sister: Priya Sharma, Class 8B',
-  profilePictureUrl: 'https://placehold.co/150x150/E6E6FA/300130.png?text=RS', 
+  profilePictureUrl: 'https://placehold.co/150x150.png', 
   remarks: [
     { id: 'r1', teacherName: 'Ms. Priya Sharma', teacherSubject: 'English' as SubjectName, remark: 'Ravi has shown excellent improvement in English grammar this term. Keep up the great work!', date: '2024-05-15', sentiment: 'good' },
     { id: 'r2', teacherName: 'Mr. Anand Singh', teacherSubject: 'Maths' as SubjectName, remark: 'Needs to focus more during math class to grasp complex concepts.', date: '2024-05-10', sentiment: 'bad' },
