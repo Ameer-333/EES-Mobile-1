@@ -4,8 +4,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
-    function isAuthenticated() {
+    // Helper functions to get user data and check roles
+    function isSignedIn() {
       return request.auth != null;
     }
 
@@ -14,115 +14,141 @@ service cloud.firestore {
     }
 
     function isUserRole(userId, role) {
-      let userData = getUserData(userId);
-      return userData != null && userData.role == role;
+      return isSignedIn() && getUserData(userId).role == role;
     }
 
-    function isAdmin(userId) {
-      return isAuthenticated() && isUserRole(userId, 'Admin');
+    function isAdmin() {
+      return isUserRole(request.auth.uid, 'Admin');
     }
 
-    function isTeacher(userId) {
-      return isAuthenticated() && isUserRole(userId, 'Teacher');
+    function isCoordinator() {
+      return isUserRole(request.auth.uid, 'Coordinator');
     }
 
-    function isStudent(userId) {
-      return isAuthenticated() && isUserRole(userId, 'Student');
+    function isTeacher() {
+      return isUserRole(request.auth.uid, 'Teacher');
     }
 
-    // Checks if a teacher is assigned to a specific class (ignoring section/group for broader class access)
-    function isTeacherAssignedToClass(teacherAssignments, targetClassId) {
-      return teacherAssignments != null && teacherAssignments is list &&
-             teacherAssignments.filter(assignment =>
-               assignment.classId == targetClassId
-             ).size() > 0;
+    function isStudent() {
+      return isUserRole(request.auth.uid, 'Student');
     }
 
-    // Checks if a teacher is assigned to a student based on class, and optionally section or group
-    function isTeacherAssignedToStudent(teacherAssignments, studentClassId, studentSectionId, studentGroupId) {
-      return teacherAssignments != null && teacherAssignments is list &&
-             teacherAssignments.filter(assignment =>
-               assignment.classId == studentClassId &&
-               ( ( !('sectionId' in assignment) || assignment.sectionId == null || assignment.sectionId == '') || assignment.sectionId == studentSectionId ) &&
-               ( ( !('groupId' in assignment) || assignment.groupId == null || assignment.groupId == '') || assignment.groupId == studentGroupId )
-             ).size() > 0;
-    }
-
-    // /users/{userId}
+    // --- Users Collection (Authentication profiles, roles, assignments) ---
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin(request.auth.uid));
-      allow list: if isAdmin(request.auth.uid); // Only admins can list all users
-      allow create: if isAdmin(request.auth.uid); // Only admins can create raw user entries here
-      allow update: if isAdmin(request.auth.uid) ||
-                       (isAuthenticated() && request.auth.uid == userId &&
-                        request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['name', 'displayName', 'photoURL', 'lastLogin', 'assignments', 'classId', 'studentProfileId'])); // Users can update specific fields
-      allow delete: if isAdmin(request.auth.uid);
+      // Admins and Coordinators can read any user profile.
+      // Users can read their own profile.
+      allow read: if isSignedIn() && (isAdmin() || isCoordinator() || request.auth.uid == userId);
+
+      // Only Admins can create new user documents directly in this collection.
+      // (Typically, auth user created first, then app logic creates this doc).
+      allow create: if isAdmin();
+
+      // Admins and Coordinators can update any user profile.
+      // Users can update their own profile (e.g. display name, if app allows).
+      allow update: if isSignedIn() && (isAdmin() || isCoordinator() || request.auth.uid == userId);
+
+      // Only Admins can delete user profiles.
+      allow delete: if isAdmin();
     }
 
-    // /teachers/{teacherId} - HR specific profiles
+    // --- Teachers Collection (HR specific profiles) ---
     match /teachers/{teacherId} {
-      allow read: if isAuthenticated() && (request.auth.uid == teacherId || isAdmin(request.auth.uid));
-      allow list: if isAdmin(request.auth.uid);
-      allow create, update, delete: if isAdmin(request.auth.uid); // Managed by Admins
+      // Admins, Coordinators, and the specific teacher can read the teacher's HR profile.
+      allow read: if isSignedIn() && (isAdmin() || isCoordinator() || request.auth.uid == teacherId);
+
+      // Admins and Coordinators can create/update teacher HR profiles.
+      // A teacher cannot modify their own HR profile directly.
+      allow write: if isSignedIn() && (isAdmin() || isCoordinator());
     }
 
-    // Student data, organized by class, then profiles
-    // /student_data_by_class/{classId}/profiles/{studentProfileId}
-    match /student_data_by_class/{classId}/profiles/{studentProfileId} {
-      let currentUserData = getUserData(request.auth.uid);
-      let studentResourceData = resource.data; // Existing document data for read/update/delete
-      let studentRequestData = request.resource.data; // Incoming document data for create/update
+    // --- Student Data (Profiles nested under classId) ---
+    // student_data_by_class/{classId}/profiles/{studentProfileId}
+    match /student_data_by_class/{classIdFromPath}/profiles/{studentProfileId} {
 
-      allow read: if isAuthenticated() && (
-                    isAdmin(request.auth.uid) ||
-                    ( // Student reads their own profile
-                      isStudent(request.auth.uid) &&
-                      currentUserData.classId == classId &&
-                      currentUserData.studentProfileId == studentProfileId &&
-                      studentResourceData.authUid == request.auth.uid
-                    ) ||
-                    ( // Teacher reads profile of a student they are assigned to
-                      isTeacher(request.auth.uid) &&
-                      isTeacherAssignedToStudent(currentUserData.assignments, classId, studentResourceData.sectionId, studentResourceData.groupId)
-                    )
+      // READ access:
+      // - Admins and Coordinators can read any student profile.
+      // - Students can read their own profile (matching authUid's studentProfileId and classId).
+      // - Teachers can read student profiles if they are assigned to that student's classId.
+      allow read: if isSignedIn() && (
+                    isAdmin() ||
+                    isCoordinator() ||
+                    (isStudent() && getUserData(request.auth.uid).studentProfileId == studentProfileId && getUserData(request.auth.uid).classId == classIdFromPath) ||
+                    (isTeacher() && getUserData(request.auth.uid).assignments.exists(assignment, assignment.classId == classIdFromPath))
                   );
 
-      allow list: if isAuthenticated() && ( // Who can list students within a class
-                    isAdmin(request.auth.uid) ||
-                    (isTeacher(request.auth.uid) && isTeacherAssignedToClass(currentUserData.assignments, classId))
-                  );
-
-      allow create: if isAuthenticated() &&
-                      (isAdmin(request.auth.uid) || isTeacher(request.auth.uid)) &&
-                      studentRequestData.classId == classId && // Ensure classId in data matches path
-                      ('authUid' in studentRequestData) && studentRequestData.authUid != null;     // Ensure authUid is set
-
-
-      allow update: if isAuthenticated() &&
-                      (isAdmin(request.auth.uid) ||
-                        (
-                          isTeacher(request.auth.uid) &&
-                          isTeacherAssignedToStudent(currentUserData.assignments, classId, studentResourceData.sectionId, studentResourceData.groupId)
+      // CREATE access (adding a new student):
+      // - Admins and Coordinators can create students in any class.
+      // - Teachers can create students IF:
+      //    - They are creating in the correct classId path.
+      //    - The student's data (request.resource.data) has classId and sectionId that match one of their 'class_teacher' or 'mother_teacher' assignments.
+      allow create: if isSignedIn() && (
+                      isAdmin() ||
+                      isCoordinator() ||
+                      (
+                        isTeacher() &&
+                        request.resource.data.classId == classIdFromPath && // Ensures document is created in path matching its data
+                        getUserData(request.auth.uid).assignments.exists(assignment,
+                          assignment.classId == request.resource.data.classId &&
+                          (assignment.sectionId == null || assignment.sectionId == request.resource.data.sectionId) && // Match section if student has one
+                          (assignment.type == 'class_teacher' || assignment.type == 'mother_teacher')
                         )
-                      ) &&
-                      studentRequestData.authUid == studentResourceData.authUid && // Prevent changing authUid
-                      studentRequestData.classId == classId; // classId within doc should match path (or be updated carefully by admin)
+                      )
+                    );
 
+      // UPDATE access (modifying an existing student):
+      // - Admins and Coordinators can update any student.
+      // - Teachers can update students if assigned to the student's specific class/section/group.
+      //   (Application logic should control *which* fields a teacher can update, e.g., marks, attendance, remarks).
+      allow update: if isSignedIn() && (
+                      isAdmin() ||
+                      isCoordinator() ||
+                      (
+                        isTeacher() &&
+                        resource.data.classId == classIdFromPath && // Ensure operation is on a doc in the correct path
+                        getUserData(request.auth.uid).assignments.exists(assignment,
+                          assignment.classId == resource.data.classId && // Student's actual class
+                          (assignment.sectionId == null || assignment.sectionId == resource.data.sectionId) && // Student's actual section
+                          (assignment.groupId == null || assignment.groupId == resource.data.groupId) // Student's actual group
+                          // Further checks can be added, e.g., teacher cannot change student's classId unless admin
+                          // && (isAdmin() || isCoordinator() || request.resource.data.classId == resource.data.classId)
+                        )
+                      )
+                    );
 
-      allow delete: if isAdmin(request.auth.uid);
+      // DELETE access:
+      // - Admins and Coordinators can delete any student.
+      // - Teachers can delete students IF:
+      //    - They are a 'class_teacher' or 'mother_teacher' for the student's specific class/section.
+      allow delete: if isSignedIn() && (
+                      isAdmin() ||
+                      isCoordinator() ||
+                      (
+                        isTeacher() &&
+                        resource.data.classId == classIdFromPath &&
+                        getUserData(request.auth.uid).assignments.exists(assignment,
+                          assignment.classId == resource.data.classId &&
+                          (assignment.sectionId == null || assignment.sectionId == resource.data.sectionId) &&
+                          (assignment.type == 'class_teacher' || assignment.type == 'mother_teacher')
+                        )
+                      )
+                    );
     }
 
-    // /app_settings/{settingId}
-    match /app_settings/{settingId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin(request.auth.uid);
+    // --- App Settings Collection ---
+    // Assuming a single document named 'general' for app-wide settings like name, logo.
+    match /app_settings/general {
+      // All authenticated users can read general app settings.
+      allow read: if isSignedIn();
+      // Only Admins can write/update general app settings.
+      allow write: if isAdmin();
     }
 
-    // /hall_of_fame_items/{itemId}
+    // --- Hall of Fame Collection ---
     match /hall_of_fame_items/{itemId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin(request.auth.uid);
+      // All authenticated users can read Hall of Fame items.
+      allow read: if isSignedIn();
+      // Only Admins can create, update, or delete Hall of Fame items.
+      allow write: if isAdmin();
     }
   }
 }
