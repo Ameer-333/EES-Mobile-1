@@ -89,7 +89,6 @@ function getDashboardTitle(pathname: string, actualRole: UserRole | null, appNam
     if (pathname === `/admin/analytics`) return `System Analytics`;
     if (pathname === `/admin/settings`) return `Admin Settings`;
     if (pathname === `/coordinator/students`) return `All Student Management`;
-    // Corrected path for coordinator teacher management
     if (pathname === `/coordinator/teacher-management`) return `All Teacher Management`; 
     if (pathname === `/coordinator/data-entry`) return `Global Student Data Entry`;
     if (pathname.startsWith(`/hall-of-fame`)) return `EES Hall of Fame`;
@@ -231,13 +230,13 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode; }) {
   const router = useRouter();
   const pathname = usePathname();
   
-  const pageTitle = getDashboardTitle(pathname, userProfile?.role || null, currentAppName);
+  // const pageTitle = getDashboardTitle(pathname, userProfile?.role || null, currentAppName); // Temporarily remove for diagnosis
 
   if (isLoadingAuth) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Verifying access & loading application...</p>
+        <p className="text-lg text-muted-foreground">Verifying access & loading application (Layout)...</p>
       </div>
     );
   }
@@ -246,7 +245,7 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode; }) {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-background">
              <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
-             <p className="text-lg text-muted-foreground">Redirecting to login...</p>
+             <p className="text-lg text-muted-foreground">Redirecting to login (Layout)...</p>
         </div>
       );
   }
@@ -255,13 +254,58 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode; }) {
                            ( (getExpectedRoleFromPathname(pathname) === null && pathname.startsWith('/hall-of-fame')) || 
                              (getExpectedRoleFromPathname(pathname) === userProfile?.role) );
 
+  // --- TEMPORARY SIMPLIFIED LAYOUT FOR DIAGNOSIS ---
+  if (canRenderChildren) {
+    return (
+        <div style={{ border: '3px dashed blue', padding: '20px', margin: '20px', minHeight: '100vh' }}>
+            <h1 style={{ color: 'blue', fontSize: '24px', fontWeight: 'bold' }}>Diagnostic: Simplified Protected Layout Active</h1>
+            <p style={{ marginBottom: '10px' }}>App Name: {currentAppName}</p>
+            {userProfile && <p>User: {userProfile.displayName} ({userProfile.role})</p>}
+            <p>Attempting to render page content below:</p>
+            <hr style={{ margin: '10px 0' }} />
+            <div style={{ border: '1px solid green', padding: '10px' }}>
+                 {children}
+            </div>
+        </div>
+    );
+  } else if (!isLoadingAuth) {
+    // This case implies authUser might be present, but userProfile or role check failed, or path mismatch
+    return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 text-center">
+            <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+            <p className="text-lg text-destructive font-semibold">Access Issue or Page Not Found</p>
+            <p className="text-md text-muted-foreground">
+                Cannot render page content. You might not have permission for this page, or the page doesn't exist.
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+                Auth User: {authUser ? 'Logged In' : 'Not Logged In'} <br />
+                User Profile: {userProfile ? `Loaded (Role: ${userProfile.role || 'N/A'})` : 'Not Loaded'} <br />
+                Path: {pathname} <br/>
+                Expected Role: {getExpectedRoleFromPathname(pathname) || 'N/A (e.g., /hall-of-fame or invalid path)'}
+            </p>
+            <Button onClick={() => router.push('/')} className="mt-4">Go to Home</Button>
+            {authUser && <Button onClick={logout} variant="outline" className="mt-2">Logout</Button>}
+        </div>
+    );
+  }
+  // Fallback if still loading or other edge cases
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+      <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+      <p className="text-lg text-muted-foreground">Preparing application...</p>
+    </div>
+  );
+
+
+  // --- ORIGINAL COMPLEX LAYOUT (COMMENTED OUT FOR DIAGNOSIS) ---
+  /*
   return (
     <>
       <Sidebar collapsible="icon" className="border-r shadow-md bg-sidebar text-sidebar-foreground" variant="sidebar">
         <SidebarHeader className="flex h-[60px] items-center border-b border-sidebar-border px-4 lg:px-6">
           <Link href={userProfile?.role ? `/${userProfile.role.toLowerCase()}/dashboard` : "/"} className="flex items-center gap-3 font-semibold text-sidebar-primary">
             {currentLogoUrl ? (
-               <Image src={currentLogoUrl} alt="Logo" width={32} height={32} className="object-contain rounded-md" data-ai-hint="school logo custom small" onError={() => { /* Handle error */ }} />
+               <Image src={currentLogoUrl} alt="Logo" width={32} height={32} className="object-contain rounded-md" data-ai-hint="school logo custom small" onError={() => { }} />
             ) : (
               <LogoIcon className="h-7 w-7" />
             )}
@@ -338,4 +382,5 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode; }) {
       </SidebarInset>
     </>
   );
+  */
 }
