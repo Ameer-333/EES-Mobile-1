@@ -1,22 +1,3 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  /* config options here */
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
-      },
-    ],
-  },
-};
-
-module.exports = nextConfig;
+// This file has been removed to resolve a conflict with next.config.ts
+// Next.js projects should only have one next.config.* file.
+// The configuration from next.config.ts will be used.
