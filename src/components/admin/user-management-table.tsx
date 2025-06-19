@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Search, UserPlus, Trash2, ShieldCheck, School, User, Loader2, ClipboardUser } from 'lucide-react';
+import { Edit, Search, UserPlus, Trash2, ShieldCheck, School, User, Loader2, Users as UsersIcon } from 'lucide-react'; // Changed ClipboardUser to UsersIcon
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,7 +39,7 @@ const roleIcons: Record<UserRole, React.ElementType> = {
   Admin: ShieldCheck,
   Teacher: School,
   Student: User,
-  Coordinator: ClipboardUser,
+  Coordinator: UsersIcon, // Changed from ClipboardUser
 };
 
 export function UserManagementTable() {
@@ -75,7 +75,7 @@ export function UserManagementTable() {
     });
 
     return () => unsubscribe();
-  }, []); // Removed toast dependency
+  }, []); 
 
   const filteredUsers = useMemo(() => {
     return users.filter(
@@ -297,3 +297,4 @@ export function UserManagementTable() {
     </>
   );
 }
+

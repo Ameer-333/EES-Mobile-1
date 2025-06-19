@@ -3,6 +3,7 @@
 
 import * as React from "react"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
+import { Slot } from "@radix-ui/react-slot" // Import Slot from @radix-ui/react-slot
 
 import { cn } from "@/lib/utils"
 
@@ -15,10 +16,10 @@ const TooltipTrigger = TooltipPrimitive.Trigger
 const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content> & {
-    asChild?: boolean; // Added to allow Slot behavior if needed
+    asChild?: boolean; 
   }
 >(({ className, sideOffset = 4, asChild, ...props }, ref) => {
-  const Comp = asChild ? TooltipPrimitive.Slot : "div"; // Use Slot if asChild is true
+  const Comp = asChild ? Slot : "div"; // Use Slot if asChild is true
   return (
     <TooltipPrimitive.Content
       ref={ref}
