@@ -19,6 +19,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger, // Added missing import
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TeacherProfileFormDialog } from './teacher-profile-form-dialog';
@@ -325,8 +326,8 @@ export function ManageTeacherProfiles() {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                This will permanently delete the HR profile from the 'teachers' collection and the user record (role, assignments) from the 'users' collection for &lt;strong&gt;{teacher.name}&lt;/strong&gt; (Auth ID: {teacher.authUid}).
-                                &lt;br/&gt;&lt;strong className="text-destructive mt-2 block"&gt;The Firebase Authentication account for this teacher needs to be deleted manually from the Firebase Console.&lt;/strong&gt;
+                                This will permanently delete the HR profile from the 'teachers' collection and the user record (role, assignments) from the 'users' collection for <strong>{teacher.name}</strong> (Auth ID: {teacher.authUid}).
+                                <br/><strong className="text-destructive mt-2 block">The Firebase Authentication account for this teacher needs to be deleted manually from the Firebase Console.</strong>
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
