@@ -2,7 +2,7 @@
 'use client';
 
 import { LoginForm } from '@/components/auth/login-form';
-import { ClipboardUser } from 'lucide-react'; // Changed to ClipboardUser
+import { ClipboardUser } from 'lucide-react'; // Using ClipboardUser for Coordinator
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Home } from 'lucide-react';
@@ -56,7 +56,7 @@ export default function CoordinatorLoginPage() {
             height={80}
             className="mx-auto mb-2 rounded-md object-contain"
             data-ai-hint="school logo custom"
-            onError={() => setLogoUrl(null)}
+            onError={() => setLogoUrl(null)} // Fallback if logo fails to load
           />
         ) : (
           <ClipboardUser className="h-20 w-20 text-primary mx-auto mb-2" />
