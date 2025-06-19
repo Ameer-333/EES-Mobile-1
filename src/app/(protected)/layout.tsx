@@ -36,6 +36,7 @@ import { navItems } from '@/components/shared/sidebar-nav';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 
 
 interface AppContextType {
@@ -65,8 +66,8 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   const [appName, setAppName] = useState('EES Education');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const router = useRouter();
-  const pathname = usePathname(); // Keep for use within the effect, but not as dependency for the listener itself
-  const { toast } = useToast(); // Keep for use within the effect
+  // const pathname = usePathname(); // Removed from dependencies of main auth effect
+  // const { toast } = useToast(); // Removed from dependencies of main auth effect
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -80,8 +81,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
             const profileData = userDocSnap.data() as ManagedUser;
             setUserProfile(profileData);
 
-            // Perform path check using the current pathname from usePathname()
-            const currentPath = window.location.pathname; // More direct way to get current path for this check
+            const currentPath = window.location.pathname; 
             const currentBasePath = currentPath.split('/')[1]?.toLowerCase();
             const userRolePath = profileData.role.toLowerCase();
 
@@ -90,20 +90,23 @@ function AppProvider({ children }: { children: React.ReactNode }) {
                 if (currentPath.startsWith('/hall-of-fame')) {
                   // Allow access
                 } else {
-                  toast({ title: "Redirecting", description: `Accessing restricted area. Redirecting to your ${profileData.role} dashboard.`, variant: "default", duration: 4000 });
+                  // Use a local toast instance if needed, or ensure toast from context is stable
+                  // For now, assuming console log is sufficient for this effect's internal logic
+                  console.log(`Redirecting to ${profileData.role} dashboard.`);
                   router.push(`/${userRolePath}/dashboard`);
                 }
               }
             }
           } else {
             setUserProfile(null);
-            toast({ title: "Profile Error", description: "User profile not found. Please contact support.", variant: "destructive" });
+            console.error("User profile not found in Firestore.");
+            // toast({ title: "Profile Error", description: "User profile not found. Please contact support.", variant: "destructive" });
             await firebaseSignOut(auth);
             router.push('/'); 
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
-          toast({ title: "Error", description: "Failed to load user profile. Please try logging in again.", variant: "destructive" });
+          // toast({ title: "Error", description: "Failed to load user profile. Please try logging in again.", variant: "destructive" });
           setUserProfile(null);
           await firebaseSignOut(auth);
           router.push('/');
@@ -111,7 +114,6 @@ function AppProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUser(null);
         setUserProfile(null);
-        // Perform path check using the current pathname from usePathname()
         const currentPath = window.location.pathname;
         if (!currentPath.startsWith('/login/') && currentPath !== '/') {
             router.push('/');
@@ -120,7 +122,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingAuth(false);
     });
     return () => unsubscribe();
-  }, [router]); // Dependency array modified: removed pathname and toast
+  }, [router]); // Dependency array: router is needed for navigation.
 
 
   useEffect(() => {
@@ -140,6 +142,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
     fetchAppSettings();
   }, []);
 
+  const { toast } = useToast(); // Get toast here for handleSignOut
   const handleSignOut = async () => {
     try {
       await firebaseSignOut(auth);
@@ -153,9 +156,9 @@ function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
   
+  const pathname = usePathname(); // Get pathname here for currentRole memo
   const currentRole = useMemo(() => {
     if (!userProfile) return null;
-    // Pathname from usePathname() is reactive and correct here
     const pathSegments = pathname.split('/');
     if (pathSegments.length > 1) {
         const roleSegment = pathSegments[1].toLowerCase();
@@ -253,7 +256,21 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
       </Sidebar>
 
-      <div className="flex flex-col flex-1 min-h-screen peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)] md:peer-data-[state=expanded]:peer-data-[variant=inset]:ml-[calc(var(--sidebar-width)_+_theme(spacing.4)_+2px)] md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl">
+      <div className={cn(
+          "flex flex-col flex-1 min-h-screen transition-[margin-left] duration-200 ease-linear",
+          // Default for variant="sidebar" (which is used)
+          "md:ml-[var(--sidebar-width)]", // Base for expanded
+          "md:peer-data-[state=collapsed]:ml-[var(--sidebar-width-icon)]", // Override for collapsed
+          
+          // Specifics for variant="inset" (these will only apply if Sidebar has data-variant="inset")
+          // These use !important essentially, via explicit attribute selectors, to override the general ones above if variant IS inset.
+          "md:peer-data-[variant=inset]:!m-2", // Margin for inset, ! to ensure it overrides individual ml if needed
+          "md:peer-data-[variant=inset]:!ml-0", // Reset base ml when inset and m-2 handles spacing
+          "md:peer-data-[variant=inset]:rounded-xl",
+          "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))]",
+          "md:peer-data-[variant=inset]:peer-data-[state=expanded]:!ml-[calc(var(--sidebar-width)_+_theme(spacing.4)_+2px)]", 
+          "md:peer-data-[variant=inset]:peer-data-[state=collapsed]:!ml-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
+        )}>
         <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 md:px-6 shadow-sm">
             <div className="md:hidden">
                 <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
