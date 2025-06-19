@@ -1,14 +1,14 @@
 
 'use client';
 
-import type { Teacher, ManagedUser, TeacherAssignment } from '@/types'; // Added TeacherAssignment
+import type { Teacher, ManagedUser, TeacherAssignment } from '@/types';
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Search, UserPlus, Trash2, Loader2, Briefcase } from 'lucide-react'; // Added Briefcase
+import { Edit, Search, UserPlus, Trash2, Loader2, Briefcase } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,8 +24,8 @@ import { TeacherProfileFormDialog } from './teacher-profile-form-dialog';
 import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { firestore } from '@/lib/firebase';
-import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData, getDoc } from 'firebase/firestore'; // Added getDoc
-import { getTeachersCollectionPath, getUserDocPath, getTeacherDocPath } from '@/lib/firestore-paths'; // Added getTeacherDocPath
+import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData, getDoc } from 'firebase/firestore';
+import { getTeachersCollectionPath, getUserDocPath, getTeacherDocPath } from '@/lib/firestore-paths';
 
 interface TeacherWithAssignments extends Teacher {
     assignments?: TeacherAssignment[];
@@ -37,7 +37,7 @@ export function ManageTeacherProfiles() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null); // Keep as Teacher, form dialog handles fetching assignments for edit
+  const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,15 +47,34 @@ export function ManageTeacherProfiles() {
 
     const unsubscribe = onSnapshot(teachersCollectionRef, async (teachersSnapshot: QuerySnapshot<DocumentData>) => {
       const fetchedTeachersPromises = teachersSnapshot.docs.map(async (teacherDoc) => {
-        const teacherData = { id: teacherDoc.id, ...teacherDoc.data() } as Teacher;
-        // Fetch assignments from the 'users' collection
-        const userDocRef = doc(firestore, getUserDocPath(teacherData.authUid));
+        const docId = teacherDoc.id;
+        const data = teacherDoc.data();
+
+        if (!docId) { 
+          console.warn("Teacher document found with an invalid ID in 'teachers' collection. Skipping.");
+          return null; 
+        }
+
+        // Construct Teacher object. 
+        // 'id' is the document ID of the HR profile.
+        // 'authUid' is the Firebase Auth UID, which *is* the document ID for /teachers collection by design.
+        const teacherData: Teacher = {
+          ...data, 
+          id: docId,        
+          authUid: docId,   
+        } as Teacher; 
+
+        // Fetch assignments from the 'users' collection using this authUid (docId)
+        // getUserDocPath will throw an error if teacherData.authUid is falsy, but we've ensured it's docId.
+        const userDocRef = doc(firestore, getUserDocPath(teacherData.authUid)); 
         const userDocSnap = await getDoc(userDocRef);
         const assignments = userDocSnap.exists() ? (userDocSnap.data() as ManagedUser).assignments || [] : [];
+        
         return { ...teacherData, assignments };
       });
       
-      const resolvedTeachers = await Promise.all(fetchedTeachersPromises);
+      const resolvedTeachersWithNulls = await Promise.all(fetchedTeachersPromises);
+      const resolvedTeachers = resolvedTeachersWithNulls.filter(Boolean) as TeacherWithAssignments[];
       setTeachersWithAssignments(resolvedTeachers);
       setIsLoading(false);
     }, (error) => {
@@ -92,23 +111,23 @@ export function ManageTeacherProfiles() {
     setIsFormOpen(true);
   };
 
-  const handleEditTeacher = (teacher: Teacher) => { // Parameter remains Teacher
+  const handleEditTeacher = (teacher: Teacher) => {
     setTeacherToEdit(teacher);
     setIsFormOpen(true);
   };
 
   const handleDeleteTeacher = async (teacherAuthUid: string, teacherName: string) => {
+    // teacherAuthUid here is teacher.authUid, which is now guaranteed to be the docId.
+    if (!teacherAuthUid) {
+        toast({ title: "Error", description: "Teacher Auth ID is missing, cannot delete.", variant: "destructive" });
+        return;
+    }
     try {
-      // Delete from 'teachers' (HR Profile) collection
       const teacherHRDocPath = getTeacherDocPath(teacherAuthUid);
       await deleteDoc(doc(firestore, teacherHRDocPath));
 
-      // Delete from 'users' (Auth Supplemental) collection
       const userDocPath = getUserDocPath(teacherAuthUid);
       await deleteDoc(doc(firestore, userDocPath));
-
-      // Note: Firebase Auth account needs manual deletion from Firebase Console.
-      // This is a common practice as deleting auth users programmatically from client/admin panel can be risky.
 
       toast({
           title: "Teacher Records Deleted",
@@ -131,7 +150,6 @@ export function ManageTeacherProfiles() {
   };
 
   const handleTeacherSaved = (savedTeacher: Teacher, isEditing: boolean) => {
-     // Snapshot listener will update the UI automatically.
     if (isEditing) {
       setIsFormOpen(false);
     }
@@ -229,7 +247,7 @@ export function ManageTeacherProfiles() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1 max-w-[200px]">
-                        {teacher.subjectsTaught && teacher.subjectsTaught.slice(0,3).map(subject => ( // Show first 3
+                        {teacher.subjectsTaught && teacher.subjectsTaught.slice(0,3).map(subject => (
                           <Badge key={subject} variant="secondary" className="text-xs">{subject}</Badge>
                         ))}
                         {teacher.subjectsTaught && teacher.subjectsTaught.length > 3 && <Badge variant="outline" className="text-xs">+{teacher.subjectsTaught.length - 3} more</Badge>}
@@ -241,7 +259,7 @@ export function ManageTeacherProfiles() {
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm">
+                          <Button variant="destructive" size="sm" disabled={!teacher.authUid}>
                             <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                           </Button>
                         </AlertDialogTrigger>
@@ -250,12 +268,12 @@ export function ManageTeacherProfiles() {
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
                               This will permanently delete the HR profile from the 'teachers' collection and the user record (role, assignments) from the 'users' collection for <strong>{teacher.name}</strong> (Auth ID: {teacher.authUid}).
-                              <br/><strong className="text-destructive mt-2 block">The Firebase Authentication account (login credentials) must be deleted manually from the Firebase Console.</strong>
+                              <br/><strong className="text-destructive mt-2 block">The Firebase Authentication account for this teacher needs to be deleted manually from the Firebase Console.</strong>
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.authUid, teacher.name)}>
+                            <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.authUid, teacher.name)} disabled={!teacher.authUid}>
                               Yes, delete Firestore records
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -285,9 +303,8 @@ export function ManageTeacherProfiles() {
         isOpen={isFormOpen}
         onOpenChange={setIsFormOpen}
         onTeacherSaved={handleTeacherSaved}
-        teacherToEdit={teacherToEdit} // Pass Teacher; dialog fetches assignments
+        teacherToEdit={teacherToEdit}
       />
     </>
   );
 }
-
