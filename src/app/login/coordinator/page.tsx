@@ -2,10 +2,9 @@
 'use client';
 
 import { LoginForm } from '@/components/auth/login-form';
-import { ClipboardUser } from 'lucide-react'; // Using ClipboardUser for Coordinator
+import { Users, Home } from 'lucide-react'; // Changed ClipboardUser to Users
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Home } from 'lucide-react';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { firestore } from '@/lib/firebase';
@@ -47,7 +46,7 @@ export default function CoordinatorLoginPage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-accent/30 p-4">
       <div className="mb-8 text-center">
         {isLoading ? (
-          <ClipboardUser className="h-20 w-20 text-primary mx-auto mb-2 animate-pulse" />
+          <Users className="h-20 w-20 text-primary mx-auto mb-2 animate-pulse" />
         ) : logoUrl ? (
           <Image
             src={logoUrl}
@@ -59,7 +58,7 @@ export default function CoordinatorLoginPage() {
             onError={() => setLogoUrl(null)} // Fallback if logo fails to load
           />
         ) : (
-          <ClipboardUser className="h-20 w-20 text-primary mx-auto mb-2" />
+          <Users className="h-20 w-20 text-primary mx-auto mb-2" />
         )}
         <h1 className="text-4xl font-headline font-bold text-primary">
            {isLoading ? 'Loading...' : appName}
