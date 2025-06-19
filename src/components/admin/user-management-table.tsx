@@ -75,7 +75,7 @@ export function UserManagementTable() {
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, []); // Removed toast dependency
 
   const filteredUsers = useMemo(() => {
     return users.filter(
@@ -109,10 +109,13 @@ export function UserManagementTable() {
   };
 
   const handleUserAdded = (newUser: ManagedUser) => {
-    setIsAddUserDialogOpen(false);
+    // Dialog will manage its own closing after displaying credentials.
+    // The onSnapshot listener will update the table.
+    // console.log("User added in parent:", newUser);
   };
 
   const handleUserEdited = (editedUser: ManagedUser) => {
+    // The onSnapshot listener will update the table.
     setIsEditUserDialogOpen(false);
   };
   
@@ -294,5 +297,3 @@ export function UserManagementTable() {
     </>
   );
 }
-
-    
