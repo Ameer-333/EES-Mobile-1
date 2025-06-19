@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel as RHFFormLabel, FormMessage } from '@/components/ui/form'; // Renamed FormLabel to avoid conflict
+import { Label } from '@/components/ui/label'; // Import the base Label
 import { Input } from '@/components/ui/input';
 import { Loader2, PlusCircle, Edit, Trash2, ClipboardList, Users, UserCog, AlertTriangle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -198,7 +199,7 @@ export function TeacherAssignmentView() {
             </div>
           </div>
            <div className="mt-4 space-y-2">
-            <FormLabel htmlFor="teacher-select">Select Teacher</FormLabel>
+            <Label htmlFor="teacher-select">Select Teacher</Label>
             <Select onValueChange={setSelectedTeacherAuthUid} value={selectedTeacherAuthUid || ""}>
               <SelectTrigger id="teacher-select" className="w-full md:w-1/2">
                 <SelectValue placeholder="Choose a teacher to manage assignments..." />
@@ -291,20 +292,20 @@ export function TeacherAssignmentView() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSaveAssignment)} className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
               <FormField control={form.control} name="type" render={({ field }) => (
-                  <FormItem><FormLabel>Assignment Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmittingForm}>
+                  <FormItem><RHFFormLabel>Assignment Type</RHFFormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmittingForm}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
                       <SelectContent>{Object.entries(assignmentTypeLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
                   </Select><FormMessage /></FormItem> )}/>
               <FormField control={form.control} name="classId" render={({ field }) => (
-                  <FormItem><FormLabel>Class/Program ID (System ID)</FormLabel><FormControl><Input placeholder="e.g., LKG, 10, NIOS_PROGRAM, NCLP_PROJECT" {...field} disabled={isSubmittingForm}/></FormControl><FormMessage /></FormItem> )}/>
+                  <FormItem><RHFFormLabel>Class/Program ID (System ID)</RHFFormLabel><FormControl><Input placeholder="e.g., LKG, 10, NIOS_PROGRAM, NCLP_PROJECT" {...field} disabled={isSubmittingForm}/></FormControl><FormMessage /></FormItem> )}/>
               <FormField control={form.control} name="className" render={({ field }) => (
-                  <FormItem><FormLabel>Class/Program Display Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., LKG Sunshine, Class 10 Bravo" {...field} disabled={isSubmittingForm}/></FormControl><FormMessage /></FormItem> )}/>
+                  <FormItem><RHFFormLabel>Class/Program Display Name (Optional)</RHFFormLabel><FormControl><Input placeholder="e.g., LKG Sunshine, Class 10 Bravo" {...field} disabled={isSubmittingForm}/></FormControl><FormMessage /></FormItem> )}/>
               <FormField control={form.control} name="sectionId" render={({ field }) => (
-                  <FormItem><FormLabel>Section ID (Optional)</FormLabel><FormControl><Input placeholder="e.g., A, B, Morning_Batch" {...field} disabled={isSubmittingForm}/></FormControl><FormMessage /></FormItem> )}/>
+                  <FormItem><RHFFormLabel>Section ID (Optional)</RHFFormLabel><FormControl><Input placeholder="e.g., A, B, Morning_Batch" {...field} disabled={isSubmittingForm}/></FormControl><FormMessage /></FormItem> )}/>
              
               { (watchedAssignmentType === 'subject_teacher' || watchedAssignmentType === 'nios_teacher' || watchedAssignmentType === 'nclp_teacher') && subjectOptionsForForm.length > 0 && (
                 <FormField control={form.control} name="subjectId" render={({ field }) => (
-                  <FormItem><FormLabel>Subject</FormLabel><Select onValueChange={field.onChange} value={field.value || ""} disabled={isSubmittingForm}>
+                  <FormItem><RHFFormLabel>Subject</RHFFormLabel><Select onValueChange={field.onChange} value={field.value || ""} disabled={isSubmittingForm}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger></FormControl>
                       <SelectContent>{subjectOptionsForForm.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                   </Select><FormMessage /></FormItem> )}/>
@@ -317,7 +318,7 @@ export function TeacherAssignmentView() {
                )}
 
               <FormField control={form.control} name="groupId" render={({ field }) => (
-                  <FormItem><FormLabel>Group ID (Optional, for NIOS/NCLP sub-groups)</FormLabel><FormControl><Input placeholder="e.g., Group_A_Painting, NCLP_B_Science_Focus" {...field} disabled={isSubmittingForm}/></FormControl><FormMessage /></FormItem> )}/>
+                  <FormItem><RHFFormLabel>Group ID (Optional, for NIOS/NCLP sub-groups)</RHFFormLabel><FormControl><Input placeholder="e.g., Group_A_Painting, NCLP_B_Science_Focus" {...field} disabled={isSubmittingForm}/></FormControl><FormMessage /></FormItem> )}/>
               
               <DialogFooter className="pt-4">
                 <DialogClose asChild><Button type="button" variant="outline" disabled={isSubmittingForm}>Cancel</Button></DialogClose>
@@ -330,5 +331,3 @@ export function TeacherAssignmentView() {
     </>
   );
 }
-
-
