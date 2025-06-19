@@ -1,7 +1,9 @@
-// This file has been intentionally emptied and superseded by next.config.ts.
-// Next.js projects should only have one next.config.* file.
-// The configuration from next.config.ts will be used.
-// If you are still seeing errors related to next.config.js after this change,
-// please ensure you have completely cleared your .next cache and node_modules, then reinstall and restart.
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // No images configuration here.
+  // This file is intended to be superseded by next.config.ts.
+  // Adding a minimal valid config to avoid potential conflicts if Next.js still tries to read this file.
+  reactStrictMode: true,
+};
 
-module.exports = {}; // Export an empty object to be safe
+module.exports = nextConfig;
