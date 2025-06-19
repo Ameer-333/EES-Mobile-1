@@ -245,9 +245,10 @@ export interface HallOfFameItem {
 }
 
 export const motherTeacherCoreSubjects: StandardSubjectName[] = ['English', 'EVS', 'Maths'];
-export const nclpAllSubjects: SubjectName[] = ['English (NCLP)', 'Kannada (NCLP)', 'Hindi (NCLP)', 'Maths (NCLP)', 'EVS (NCLP)'];
-export const nclpGroupBSubjectsNoHindi: SubjectName[] = ['English (NCLP)', 'Kannada (NCLP)', 'Maths (NCLP)', 'EVS (NCLP)'];
+export const nclpAllSubjects: NCLPSubjectName[] = ['English (NCLP)', 'Kannada (NCLP)', 'Hindi (NCLP)', 'Maths (NCLP)', 'EVS (NCLP)'];
+export const nclpGroupBSubjectsNoHindi: NCLPSubjectName[] = ['English (NCLP)', 'Kannada (NCLP)', 'Maths (NCLP)', 'EVS (NCLP)'];
 export const niosSubjectsForAssignment: NIOSSubjectName[] = ['Data Entry', 'Painting', 'Indian Culture and Heritage', 'Home Science', 'English (NIOS)'];
+
 
 export const assignmentTypeLabels: Record<TeacherAssignmentType, string> = {
   class_teacher: "Class Teacher",
@@ -269,4 +270,5 @@ export interface TeacherAppraisalRequest {
   adminNotes?: string;
   processedDate?: string; // ISO Date string
 }
+
 
