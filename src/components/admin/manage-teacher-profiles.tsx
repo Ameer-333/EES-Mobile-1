@@ -18,6 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger, // Added missing import
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TeacherProfileFormDialog } from './teacher-profile-form-dialog';
@@ -50,23 +51,23 @@ export function ManageTeacherProfiles() {
         const docId = teacherDoc.id;
         const data = teacherDoc.data();
 
-        if (!docId) { 
+        if (!docId) {
           console.warn("Teacher document found with an invalid ID in 'teachers' collection. Skipping.");
-          return null; 
+          return null;
         }
 
-        // Construct Teacher object. 
+        // Construct Teacher object.
         // 'id' is the document ID of the HR profile.
         // 'authUid' is the Firebase Auth UID, which *is* the document ID for /teachers collection by design.
         const teacherData: Teacher = {
-          ...data, 
-          id: docId,        
-          authUid: docId,   
-        } as Teacher; 
+          ...data,
+          id: docId,
+          authUid: docId, // Explicitly set authUid to the document ID
+        } as Teacher;
 
         // Fetch assignments from the 'users' collection using this authUid (docId)
         // getUserDocPath will throw an error if teacherData.authUid is falsy, but we've ensured it's docId.
-        const userDocRef = doc(firestore, getUserDocPath(teacherData.authUid)); 
+        const userDocRef = doc(firestore, getUserDocPath(teacherData.authUid));
         const userDocSnap = await getDoc(userDocRef);
         const assignments = userDocSnap.exists() ? (userDocSnap.data() as ManagedUser).assignments || [] : [];
         
@@ -98,7 +99,7 @@ export function ManageTeacherProfiles() {
         teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (teacher.authUid && teacher.authUid.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (teacher.subjectsTaught && teacher.subjectsTaught.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()))) ||
-        (teacher.assignments && teacher.assignments.some(a => 
+        (teacher.assignments && teacher.assignments.some(a =>
             (a.className && a.className.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (a.classId && a.classId.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (a.sectionId && a.sectionId.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -150,7 +151,9 @@ export function ManageTeacherProfiles() {
   };
 
   const handleTeacherSaved = (savedTeacher: Teacher, isEditing: boolean) => {
-    if (isEditing) {
+    // The onSnapshot listener will update the list automatically.
+    // We just need to close the form.
+    if (isEditing || !isEditing) { // Close form on both add and edit
       setIsFormOpen(false);
     }
   };
@@ -308,3 +311,6 @@ export function ManageTeacherProfiles() {
     </>
   );
 }
+
+
+    
