@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { LogoIcon } from '@/components/icons/logo-icon';
-import { ArrowRight, User, Briefcase, Shield, ClipboardUser } from 'lucide-react';
+import { ArrowRight, User, Briefcase, Shield, Users as UsersIconLucide } from 'lucide-react'; // Changed ClipboardUser to UsersIconLucide
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { firestore } from '@/lib/firebase';
@@ -12,11 +12,6 @@ import { doc, getDoc } from 'firebase/firestore';
 import { getGeneralSettingsDocPath } from '@/lib/firestore-paths';
 
 export default function LandingPage() {
-  console.log("Imported User icon:", User);
-  console.log("Imported Briefcase icon:", Briefcase);
-  console.log("Imported Shield icon:", Shield);
-  console.log("Imported ClipboardUser icon:", ClipboardUser);
-
   const [appName, setAppName] = useState('EES Education');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,7 +93,7 @@ export default function LandingPage() {
           role="Coordinator"
           description="Oversee student progress, manage teacher data, and coordinate activities."
           href="/login/coordinator"
-          icon={ClipboardUser}
+          icon={UsersIconLucide} // Changed from ClipboardUser to UsersIconLucide
         />
         <LoginOptionCard
           role="Admin"
@@ -125,14 +120,13 @@ interface LoginOptionCardProps {
 
 function LoginOptionCard({ role, description, href, icon: Icon }: LoginOptionCardProps) {
   if (!Icon) {
+    // This fallback can be removed if the primary issue is resolved.
     console.error(`LoginOptionCard for role "${role}" received an undefined icon. This is likely the cause of the "Element type is invalid" error.`);
-    // Fallback rendering to prevent a complete crash, though the icon will be missing.
     return (
         <Card className="card-hover-effect flex flex-col group bg-card/80 backdrop-blur-sm border-border/50 rounded-xl">
         <CardHeader className="items-center text-center pb-4">
-            {/* Icon rendering skipped due to error */}
             <div className="p-4 bg-destructive/10 text-destructive rounded-full mb-4">
-                <ArrowRight className="h-8 w-8" /> {/* Fallback icon */}
+                <ArrowRight className="h-8 w-8" /> 
             </div>
             <CardTitle className="text-2xl font-headline text-primary group-hover:text-primary/90 transition-colors">
             {role} Portal (Icon Error)
@@ -180,3 +174,4 @@ function LoginOptionCard({ role, description, href, icon: Icon }: LoginOptionCar
     </Card>
   );
 }
+
