@@ -540,13 +540,18 @@ const SidebarMenuButton = React.forwardRef<
       size = "default",
       tooltip,
       className,
-      children, // Added children here
+      children,
       ...props
     },
     ref
   ) => {
     const Comp = asChild ? Slot : "button"
     const { isMobile, state } = useSidebar()
+
+    const tooltipContentProps = React.useMemo(() => {
+      if (!tooltip) return undefined; // Return undefined if no tooltip
+      return typeof tooltip === 'object' ? tooltip : { children: tooltip };
+    }, [tooltip]);
 
     const buttonElement = (
       <Comp
@@ -557,29 +562,24 @@ const SidebarMenuButton = React.forwardRef<
         className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
         {...props}
       >
-        {children} {/* Ensure children are rendered */}
+        {children}
       </Comp>
     )
 
-    if (!tooltip) {
-      return buttonElement
+    if (tooltipContentProps && state === "collapsed" && !isMobile) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>{buttonElement}</TooltipTrigger>
+          <TooltipContent
+            side="right"
+            align="center"
+            {...tooltipContentProps}
+          />
+        </Tooltip>
+      )
     }
 
-    // Prepare tooltip props, ensuring children is set correctly if tooltip is a string
-    const tooltipContentProps = typeof tooltip === 'object' ? tooltip : { children: tooltip };
-
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{buttonElement}</TooltipTrigger>
-        <TooltipContent
-          side="right"
-          align="center"
-          hidden={state !== "collapsed" || isMobile}
-          {...tooltipContentProps} // Spread the prepared tooltip props
-        />
-      </Tooltip>
-    )
+    return buttonElement
   }
 )
 SidebarMenuButton.displayName = "SidebarMenuButton"
@@ -751,5 +751,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-
-    

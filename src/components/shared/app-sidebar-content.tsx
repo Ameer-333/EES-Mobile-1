@@ -42,25 +42,27 @@ export function AppSidebarContent({ currentActualRole, navItems, onLinkClick }: 
 
         return (
           <SidebarMenuItem key={item.href + item.label}>
-            <Link href={item.href} asChild>
-              <SidebarMenuButton // Note: asChild is NOT used here
-                isActive={isActive}
-                className={cn(
-                  isActive && 'bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/90'
-                )}
-                tooltip={item.tooltip || item.label}
-                onClick={onLinkClick}
+            {/* SidebarMenuButton wraps the Link component */}
+            <SidebarMenuButton
+              isActive={isActive}
+              className={cn(
+                isActive && 'bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/90'
+              )}
+              tooltip={item.tooltip || item.label}
+              asChild // SidebarMenuButton becomes a Slot for the Link
+            >
+              <Link 
+                href={item.href} 
+                onClick={onLinkClick} 
+                className="flex w-full items-center gap-2" // Ensure Link itself is styled to fill and align
               >
-                {/* Icon and label are direct children of SidebarMenuButton */}
                 {IconComponent && <IconComponent />}
                 <span>{item.label}</span>
-              </SidebarMenuButton>
-            </Link>
+              </Link>
+            </SidebarMenuButton>
           </SidebarMenuItem>
         );
       })}
     </SidebarMenu>
   );
 }
-
-    
