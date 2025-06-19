@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/tooltip"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
+const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7 // 7 days
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
@@ -71,8 +71,24 @@ const SidebarProvider = React.forwardRef<
     const isMobile = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
 
-    const [_open, _setOpen] = React.useState(defaultOpen)
+    const getInitialOpenState = React.useCallback(() => {
+      if (typeof window === "undefined") {
+        return defaultOpen; // Default for SSR or if window is not available
+      }
+      const cookieValue = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith(`${SIDEBAR_COOKIE_NAME}=`))
+        ?.split("=")[1];
+
+      if (cookieValue === "true") return true;
+      if (cookieValue === "false") return false;
+      return defaultOpen; // Fallback to prop if cookie not set or invalid
+    }, [defaultOpen]);
+
+
+    const [_open, _setOpen] = React.useState(getInitialOpenState());
     const open = openProp ?? _open
+    
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {
         const openState = typeof value === "function" ? value(open) : value
@@ -81,16 +97,26 @@ const SidebarProvider = React.forwardRef<
         } else {
           _setOpen(openState)
         }
-
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+        if (typeof window !== "undefined") {
+          document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+        }
       },
       [setOpenProp, open]
     )
 
+    // Effect to update state if cookie changes from another tab (or if defaultOpen changes and no cookie was set)
+    React.useEffect(() => {
+        const currentInitialState = getInitialOpenState();
+        if (_open !== currentInitialState && openProp === undefined) { // only if uncontrolled and different
+            _setOpen(currentInitialState);
+        }
+    }, [getInitialOpenState, _open, openProp]);
+
+
     const toggleSidebar = React.useCallback(() => {
       return isMobile
-        ? setOpenMobile((open) => !open)
-        : setOpen((open) => !open)
+        ? setOpenMobile((current) => !current)
+        : setOpen((current) => !current)
     }, [isMobile, setOpen, setOpenMobile])
 
     React.useEffect(() => {
@@ -218,11 +244,7 @@ const Sidebar = React.forwardRef<
         <div
           className={cn(
             "duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear",
-            "group-data-[collapsible=offcanvas]:w-0",
-            "group-data-[side=right]:rotate-180",
-            variant === "floating" || variant === "inset"
-              ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]"
-              : "group-data-[collapsible=icon]:w-[--sidebar-width-icon]"
+            "group-data-[collapsible=icon]:w-[--sidebar-width-icon]"
           )}
         />
         <div
@@ -549,8 +571,8 @@ const SidebarMenuButton = React.forwardRef<
     const { isMobile, state } = useSidebar()
 
     const tooltipContentProps = React.useMemo(() => {
-      if (!tooltip) return undefined; // Return undefined if no tooltip
-      return typeof tooltip === 'object' ? tooltip : { children: tooltip };
+      if (!tooltip) return undefined;
+      return typeof tooltip === 'object' && tooltip !== null && 'children' in tooltip ? tooltip : { children: tooltip };
     }, [tooltip]);
 
     const buttonElement = (
@@ -573,7 +595,7 @@ const SidebarMenuButton = React.forwardRef<
           <TooltipContent
             side="right"
             align="center"
-            {...tooltipContentProps}
+            {...tooltipContentProps} // Spread the object here
           />
         </Tooltip>
       )
@@ -751,3 +773,4 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+
