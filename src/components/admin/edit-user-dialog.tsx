@@ -41,7 +41,7 @@ import { getUserDocPath } from '@/lib/firestore-paths';
 const editUserSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }),
-  role: z.custom<UserRole>(val => ['Admin', 'Teacher', 'Student'].includes(val as UserRole), 'Role is required.'),
+  role: z.custom<UserRole>(val => ['Admin', 'Teacher', 'Student', 'Coordinator'].includes(val as UserRole), 'Role is required.'),
   status: z.enum(['Active', 'Inactive', 'Pending'], { required_error: "Status is required."}),
 });
 
@@ -168,6 +168,7 @@ export function EditUserDialog({ isOpen, onOpenChange, onUserEdited, userToEdit 
                       <SelectItem value="Student">Student</SelectItem>
                       <SelectItem value="Teacher">Teacher</SelectItem>
                       <SelectItem value="Admin">Admin</SelectItem>
+                      <SelectItem value="Coordinator">Coordinator</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -215,5 +216,3 @@ export function EditUserDialog({ isOpen, onOpenChange, onUserEdited, userToEdit 
     </Dialog>
   );
 }
-
-    

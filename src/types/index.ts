@@ -23,7 +23,7 @@ export const examNamesArray: ExamName[] = ['FA1', 'FA2', 'SA1', 'FA3', 'FA4', 'S
 export type ReligionType = 'Hindu' | 'Muslim' | 'Christian' | 'Sikh' | 'Jain' | 'Buddhist' | 'Other';
 export const religionOptions: ReligionType[] = ['Hindu', 'Muslim', 'Christian', 'Sikh', 'Jain', 'Buddhist', 'Other'];
 
-export type UserRole = 'Admin' | 'Teacher' | 'Student';
+export type UserRole = 'Admin' | 'Teacher' | 'Student' | 'Coordinator';
 
 export type TeacherAssignmentType = 
   | 'class_teacher'       // For a specific class and section (e.g., 9A Class Teacher)

@@ -41,7 +41,7 @@ import { getUsersCollectionPath } from '@/lib/firestore-paths';
 const addUserSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }),
-  role: z.custom<UserRole>(val => ['Admin', 'Teacher', 'Student'].includes(val as UserRole), 'Role is required.'),
+  role: z.custom<UserRole>(val => ['Admin', 'Teacher', 'Student', 'Coordinator'].includes(val as UserRole), 'Role is required.'),
 });
 
 type AddUserFormValues = z.infer<typeof addUserSchema>;
@@ -72,7 +72,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
         name: values.name,
         email: values.email,
         role: values.role,
-        status: 'Pending' as ManagedUser['status'],
+        status: 'Pending' as ManagedUser['status'], // Default status
         lastLogin: 'N/A',
       };
 
@@ -155,6 +155,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
                       <SelectItem value="Student">Student</SelectItem>
                       <SelectItem value="Teacher">Teacher</SelectItem>
                       <SelectItem value="Admin">Admin</SelectItem>
+                      <SelectItem value="Coordinator">Coordinator</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -180,5 +181,3 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     </Dialog>
   );
 }
-
-    

@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Search, UserPlus, Trash2, ShieldCheck, School, User, Loader2 } from 'lucide-react';
+import { Edit, Search, UserPlus, Trash2, ShieldCheck, School, User, Loader2, ClipboardUser } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added missing import
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -39,6 +39,7 @@ const roleIcons: Record<UserRole, React.ElementType> = {
   Admin: ShieldCheck,
   Teacher: School,
   Student: User,
+  Coordinator: ClipboardUser,
 };
 
 export function UserManagementTable() {
@@ -57,7 +58,7 @@ export function UserManagementTable() {
     const usersCollectionRef = collection(firestore, usersCollectionPath);
     
     const unsubscribe = onSnapshot(usersCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
-      const fetchedUsers = snapshot.docs.map(docSnap => ({ // Renamed doc to docSnap
+      const fetchedUsers = snapshot.docs.map(docSnap => ({ 
         id: docSnap.id,
         ...docSnap.data(),
       } as ManagedUser));
@@ -190,6 +191,7 @@ export function UserManagementTable() {
                 <SelectItem value="Admin">Admin</SelectItem>
                 <SelectItem value="Teacher">Teacher</SelectItem>
                 <SelectItem value="Student">Student</SelectItem>
+                <SelectItem value="Coordinator">Coordinator</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -217,7 +219,7 @@ export function UserManagementTable() {
                     <TableCell>{user.name}</TableCell>
                     <TableCell className="text-muted-foreground">{user.email}</TableCell>
                     <TableCell>
-                      <Badge variant={user.role === 'Admin' ? 'default' : 'secondary'} className="capitalize flex items-center gap-1">
+                      <Badge variant={user.role === 'Admin' || user.role === 'Coordinator' ? 'default' : 'secondary'} className="capitalize flex items-center gap-1">
                         {RoleIcon && <RoleIcon className="h-3.5 w-3.5" />}
                         {user.role}
                       </Badge>

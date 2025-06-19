@@ -58,6 +58,7 @@ function getExpectedRoleFromPathname(pathname: string): UserRole | null {
   if (pathname.startsWith('/student/')) return 'Student';
   if (pathname.startsWith('/teacher/')) return 'Teacher';
   if (pathname.startsWith('/admin/')) return 'Admin';
+  if (pathname.startsWith('/coordinator/')) return 'Coordinator';
   return null;
 }
 
@@ -65,23 +66,30 @@ function getDashboardTitle(pathname: string, actualRole: UserRole | null, appNam
     const rolePrefix = actualRole ? actualRole.toLowerCase() : '';
 
     if (pathname === `/${rolePrefix}/dashboard`) return `${actualRole} Dashboard`;
-    if (pathname === `/${rolePrefix}/profile`) return `${actualRole} Profile`;
+    if (pathname === `/${rolePrefix}/profile`) return `${actualRole} Profile`; // Student & Teacher
+    // Student specific
     if (pathname === `/${rolePrefix}/records`) return `My Academic Records`;
     if (pathname === `/${rolePrefix}/attendance`) return `My Attendance`;
     if (pathname === `/${rolePrefix}/remarks`) return `My Remarks`;
     if (pathname === `/${rolePrefix}/events`) return `Upcoming Events`;
     if (pathname === `/${rolePrefix}/scholarships`) return `My Scholarships`;
     
+    // Teacher specific (some might be shared with Coordinator later)
     if (pathname === `/${rolePrefix}/students`) return `Manage Students`;
     if (pathname === `/${rolePrefix}/data-entry`) return `Student Data Entry`;
     if (pathname === `/${rolePrefix}/give-remark`) return `Provide Student Remark`;
     if (pathname === `/${rolePrefix}/messaging`) return `Send Messages`;
     
+    // Admin specific
     if (pathname === `/admin/user-management`) return `User Management`;
     if (pathname === `/admin/teacher-management`) return `Teacher Management`;
     if (pathname === `/admin/hall-of-fame-management`) return `Manage Hall of Fame`;
     if (pathname === `/admin/analytics`) return `System Analytics`;
     if (pathname === `/admin/settings`) return `Admin Settings`;
+
+    // Coordinator specific (can reuse some descriptions if pages are shared)
+    if (pathname === `/coordinator/students`) return `All Student Management`; // Example for coordinator
+    if (pathname === `/coordinator/teachers`) return `All Teacher Management`; // Example for coordinator
     
     if (pathname.startsWith(`/hall-of-fame`)) return `EES Hall of Fame`;
 
@@ -154,7 +162,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
 
           const roleFromDb = profile.role;
 
-          if (roleFromDb && ['Admin', 'Teacher', 'Student'].includes(roleFromDb)) {
+          if (roleFromDb && ['Admin', 'Teacher', 'Student', 'Coordinator'].includes(roleFromDb)) {
             const expectedRole = getExpectedRoleFromPathname(pathname);
             if (pathname.startsWith('/hall-of-fame') && !expectedRole) {
                setIsLoadingAuth(false);
@@ -335,6 +343,11 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode; }) {
                  {userProfile.role === 'Admin' && (
                   <DropdownMenuItem onClick={() => router.push(`/admin/settings`)}>
                      <SettingsIcon className="mr-2 h-4 w-4 text-muted-foreground" /> Settings
+                  </DropdownMenuItem>
+                )}
+                 {userProfile.role === 'Coordinator' && ( // Example: Coordinator might not have a dedicated profile page but can see settings
+                  <DropdownMenuItem onClick={() => router.push(`/admin/settings`)}>
+                     <SettingsIcon className="mr-2 h-4 w-4 text-muted-foreground" /> View Settings (Read-only example)
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => router.push(`/hall-of-fame`)}>
