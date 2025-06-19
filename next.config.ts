@@ -8,16 +8,18 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**', // This should cover any path on placehold.co
-      },
-    ],
-  },
+  // The images configuration is now handled in next.config.js
+  // to resolve the persistent issue as per user request.
+  // images: {
+  //   remotePatterns: [
+  //     {
+  //       protocol: 'https',
+  //       hostname: 'placehold.co',
+  //       port: '',
+  //       pathname: '/**', 
+  //     },
+  //   ],
+  // },
 };
 
 export default nextConfig;

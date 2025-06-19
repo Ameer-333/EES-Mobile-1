@@ -1,10 +1,12 @@
-// This file defers to next.config.ts for all Next.js configuration.
-// Ensure next.config.ts exports its configuration as default.
-
+// next.config.js
 /** @type {import('next').NextConfig} */
-const tsConfig = require('./next.config.ts');
+const nextConfig = {
+  images: {
+    domains: ['placehold.co'],
+  },
+  // Other configurations previously deferred from next.config.ts might need to be
+  // explicitly added here or managed carefully if next.config.ts also defines them.
+  // For now, focusing on fixing the image domain issue as requested.
+};
 
-// If tsConfig is an ESModule, its default export might be under tsConfig.default
-// Otherwise, it might be the module itself if it uses module.exports.
-// This handles both common scenarios.
-module.exports = tsConfig.default || tsConfig;
+module.exports = nextConfig;
