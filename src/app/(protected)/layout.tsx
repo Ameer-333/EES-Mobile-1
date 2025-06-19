@@ -1,3 +1,4 @@
+
 // src/app/(protected)/layout.tsx
 'use client';
 
@@ -64,8 +65,8 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   const [appName, setAppName] = useState('EES Education');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const router = useRouter();
-  const pathname = usePathname();
-  const { toast } = useToast();
+  const pathname = usePathname(); // Keep for use within the effect, but not as dependency for the listener itself
+  const { toast } = useToast(); // Keep for use within the effect
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -79,13 +80,15 @@ function AppProvider({ children }: { children: React.ReactNode }) {
             const profileData = userDocSnap.data() as ManagedUser;
             setUserProfile(profileData);
 
-            const currentBasePath = pathname.split('/')[1]?.toLowerCase(); 
+            // Perform path check using the current pathname from usePathname()
+            const currentPath = window.location.pathname; // More direct way to get current path for this check
+            const currentBasePath = currentPath.split('/')[1]?.toLowerCase();
             const userRolePath = profileData.role.toLowerCase();
 
             if (currentBasePath && currentBasePath !== userRolePath) {
-              if (pathname !== `/login/${userRolePath}` && !pathname.startsWith(`/${userRolePath}/`)) {
-                if (pathname.startsWith('/hall-of-fame')) {
-                  // Allow access to /hall-of-fame from any role's context
+              if (currentPath !== `/login/${userRolePath}` && !currentPath.startsWith(`/${userRolePath}/`)) {
+                if (currentPath.startsWith('/hall-of-fame')) {
+                  // Allow access
                 } else {
                   toast({ title: "Redirecting", description: `Accessing restricted area. Redirecting to your ${profileData.role} dashboard.`, variant: "default", duration: 4000 });
                   router.push(`/${userRolePath}/dashboard`);
@@ -108,14 +111,16 @@ function AppProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUser(null);
         setUserProfile(null);
-        if (!pathname.startsWith('/login/') && pathname !== '/') {
+        // Perform path check using the current pathname from usePathname()
+        const currentPath = window.location.pathname;
+        if (!currentPath.startsWith('/login/') && currentPath !== '/') {
             router.push('/');
         }
       }
       setIsLoadingAuth(false);
     });
     return () => unsubscribe();
-  }, [router, pathname, toast]);
+  }, [router]); // Dependency array modified: removed pathname and toast
 
 
   useEffect(() => {
@@ -150,15 +155,15 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   
   const currentRole = useMemo(() => {
     if (!userProfile) return null;
+    // Pathname from usePathname() is reactive and correct here
     const pathSegments = pathname.split('/');
     if (pathSegments.length > 1) {
         const roleSegment = pathSegments[1].toLowerCase();
-        // Ensure the current path segment matches the user's role, or it's a general access page like hall-of-fame
         if (roleSegment === userProfile.role.toLowerCase() || roleSegment === 'hall-of-fame') {
             return userProfile.role;
         }
     }
-    return userProfile.role; // Fallback to profile role if path is ambiguous or doesn't match
+    return userProfile.role; 
   }, [pathname, userProfile]);
 
 
@@ -197,22 +202,18 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
 
   const getPageTitle = () => {
     const item = navItems.find(navItem => {
-        // More specific matching for dashboard/root paths of a role
         if (pathname === navItem.href || pathname === `${navItem.href}/`) return true;
-        // General startsWith for sub-pages, but exclude if it's just a prefix of another item
         if (navItem.href !== '/' && pathname.startsWith(navItem.href + '/')) return true;
-        // Handle /hall-of-fame specifically if it's not the root
         if (navItem.href === '/hall-of-fame' && pathname.startsWith('/hall-of-fame')) return true;
         return false;
     });
     
     if (item) return item.label;
 
-    // Fallback for paths not directly in navItems (e.g. /admin/user-management/edit/some-id)
     if (currentRole) {
         const rolePath = `/${currentRole.toLowerCase()}`;
         if (pathname.startsWith(`${rolePath}/dashboard`)) return "Dashboard";
-        if (pathname.startsWith(`${rolePath}/`)) { // General fallback for the role
+        if (pathname.startsWith(`${rolePath}/`)) { 
             const section = pathname.substring(rolePath.length + 1).split('/')[0];
             return section.charAt(0).toUpperCase() + section.slice(1).replace(/-/g, ' ');
         }
@@ -354,3 +355,4 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     </AppProvider>
   );
 }
+
