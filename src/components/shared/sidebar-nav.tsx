@@ -3,9 +3,9 @@
 
 // Icon imports remain critical for navItems
 import {
-  Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart,
+  Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart, Activity,
   MessageSquarePlus, Mail, Award, Building, MessageSquareText,
-  CalendarCheck, CalendarClock, ClipboardUser
+  CalendarCheck, CalendarClock
 } from 'lucide-react';
 import type { UserRole } from '@/types'; // Assuming UserRole is correctly defined in @/types
 
@@ -45,7 +45,7 @@ export const navItems: NavItem[] = [
   { href: '/admin/settings', label: 'Settings', icon: Settings, roles: ['Admin'], tooltip: 'Settings' },
 
   // Coordinator
-  { href: '/coordinator/dashboard', label: 'Dashboard', icon: ClipboardUser, roles: ['Coordinator'], tooltip: 'Dashboard' },
+  { href: '/coordinator/dashboard', label: 'Dashboard', icon: Activity, roles: ['Coordinator'], tooltip: 'Dashboard' },
   { href: '/coordinator/students', label: 'All Student Management', icon: UsersIcon, roles: ['Coordinator'], tooltip: 'Students' },
   { href: '/coordinator/teacher-management', label: 'All Teacher Management', icon: UsersIcon, roles: ['Coordinator'], tooltip: 'Teachers' },
   { href: '/coordinator/data-entry', label: 'Global Data Entry', icon: Edit, roles: ['Coordinator'], tooltip: 'Data Entry' },

@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { Users, Edit3, Building, Activity } from 'lucide-react'; // Changed ClipboardUser to Activity, and added Activity
+import { Users, Edit3, Building, Activity } from 'lucide-react';
 import { useAppContext } from '@/app/(protected)/layout';
 
 interface ActionCardProps {
@@ -51,7 +51,7 @@ export default function CoordinatorDashboardPage() {
             Welcome, {userProfile?.name || 'Coordinator'}! Access your tools and manage system data.
           </p>
         </div>
-        <Activity className="h-12 w-12 text-primary hidden sm:block" /> {/* Changed ClipboardUser to Activity */}
+        <Activity className="h-12 w-12 text-primary hidden sm:block" />
       </div>
 
       <div>
@@ -67,7 +67,7 @@ export default function CoordinatorDashboardPage() {
             title="Teacher Management"
             description="View and manage teacher profiles and their assignments system-wide."
             href="/coordinator/teacher-management"
-            icon={Users}
+            icon={Users} 
           />
           <ActionCard
             title="Global Data Entry"
