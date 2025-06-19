@@ -21,7 +21,8 @@ import { Eye, EyeOff, LogIn, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { auth } from '@/lib/firebase'; // Import Firebase auth
-import { signInWithEmailAndPassword, type FirebaseError } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app'; // Correct import for FirebaseError
 import type { UserRole } from '@/types'; // Import UserRole
 
 const formSchema = z.object({
