@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Edit, Search, UserPlus, Trash2, Loader2, Briefcase, Info } from 'lucide-react';
-import NextImage from 'next/image'; // Keep NextImage for non-placeholders
+import NextImage from 'next/image'; 
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +19,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added missing import
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TeacherProfileFormDialog } from './teacher-profile-form-dialog';
@@ -107,7 +107,7 @@ export function ManageTeacherProfiles() {
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, []); // Removed toast from dependency array
 
 
   const filteredTeachers = useMemo(() => {

@@ -55,7 +55,7 @@ export function GiveStudentRemarkForm() {
   const watchedStudentId = form.watch('studentId');
   const watchedSubject = form.watch('teacherSubject');
 
-  useEffect(() => { // Fetching students
+  useEffect(() => { 
     if (teacherUserProfile?.role !== 'Teacher' || teacherAssignments.length === 0) {
       setIsLoadingStudents(false); setAllAssignedStudents([]); return;
     }
@@ -103,9 +103,9 @@ export function GiveStudentRemarkForm() {
         setTimeout(() => { if(isLoadingStudents) setIsLoadingStudents(false); clearInterval(initialLoadCheck); }, 5000);
     } else { setIsLoadingStudents(false); }
     return () => unsubscribers.forEach(unsub => unsub());
-  }, [teacherUserProfile, teacherAssignments, isLoadingStudents]);
+  }, [teacherUserProfile, teacherAssignments]); // Removed isLoadingStudents
 
-  useEffect(() => { // Update selectedStudentData and classId in form
+  useEffect(() => { 
     if (watchedStudentId) {
         const student = allAssignedStudents.find(s => s.id === watchedStudentId);
         setSelectedStudentData(student || null);
@@ -117,7 +117,7 @@ export function GiveStudentRemarkForm() {
     }
   }, [watchedStudentId, allAssignedStudents, form]);
 
-  useEffect(() => { // Check for existing remarks
+  useEffect(() => { 
     const checkExistingRemark = async () => {
       if (!watchedStudentId || !watchedSubject || !selectedStudentData || currentTeacherName === "Teacher") {
         setRemarkAlreadySubmittedThisMonth(false); return;
@@ -141,7 +141,7 @@ export function GiveStudentRemarkForm() {
     if (currentTeacherName !== "Teacher" && selectedStudentData) {
       checkExistingRemark();
     }
-  }, [watchedStudentId, watchedSubject, currentTeacherName, toast, selectedStudentData]);
+  }, [watchedStudentId, watchedSubject, currentTeacherName, selectedStudentData]); // Removed toast
 
   const relevantSubjectsForSelectedStudent = useMemo(() => {
     if (!selectedStudentData || teacherAssignments.length === 0) return [];

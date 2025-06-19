@@ -60,7 +60,7 @@ export function TeacherPayrollManagement() {
     
     const unsubscribe = onSnapshot(teachersCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
       const fetchedTeachers = snapshot.docs.map(docSnapshot => ({
-        id: docSnapshot.id, // authUid is the document ID here
+        id: docSnapshot.id, 
         ...docSnapshot.data(),
       } as Teacher));
       setTeachers(fetchedTeachers);
@@ -76,7 +76,7 @@ export function TeacherPayrollManagement() {
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, []); // Removed toast dependency
 
   const form = useForm<SalaryRecordFormValues>({
     resolver: zodResolver(salaryRecordSchema),
@@ -108,7 +108,7 @@ export function TeacherPayrollManagement() {
   };
 
   const handleSaveSalaryRecord = async (values: SalaryRecordFormValues) => {
-    if (!selectedTeacher || !selectedTeacher.authUid) { // Ensure authUid is present
+    if (!selectedTeacher || !selectedTeacher.authUid) { 
         toast({title: "Error", description: "Selected teacher data is incomplete.", variant: "destructive"});
         return;
     }

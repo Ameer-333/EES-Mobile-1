@@ -61,7 +61,7 @@ export function TeacherDataEntry() {
       setAllAssignedStudents([]);
       return;
     }
-    // Same student fetching logic as in TeacherStudentManagement
+    
     setIsLoadingStudents(true);
     const unsubscribers: (() => void)[] = [];
     const fetchedStudentsMap: Map<string, Student> = new Map();
@@ -107,10 +107,10 @@ export function TeacherDataEntry() {
                 setIsLoadingStudents(false); clearInterval(initialLoadCheck);
             }
         }, 500);
-         setTimeout(() => { if(isLoadingStudents) setIsLoadingStudents(false); clearInterval(initialLoadCheck);}, 5000); // Changed isLoading to isLoadingStudents
+         setTimeout(() => { if(isLoadingStudents) setIsLoadingStudents(false); clearInterval(initialLoadCheck);}, 5000); 
     } else { setIsLoadingStudents(false); }
     return () => unsubscribers.forEach(unsub => unsub());
-  }, [userProfile, teacherAssignments, isLoadingStudents]); // Added isLoadingStudents to dependency array
+  }, [userProfile, teacherAssignments]); // Removed isLoadingStudents
 
   const marksForm = useForm<z.infer<typeof marksSchema>>({
     resolver: zodResolver(marksSchema),
@@ -153,32 +153,32 @@ export function TeacherDataEntry() {
 
     studentAssignments.forEach(assignment => {
       switch (assignment.type) {
-        case 'mother_teacher': // e.g. LKG-4th
+        case 'mother_teacher': 
           motherTeacherCoreSubjects.forEach(s => subjects.add(s));
-          // Add Hindi/Kannada if this teacher is also assigned as subject teacher for them
+          
           if (studentAssignments.some(sa => sa.subjectId === 'Hindi' && sa.type === 'subject_teacher')) subjects.add('Hindi');
           if (studentAssignments.some(sa => sa.subjectId === 'Kannada' && sa.type === 'subject_teacher')) subjects.add('Kannada');
           break;
-        case 'class_teacher': // e.g. 5th-10th
-          standardSubjectNamesArray.forEach(s => subjects.add(s)); // Full access for class teacher
+        case 'class_teacher': 
+          standardSubjectNamesArray.forEach(s => subjects.add(s)); 
           break;
         case 'subject_teacher':
           if (assignment.subjectId) subjects.add(assignment.subjectId);
           break;
         case 'nios_teacher':
-          niosSubjectNamesArray.forEach(s => subjects.add(s)); // Or filter by assignment.subjectId if NIOS teachers are for specific NIOS subjects
-          if (assignment.subjectId) subjects.add(assignment.subjectId); // if specific subject assigned for NIOS
+          niosSubjectNamesArray.forEach(s => subjects.add(s)); 
+          if (assignment.subjectId) subjects.add(assignment.subjectId); 
           break;
         case 'nclp_teacher':
-          if (selectedStudentData.groupId === 'NCLP_GROUP_B_SPECIFIC_ID' && assignment.subjectId === 'Hindi (NCLP)') { // Example
+          if (selectedStudentData.groupId === 'NCLP_GROUP_B_SPECIFIC_ID' && assignment.subjectId === 'Hindi (NCLP)') { 
             subjects.add('Hindi (NCLP)');
           } else if (selectedStudentData.groupId === 'NCLP_GROUP_B_SPECIFIC_ID' ) {
             nclpGroupBSubjectsNoHindi.forEach(s => subjects.add(s));
           }
-          else { // NCLP Group A or general NCLP assignment
+          else { 
             nclpSubjectNamesArray.forEach(s => subjects.add(s));
           }
-           if (assignment.subjectId) subjects.add(assignment.subjectId); // if specific subject assigned for NCLP
+           if (assignment.subjectId) subjects.add(assignment.subjectId); 
           break;
       }
     });

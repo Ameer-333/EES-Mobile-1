@@ -240,7 +240,7 @@ export function TeacherProfileFormDialog({
         }
       })();
     }
-  }, [teacherToEdit, isOpen, form, isEditing, currentYear, toast, onOpenChange]);
+  }, [teacherToEdit, isOpen, form, isEditing, currentYear, onOpenChange]); // Removed toast
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -411,3 +411,4 @@ export function TeacherProfileFormDialog({
     </Dialog>
   );
 }
+

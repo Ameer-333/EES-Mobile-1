@@ -8,8 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Edit, Search, UserPlus, Trash2, Loader2, Filter, Info } from 'lucide-react';
-// Use regular <img> for placehold.co, next/image for others
-// import NextImage from 'next/image'; // No longer directly used if all fallbacks are placehold.co
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -122,7 +121,7 @@ export function TeacherStudentManagement() {
     return () => {
       unsubscribers.forEach(unsub => unsub());
     };
-  }, [userProfile, teacherAssignments, toast]);
+  }, [userProfile, teacherAssignments]); // Removed toast
 
 
   const filteredStudentsToDisplay = useMemo(() => {
@@ -264,7 +263,7 @@ export function TeacherStudentManagement() {
                           data-ai-hint="student avatar placeholder"
                         />
                       ) : (
-                         <img // Fallback to img if not placehold.co to avoid next/image errors for now
+                         <img 
                           src={imgSrc}
                           alt={student.name || 'Student'}
                           width={40}
@@ -339,3 +338,4 @@ export function TeacherStudentManagement() {
     </>
   );
 }
+
