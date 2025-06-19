@@ -220,7 +220,12 @@ export default function AdminAnalyticsPage() {
                     <RechartsLegend />
                     <Bar dataKey="usage" name="Current Usage" radius={4}>
                         <LabelList dataKey="usage" position="right" offset={8} fontSize={12} 
-                                   formatter={(value: number, props: any) => `${value.toLocaleString()} / ${props.payload.limit.toLocaleString()} ${props.payload.unit.includes('reads') || props.payload.unit.includes('writes') ? props.payload.unit.replace('/day', '') : props.payload.unit}`}/>
+                                   formatter={(value: number, props: any) => {
+                                    if (props && props.payload && typeof props.payload.limit === 'number' && typeof props.payload.unit === 'string') {
+                                      return `${value.toLocaleString()} / ${props.payload.limit.toLocaleString()} ${props.payload.unit.includes('reads') || props.payload.unit.includes('writes') ? props.payload.unit.replace('/day', '') : props.payload.unit}`;
+                                    }
+                                    return value.toLocaleString(); // Fallback
+                                  }}/>
                     </Bar>
                  </RechartsBarChart>
             </ChartContainer>
