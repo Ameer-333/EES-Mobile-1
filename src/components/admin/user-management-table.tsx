@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Search, UserPlus, Trash2, ShieldCheck, School, User, Loader2, Users as UsersIcon } from 'lucide-react'; // Changed ClipboardUser to UsersIcon
+import { Edit, Search, UserPlus, Trash2, ShieldCheck, School, User, Loader2, Users as UsersIcon } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,7 +39,7 @@ const roleIcons: Record<UserRole, React.ElementType> = {
   Admin: ShieldCheck,
   Teacher: School,
   Student: User,
-  Coordinator: UsersIcon, // Changed from ClipboardUser
+  Coordinator: UsersIcon,
 };
 
 export function UserManagementTable() {
@@ -56,9 +56,9 @@ export function UserManagementTable() {
     setIsLoading(true);
     const usersCollectionPath = getUsersCollectionPath();
     const usersCollectionRef = collection(firestore, usersCollectionPath);
-    
+
     const unsubscribe = onSnapshot(usersCollectionRef, (snapshot: QuerySnapshot<DocumentData>) => {
-      const fetchedUsers = snapshot.docs.map(docSnap => ({ 
+      const fetchedUsers = snapshot.docs.map(docSnap => ({
         id: docSnap.id,
         ...docSnap.data(),
       } as ManagedUser));
@@ -75,7 +75,7 @@ export function UserManagementTable() {
     });
 
     return () => unsubscribe();
-  }, []); 
+  }, [toast]);
 
   const filteredUsers = useMemo(() => {
     return users.filter(
@@ -91,7 +91,7 @@ export function UserManagementTable() {
     setCurrentUserToEdit(user);
     setIsEditUserDialogOpen(true);
   };
-  
+
   const handleDeleteUser = async (userId: string, userName: string) => {
     try {
       const userDocPath = getUserDocPath(userId);
@@ -111,14 +111,13 @@ export function UserManagementTable() {
   const handleUserAdded = (newUser: ManagedUser) => {
     // Dialog will manage its own closing after displaying credentials.
     // The onSnapshot listener will update the table.
-    // console.log("User added in parent:", newUser);
   };
 
   const handleUserEdited = (editedUser: ManagedUser) => {
     // The onSnapshot listener will update the table.
     setIsEditUserDialogOpen(false);
   };
-  
+
   if (isLoading) {
     return (
       <Card className="w-full shadow-xl rounded-lg border-primary/10">
@@ -231,8 +230,8 @@ export function UserManagementTable() {
                       <Badge
                         variant={user.status === 'Active' ? 'outline' : user.status === 'Pending' ? 'default': 'destructive'}
                         className={
-                            user.status === 'Active' ? 'border-green-500 text-green-600 bg-green-500/10' : 
-                            user.status === 'Pending' ? 'border-yellow-500 text-yellow-600 bg-yellow-500/10' : 
+                            user.status === 'Active' ? 'border-green-500 text-green-600 bg-green-500/10' :
+                            user.status === 'Pending' ? 'border-yellow-500 text-yellow-600 bg-yellow-500/10' :
                             'border-red-500 text-red-600 bg-red-500/10'}
                       >
                         {user.status}
@@ -283,8 +282,8 @@ export function UserManagementTable() {
           )}
         </CardContent>
       </Card>
-      <AddUserDialog 
-        isOpen={isAddUserDialogOpen} 
+      <AddUserDialog
+        isOpen={isAddUserDialogOpen}
         onOpenChange={setIsAddUserDialogOpen}
         onUserAdded={handleUserAdded}
       />
@@ -297,4 +296,3 @@ export function UserManagementTable() {
     </>
   );
 }
-

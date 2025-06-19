@@ -7,7 +7,7 @@ import NextImage from 'next/image'; // Keep NextImage for non-placeholders
 
 interface StudentProfileCardProps {
   student: Student;
-  isFullPage?: boolean; 
+  isFullPage?: boolean;
 }
 
 const mockStudent: Student = {
@@ -60,14 +60,14 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
         <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
           <div className="relative flex-shrink-0">
             {useRegularImg ? (
-              &lt;img
+              <img
                 src={profileSrc}
                 alt={`${student.name || 'Student'}'s Profile Picture`}
                 width={isFullPage ? 140 : 100}
                 height={isFullPage ? 140 : 100}
                 className="rounded-full border-4 border-primary/50 shadow-lg object-cover"
                 data-ai-hint="student portrait placeholder"
-              /&gt;
+              />
             ) : (
               <NextImage
                 src={profileSrc}
@@ -119,7 +119,7 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
             </Section>
         )}
 
-        {!isFullPage && ( 
+        {!isFullPage && (
             <div className="mt-4 pt-4 border-t border-muted/30">
                  <ProfileItem icon={MapPin} label="Address" value={student.address} className="text-sm"/>
             </div>
@@ -171,4 +171,3 @@ function ProfileItem({ icon: Icon, label, value, className }: ProfileItemProps) 
     </div>
   );
 }
-

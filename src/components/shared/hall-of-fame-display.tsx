@@ -20,9 +20,9 @@ interface HallOfFameDisplayProps {
 const categoryIcons: Record<HallOfFameItem['category'] | 'Founders & Visionaries' | 'Leadership' | 'School Accolades' | 'Founder Accolades' | 'Student Achievements', React.ElementType> = {
   'founder': Briefcase,
   'co-founder': Briefcase,
-  'principal': UsersIconLucide, 
+  'principal': UsersIconLucide,
   'school-award': Award,
-  'founder-award': Star, 
+  'founder-award': Star,
   'student-achievement': Crown,
   'Founders & Visionaries': Briefcase,
   'Leadership': UsersIconLucide,
@@ -48,8 +48,8 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
   useEffect(() => {
     setIsLoading(true);
     const hallOfFamePath = getHallOfFameCollectionPath();
-    const q = query(collection(firestore, hallOfFamePath), orderBy("name")); 
-    
+    const q = query(collection(firestore, hallOfFamePath), orderBy("name"));
+
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const fetchedItems: HallOfFameItem[] = [];
       querySnapshot.forEach((doc) => {
@@ -81,12 +81,12 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
     acc[displayKey].push(item);
     return acc;
   }, {} as Record<string, HallOfFameItem[]>);
-  
+
   const displayOrder: string[] = [
-    'Founders & Visionaries', 
-    'Leadership', 
-    'School Accolades', 
-    'Founder Accolades', 
+    'Founders & Visionaries',
+    'Leadership',
+    'School Accolades',
+    'Founder Accolades',
     'Student Achievements'
   ];
 
@@ -152,7 +152,7 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
                     sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     className="object-cover"
                     data-ai-hint={mainFounder.dataAiHint || "founder portrait"}
-                    priority 
+                    priority
                   />
                 )}
               </div>
@@ -172,7 +172,7 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
           </div>
         </section>
       )}
-      
+
       {displayOrder.map(groupTitle => {
         const itemsInGroup = groupedOtherItems[groupTitle] || [];
         if (itemsInGroup.length === 0) return null;

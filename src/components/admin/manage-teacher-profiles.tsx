@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Edit, Search, UserPlus, Trash2, Loader2, Briefcase, Info } from 'lucide-react';
-import NextImage from 'next/image'; 
+import NextImage from 'next/image';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,7 +66,7 @@ export function ManageTeacherProfiles() {
         const teacherData: Teacher = {
           ...data,
           id: docId,
-          authUid: docId, 
+          authUid: docId,
         } as Teacher;
 
         let assignments: TeacherAssignment[] = [];
@@ -76,7 +76,7 @@ export function ManageTeacherProfiles() {
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     const managedUserData = userDocSnap.data() as ManagedUser;
-                    if (managedUserData.role === 'Teacher') { 
+                    if (managedUserData.role === 'Teacher') {
                          assignments = managedUserData.assignments || [];
                     } else {
                         console.warn(`User record for Auth ID ${teacherData.authUid} is not a Teacher. Skipping assignments.`);
@@ -88,10 +88,10 @@ export function ManageTeacherProfiles() {
                 console.warn(`Could not fetch assignments for teacher ${teacherData.authUid}:`, error)
             }
         }
-        
+
         return { ...teacherData, assignments };
       });
-      
+
       const resolvedTeachersWithNulls = await Promise.all(fetchedTeachersPromises);
       const resolvedTeachers = resolvedTeachersWithNulls.filter(Boolean) as TeacherWithAssignments[];
       setTeachersWithAssignments(resolvedTeachers);
@@ -107,7 +107,7 @@ export function ManageTeacherProfiles() {
     });
 
     return () => unsubscribe();
-  }, []); // Removed toast from dependency array
+  }, [toast]);
 
 
   const filteredTeachers = useMemo(() => {
@@ -162,10 +162,10 @@ export function ManageTeacherProfiles() {
       toast({
           title: "Teacher Records Deleted",
           description: (
-            React.createElement('div', null,
-              React.createElement('p', null, `HR profile and user data for `, React.createElement('strong', null, teacherName), ` (Auth ID: ${teacherAuthUid}) removed from Firestore.`),
-              React.createElement('p', {className: "text-xs mt-1 text-destructive"}, `IMPORTANT: The Firebase Authentication account for this teacher needs to be deleted manually from the Firebase console if completely removing the teacher.`)
-            )
+            <div>
+              <p>HR profile and user data for <strong>{teacherName}</strong> (Auth ID: {teacherAuthUid}) removed from Firestore.</p>
+              <p className="text-xs mt-1 text-destructive">IMPORTANT: The Firebase Authentication account for this teacher needs to be deleted manually from the Firebase console if completely removing the teacher.</p>
+            </div>
           ),
           duration: 15000,
       });
@@ -182,7 +182,7 @@ export function ManageTeacherProfiles() {
   const handleTeacherSaved = (savedTeacher: Teacher, isEditing: boolean) => {
     setIsFormOpen(false);
   };
-  
+
   const getAssignmentSummary = (assignments?: TeacherAssignment[]): string => {
     if (!assignments || assignments.length === 0) return "No assignments";
     if (assignments.length > 2) return `${assignments.length} assignments`;
@@ -339,10 +339,10 @@ export function ManageTeacherProfiles() {
                             </AlertDialogContent>
                         </AlertDialog>
                       )}
-                       {!canEditTeachers && !canDeleteTeachers && ( 
+                       {!canEditTeachers && !canDeleteTeachers && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <span tabIndex={0}> 
+                                    <span tabIndex={0}>
                                         <Button variant="outline" size="sm" disabled className="cursor-not-allowed">
                                             <Info className="h-3.5 w-3.5 mr-1" /> View Only
                                         </Button>
@@ -382,4 +382,3 @@ export function ManageTeacherProfiles() {
     </TooltipProvider>
   );
 }
-    

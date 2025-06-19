@@ -43,12 +43,12 @@ export function UpcomingEventsDisplay({ events = mockEvents }: UpcomingEventsDis
         <Card key={event.id} className="overflow-hidden shadow-xl hover:shadow-2xl transition-shadow duration-300 ease-in-out flex flex-col group bg-card rounded-lg border border-border/50 hover:border-primary/30">
           <div className="relative w-full h-56 md:h-60 bg-muted/30">
             {useRegularImg ? (
-                &lt;img
+                <img
                     src={imgSrc}
                     alt={event.name}
                     className="object-cover w-full h-full transform transition-transform duration-300 group-hover:scale-105"
                     data-ai-hint={event.dataAiHint || 'event image placeholder'}
-                /&gt;
+                />
             ) : (
                 <NextImageComponent
                     src={imgSrc}
@@ -70,27 +70,27 @@ export function UpcomingEventsDisplay({ events = mockEvents }: UpcomingEventsDis
             <div>
               <div className="flex items-center text-sm text-muted-foreground mb-1.5">
                 <CalendarDays className="h-4 w-4 mr-2 text-primary/80" />
-                &lt;span&gt;{event.day}, {new Date(event.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}&lt;/span&gt;
+                <span>{event.day}, {new Date(event.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
               </div>
               <div className="flex items-center text-sm text-muted-foreground mb-1.5">
                 <Clock className="h-4 w-4 mr-2 text-primary/80" />
-                &lt;span&gt;{event.time}&lt;/span&gt;
+                <span>{event.time}</span>
               </div>
               {event.location && (
-                &lt;div className="flex items-center text-sm text-muted-foreground mb-3"&gt;
-                  &lt;MapPin className="h-4 w-4 mr-2 text-primary/80" /&gt;
-                  &lt;span&gt;{event.location}&lt;/span&gt;
-                &lt;/div&gt;
+                <div className="flex items-center text-sm text-muted-foreground mb-3">
+                  <MapPin className="h-4 w-4 mr-2 text-primary/80" />
+                  <span>{event.location}</span>
+                </div>
               )}
               {event.note && (
-                &lt;p className="text-sm text-foreground/80 mt-2 leading-relaxed line-clamp-3 group-hover:line-clamp-none transition-all"&gt;
+                <p className="text-sm text-foreground/80 mt-2 leading-relaxed line-clamp-3 group-hover:line-clamp-none transition-all">
                   {event.note}
-                &lt;/p&gt;
+                </p>
               )}
             </div>
             <Button variant="outline" size="sm" className="mt-4 w-full group-hover:bg-accent group-hover:text-accent-foreground transition-colors">
                 View Details
-                &lt;Info className="ml-2 h-4 w-4 opacity-70 group-hover:opacity-100"/&gt;
+                <Info className="ml-2 h-4 w-4 opacity-70 group-hover:opacity-100"/>
             </Button>
           </CardContent>
         </Card>
@@ -98,4 +98,3 @@ export function UpcomingEventsDisplay({ events = mockEvents }: UpcomingEventsDis
     </div>
   );
 }
-

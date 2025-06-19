@@ -13,8 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel as RHFFormLabel, FormMessage } from '@/components/ui/form'; // Renamed FormLabel to avoid conflict
-import { Label } from '@/components/ui/label'; // Import the base Label
+import { Form, FormControl, FormField, FormItem, FormLabel as RHFFormLabel, FormMessage } from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Loader2, PlusCircle, Edit, Trash2, ClipboardList, Users, UserCog, AlertTriangle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -23,13 +23,12 @@ import { collection, doc, getDocs, onSnapshot, updateDoc, query, orderBy, where 
 import { getTeachersCollectionPath, getUserDocPath } from '@/lib/firestore-paths';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Helper function at the top-level (similar to teacher-profile-form-dialog)
 function getSubjectOptionsForAssignmentType(assignmentType?: TeacherAssignmentType): SubjectName[] {
   if (assignmentType === 'nios_teacher') return niosSubjectsForAssignment;
-  if (assignmentType === 'nclp_teacher') return nclpAllSubjects; // Or a more filtered NCLP list if needed
-  if (assignmentType === 'subject_teacher') return standardSubjectNamesArray; // Default to standard for general subject teacher
-  if (assignmentType === 'class_teacher' || assignmentType === 'mother_teacher') return []; // No specific subject for these types at assignment level
-  return []; // Default empty for other/unspecified types
+  if (assignmentType === 'nclp_teacher') return nclpAllSubjects;
+  if (assignmentType === 'subject_teacher') return standardSubjectNamesArray;
+  if (assignmentType === 'class_teacher' || assignmentType === 'mother_teacher') return [];
+  return [];
 }
 
 
@@ -45,7 +44,7 @@ const assignmentSchema = z.object({
   const needsSubject = data.type === 'subject_teacher' || data.type === 'nios_teacher' || data.type === 'nclp_teacher';
   const hasSubjectOptions = getSubjectOptionsForAssignmentType(data.type).length > 0;
   if (needsSubject && hasSubjectOptions && !data.subjectId) {
-    return false; // Invalid if subject is needed and options exist, but no subject is selected.
+    return false;
   }
   return true;
 }, {
@@ -61,10 +60,10 @@ export function TeacherAssignmentView() {
   const [managedUsers, setManagedUsers] = useState<Record<string, ManagedUser>>({});
   const [selectedTeacherAuthUid, setSelectedTeacherAuthUid] = useState<string | null>(null);
   const [currentAssignments, setCurrentAssignments] = useState<TeacherAssignment[]>([]);
-  
+
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<TeacherAssignment | null>(null);
-  
+
   const [isLoadingTeachers, setIsLoadingTeachers] = useState(true);
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(false);
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
@@ -78,7 +77,6 @@ export function TeacherAssignmentView() {
   const subjectOptionsForForm = useMemo(() => getSubjectOptionsForAssignmentType(watchedAssignmentType), [watchedAssignmentType]);
 
 
-  // Fetch all teachers (HR profiles for selection)
   useEffect(() => {
     setIsLoadingTeachers(true);
     const teachersPath = getTeachersCollectionPath();
@@ -95,7 +93,6 @@ export function TeacherAssignmentView() {
     return () => unsubscribe();
   }, [toast]);
 
-  // Fetch assignments for the selected teacher
   useEffect(() => {
     if (!selectedTeacherAuthUid) {
       setCurrentAssignments([]);
@@ -134,8 +131,7 @@ export function TeacherAssignmentView() {
     }
     setIsSubmittingForm(true);
     const userDocPath = getUserDocPath(selectedTeacherAuthUid);
-    const teacherUserRecord = managedUsers[selectedTeacherAuthUid];
-    
+
     let updatedAssignments: TeacherAssignment[];
     if (editingAssignment) {
       updatedAssignments = currentAssignments.map(assign => assign.id === editingAssignment.id ? { ...assign, ...values } : assign);
@@ -302,7 +298,7 @@ export function TeacherAssignmentView() {
                   <FormItem><RHFFormLabel>Class/Program Display Name (Optional)</RHFFormLabel><FormControl><Input placeholder="e.g., LKG Sunshine, Class 10 Bravo" {...field} disabled={isSubmittingForm}/></FormControl><FormMessage /></FormItem> )}/>
               <FormField control={form.control} name="sectionId" render={({ field }) => (
                   <FormItem><RHFFormLabel>Section ID (Optional)</RHFFormLabel><FormControl><Input placeholder="e.g., A, B, Morning_Batch" {...field} disabled={isSubmittingForm}/></FormControl><FormMessage /></FormItem> )}/>
-             
+
               { (watchedAssignmentType === 'subject_teacher' || watchedAssignmentType === 'nios_teacher' || watchedAssignmentType === 'nclp_teacher') && subjectOptionsForForm.length > 0 && (
                 <FormField control={form.control} name="subjectId" render={({ field }) => (
                   <FormItem><RHFFormLabel>Subject</RHFFormLabel><Select onValueChange={field.onChange} value={field.value || ""} disabled={isSubmittingForm}>
@@ -319,7 +315,7 @@ export function TeacherAssignmentView() {
 
               <FormField control={form.control} name="groupId" render={({ field }) => (
                   <FormItem><RHFFormLabel>Group ID (Optional, for NIOS/NCLP sub-groups)</RHFFormLabel><FormControl><Input placeholder="e.g., Group_A_Painting, NCLP_B_Science_Focus" {...field} disabled={isSubmittingForm}/></FormControl><FormMessage /></FormItem> )}/>
-              
+
               <DialogFooter className="pt-4">
                 <DialogClose asChild><Button type="button" variant="outline" disabled={isSubmittingForm}>Cancel</Button></DialogClose>
                 <Button type="submit" disabled={isSubmittingForm}> {isSubmittingForm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingAssignment ? 'Save Changes' : 'Add Assignment')} </Button>
