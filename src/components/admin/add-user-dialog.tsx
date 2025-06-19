@@ -32,15 +32,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
-import { firestore } from '@/lib/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { Loader2, Info } from 'lucide-react';
+import { firestore, auth as firebaseAuth } from '@/lib/firebase'; // Import firebaseAuth
+import { doc, setDoc } from 'firebase/firestore'; // Import setDoc
+import { createUserWithEmailAndPassword } from 'firebase/auth'; // Import createUserWithEmailAndPassword
 import { useToast } from "@/hooks/use-toast";
 import { getUsersCollectionPath } from '@/lib/firestore-paths';
+import { Card, CardHeader as UICardHeader, CardContent as UICardContent, CardTitle as UICardTitle } from '@/components/ui/card';
 
 const addUserSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
-  email: z.string().email({ message: 'Invalid email address.' }),
+  email: z.string().email({ message: 'This email will be used for login. Ensure it is unique.' }),
   role: z.custom<UserRole>(val => ['Admin', 'Teacher', 'Student', 'Coordinator'].includes(val as UserRole), 'Role is required.'),
 });
 
@@ -54,6 +56,7 @@ interface AddUserDialogProps {
 
 export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [generatedCredentials, setGeneratedCredentials] = useState<{email: string, password: string} | null>(null);
   const { toast } = useToast();
 
   const form = useForm<AddUserFormValues>({
@@ -67,31 +70,69 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
 
   async function onSubmit(values: AddUserFormValues) {
     setIsSubmitting(true);
-    try {
-      const newUserProfileData = {
-        name: values.name,
-        email: values.email,
-        role: values.role,
-        status: 'Pending' as ManagedUser['status'], // Default status
-        lastLogin: 'N/A',
-      };
+    setGeneratedCredentials(null);
 
+    const loginEmail = values.email;
+    // Generate a simple default password, e.g., RoleDefault@YYYY
+    const roleNameCapitalized = values.role.charAt(0).toUpperCase() + values.role.slice(1);
+    const defaultPassword = `${roleNameCapitalized}Default@${new Date().getFullYear()}`;
+
+    try {
+      // 1. Create Firebase Auth user
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, loginEmail, defaultPassword);
+      const authUid = userCredential.user.uid;
+
+      // 2. Prepare Firestore data
+      const newUserFirestoreData: ManagedUser = {
+        id: authUid, // Use authUid as the document ID and the id field
+        name: values.name,
+        email: loginEmail, // Store the login email
+        role: values.role,
+        status: 'Active', // Default new users to Active
+        lastLogin: 'N/A',
+         // For students, these might be set later or if role is Student, could prompt for them
+        classId: values.role === 'Student' ? 'TO_BE_ASSIGNED' : undefined, 
+        studentProfileId: values.role === 'Student' ? 'TO_BE_ASSIGNED' : undefined,
+      };
+      if (values.role === 'Teacher') {
+        newUserFirestoreData.assignments = []; // Initialize assignments for teachers
+      }
+
+
+      // 3. Save user profile to Firestore, using authUid as document ID
       const usersCollectionPath = getUsersCollectionPath();
-      const docRef = await addDoc(collection(firestore, usersCollectionPath), newUserProfileData);
+      const userDocRef = doc(firestore, usersCollectionPath, authUid);
+      await setDoc(userDocRef, newUserFirestoreData);
       
-      onUserAdded({ ...newUserProfileData, id: docRef.id }); 
+      onUserAdded(newUserFirestoreData); 
+      setGeneratedCredentials({ email: loginEmail, password: defaultPassword });
       
       toast({
-        title: "User Profile Added",
-        description: `${values.name}'s profile has been added to Firestore. Note: Firebase Auth account needs separate creation.`,
+        title: "User Account Created!",
+        description: React.createElement('div', null,
+            React.createElement('p', null, `Account for ${values.name} (${values.role}) created.`),
+            React.createElement('p', {className: "mt-2 font-semibold"}, `Login Email: ${loginEmail}`),
+            React.createElement('p', {className: "font-semibold"}, `Password: ${defaultPassword}`),
+            React.createElement('p', {className: "text-xs mt-1 text-destructive"}, "Advise user to change password on first login.")
+        ),
+        duration: 20000, // Longer duration to view credentials
       });
-      form.reset();
-      onOpenChange(false);
-    } catch (error) {
-      console.error("Error adding user profile to Firestore:", error);
+      // Don't reset form or close dialog immediately if credentials are shown
+      // form.reset();
+      // onOpenChange(false); 
+    } catch (error: any) {
+      console.error("Error adding user or creating auth account:", error);
+      let errMsg = "Could not create user account.";
+      if (error.code === 'auth/email-already-in-use') {
+        errMsg = `The email ${loginEmail} is already in use. Please use a different email.`;
+      } else if (error.code === 'auth/weak-password') {
+        errMsg = "The auto-generated password is too weak (this is a system issue). Please contact support.";
+      } else if (error.message) {
+        errMsg = error.message;
+      }
       toast({
         title: "Error Adding User",
-        description: "Could not add user profile to Firestore.",
+        description: errMsg,
         variant: "destructive",
       });
     } finally {
@@ -99,16 +140,21 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     }
   }
 
+  const handleCloseDialog = () => {
+    if (!isSubmitting) {
+        form.reset();
+        setGeneratedCredentials(null);
+        onOpenChange(false);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-        if (!open) form.reset();
-        onOpenChange(open);
-    }}>
+    <Dialog open={isOpen} onOpenChange={handleCloseDialog}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New User Profile</DialogTitle>
+          <DialogTitle>Add New User Account</DialogTitle>
           <DialogDescription>
-            Enter the details for the new user's profile. This will create a record in Firestore.
+            Enter details to create a Firestore profile and a Firebase Authentication login.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -120,7 +166,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
                 <FormItem>
                   <FormLabel>Full Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. John Doe" {...field} disabled={isSubmitting}/>
+                    <Input placeholder="e.g. John Doe" {...field} disabled={isSubmitting || !!generatedCredentials}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -131,9 +177,9 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email Address</FormLabel>
+                  <FormLabel>Login Email Address</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="e.g. john.doe@example.com" {...field} disabled={isSubmitting}/>
+                    <Input type="email" placeholder="e.g. john.doe@example.com" {...field} disabled={isSubmitting || !!generatedCredentials}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -145,7 +191,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Role</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting || !!generatedCredentials}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a role" />
@@ -162,18 +208,32 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
                 </FormItem>
               )}
             />
+
+            {generatedCredentials && (
+              <Card className="mt-4 p-4 border-green-500 bg-green-50/80 rounded-md text-sm shadow-md">
+                <UICardHeader className='p-0 pb-2'>
+                  <UICardTitle className="text-md font-semibold text-green-700 flex items-center"><Info className="h-5 w-5 mr-2"/>Credentials Generated</UICardTitle>
+                </UICardHeader>
+                <UICardContent className='p-0'>
+                  <p><span className="font-medium">Login Email:</span> {generatedCredentials.email}</p>
+                  <p><span className="font-medium">Default Password:</span> {generatedCredentials.password}</p>
+                  <p className="text-xs mt-1 text-destructive">Advise user to change password on first login.</p>
+                </UICardContent>
+              </Card>
+            )}
+
             <DialogFooter className="pt-4">
-              <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                  Cancel
+                <Button type="button" variant="outline" onClick={handleCloseDialog} disabled={isSubmitting}>
+                  {generatedCredentials ? "Close" : "Cancel"}
                 </Button>
-              </DialogClose>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Add User Profile
-              </Button>
+              {!generatedCredentials && (
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Create User Account
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </Form>
