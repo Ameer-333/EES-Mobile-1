@@ -301,7 +301,7 @@ export function TeacherProfileFormDialog({
               </TabsContent>
 
               <TabsContent value="assignments" className="space-y-4">
-                <UICard className="bg-accent/30 border-primary/20">
+                <Card className="bg-accent/30 border-primary/20">
                   <UICardHeader className="pb-3 pt-4 px-4">
                      <UICardTitle className="text-lg text-primary flex items-center"><GraduationCap className="mr-2"/>Current Assignments</UICardTitle>
                      <UICardDescription className="text-xs">Define specific classes, sections, subjects, or programs the teacher is assigned to.</UICardDescription>
@@ -373,7 +373,7 @@ export function TeacherProfileFormDialog({
                       <PlusCircle className="mr-2 h-4 w-4" /> Add New Teaching Assignment
                     </Button>
                   </UICardContent>
-                </UICard>
+                </Card>
               </TabsContent>
             </Tabs>
 
