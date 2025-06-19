@@ -44,9 +44,9 @@ export function AppSidebarContent({ currentActualRole, navItems, onLinkClick }: 
 
         return (
           <SidebarMenuItem key={item.href + item.label}>
-            <Link href={item.href} passHref legacyBehavior>
+            <Link href={item.href} asChild>
               <SidebarMenuButton
-                asChild
+                asChild // SidebarMenuButton also needs asChild to pass props to the <a>
                 isActive={isActive}
                 className={cn(
                   isActive && 'bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/90'
@@ -54,7 +54,7 @@ export function AppSidebarContent({ currentActualRole, navItems, onLinkClick }: 
                 tooltip={item.tooltip || item.label}
                 onClick={onLinkClick}
               >
-                <a> {/* legacyBehavior needs an <a> tag child */}
+                <a> {/* This <a> tag now correctly receives href from Link via SidebarMenuButton */}
                   {IconComponent && <IconComponent />}
                   <span>{item.label}</span>
                 </a>
