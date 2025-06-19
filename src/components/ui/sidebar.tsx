@@ -102,7 +102,7 @@ const SidebarProvider = React.forwardRef<
           document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
         }
       },
-      [setOpenProp, open, _setOpen] // Added _setOpen
+      [setOpenProp, open, _setOpen]
     )
 
     React.useEffect(() => {
@@ -136,41 +136,50 @@ const SidebarProvider = React.forwardRef<
 
     const state = open ? "expanded" : "collapsed"
 
-    // Auto-close logic for desktop
-    const [autoCloseTimeoutId, setAutoCloseTimeoutId] = React.useState<NodeJS.Timeout | null>(null);
+    const desktopAutoCloseTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+    const mobileAutoCloseTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
     React.useEffect(() => {
       if (open && !isMobile) {
-        if (autoCloseTimeoutId) clearTimeout(autoCloseTimeoutId);
-        const newTimeoutId = setTimeout(() => {
+        if (desktopAutoCloseTimeoutRef.current) {
+          clearTimeout(desktopAutoCloseTimeoutRef.current);
+        }
+        desktopAutoCloseTimeoutRef.current = setTimeout(() => {
           setOpen(false);
         }, SIDEBAR_AUTO_CLOSE_DELAY);
-        setAutoCloseTimeoutId(newTimeoutId);
-      } else if (autoCloseTimeoutId) {
-        clearTimeout(autoCloseTimeoutId);
-        setAutoCloseTimeoutId(null);
+      } else {
+        if (desktopAutoCloseTimeoutRef.current) {
+          clearTimeout(desktopAutoCloseTimeoutRef.current);
+          desktopAutoCloseTimeoutRef.current = null;
+        }
       }
       return () => {
-        if (autoCloseTimeoutId) clearTimeout(autoCloseTimeoutId);
+        if (desktopAutoCloseTimeoutRef.current) {
+          clearTimeout(desktopAutoCloseTimeoutRef.current);
+        }
       };
-    }, [open, isMobile, setOpen]); // Removed autoCloseTimeoutId from deps
+    }, [open, isMobile, setOpen]);
 
-    // Auto-close logic for mobile
-    const [autoCloseMobileTimeoutId, setAutoCloseMobileTimeoutId] = React.useState<NodeJS.Timeout | null>(null);
     React.useEffect(() => {
       if (openMobile && isMobile) {
-        if (autoCloseMobileTimeoutId) clearTimeout(autoCloseMobileTimeoutId);
-        const newTimeoutId = setTimeout(() => {
+        if (mobileAutoCloseTimeoutRef.current) {
+          clearTimeout(mobileAutoCloseTimeoutRef.current);
+        }
+        mobileAutoCloseTimeoutRef.current = setTimeout(() => {
           setOpenMobile(false);
         }, SIDEBAR_AUTO_CLOSE_DELAY);
-        setAutoCloseMobileTimeoutId(newTimeoutId);
-      } else if (autoCloseMobileTimeoutId) {
-        clearTimeout(autoCloseMobileTimeoutId);
-        setAutoCloseMobileTimeoutId(null);
+      } else {
+        if (mobileAutoCloseTimeoutRef.current) {
+          clearTimeout(mobileAutoCloseTimeoutRef.current);
+          mobileAutoCloseTimeoutRef.current = null;
+        }
       }
       return () => {
-        if (autoCloseMobileTimeoutId) clearTimeout(autoCloseMobileTimeoutId);
+        if (mobileAutoCloseTimeoutRef.current) {
+          clearTimeout(mobileAutoCloseTimeoutRef.current);
+        }
       };
-    }, [openMobile, isMobile, setOpenMobile]); // Removed autoCloseMobileTimeoutId from deps
+    }, [openMobile, isMobile, setOpenMobile]);
 
 
     const contextValue = React.useMemo<SidebarContext>(
@@ -609,12 +618,13 @@ const SidebarMenuButton = React.forwardRef<
 
     const tooltipContentProps = React.useMemo(() => {
       if (!tooltip) return undefined;
-      // If tooltip is an object with a 'children' prop, assume it's TooltipContentProps
-      if (typeof tooltip === 'object' && tooltip !== null && 'children' in tooltip) {
-        return tooltip as React.ComponentProps<typeof TooltipContent>;
+      if (typeof tooltip === 'object' && tooltip !== null && 'children' in tooltip && typeof tooltip.children === 'string') {
+        return { children: tooltip.children } as React.ComponentProps<typeof TooltipContent>;
       }
-      // Otherwise, wrap the string in { children: tooltip }
-      return { children: tooltip } as React.ComponentProps<typeof TooltipContent>;
+      if (typeof tooltip === 'string') {
+        return { children: tooltip } as React.ComponentProps<typeof TooltipContent>;
+      }
+      return tooltip as React.ComponentProps<typeof TooltipContent>;
     }, [tooltip]);
 
 
@@ -816,3 +826,4 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+

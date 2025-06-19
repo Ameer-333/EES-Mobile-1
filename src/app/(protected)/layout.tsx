@@ -66,8 +66,6 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   const [appName, setAppName] = useState('EES Education');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const router = useRouter();
-  // const pathname = usePathname(); // Removed from dependencies of main auth effect
-  // const { toast } = useToast(); // Removed from dependencies of main auth effect
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -90,8 +88,6 @@ function AppProvider({ children }: { children: React.ReactNode }) {
                 if (currentPath.startsWith('/hall-of-fame')) {
                   // Allow access
                 } else {
-                  // Use a local toast instance if needed, or ensure toast from context is stable
-                  // For now, assuming console log is sufficient for this effect's internal logic
                   console.log(`Redirecting to ${profileData.role} dashboard.`);
                   router.push(`/${userRolePath}/dashboard`);
                 }
@@ -100,13 +96,11 @@ function AppProvider({ children }: { children: React.ReactNode }) {
           } else {
             setUserProfile(null);
             console.error("User profile not found in Firestore.");
-            // toast({ title: "Profile Error", description: "User profile not found. Please contact support.", variant: "destructive" });
             await firebaseSignOut(auth);
             router.push('/'); 
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
-          // toast({ title: "Error", description: "Failed to load user profile. Please try logging in again.", variant: "destructive" });
           setUserProfile(null);
           await firebaseSignOut(auth);
           router.push('/');
@@ -122,7 +116,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingAuth(false);
     });
     return () => unsubscribe();
-  }, [router]); // Dependency array: router is needed for navigation.
+  }, [router]); 
 
 
   useEffect(() => {
@@ -142,7 +136,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
     fetchAppSettings();
   }, []);
 
-  const { toast } = useToast(); // Get toast here for handleSignOut
+  const { toast } = useToast(); 
   const handleSignOut = async () => {
     try {
       await firebaseSignOut(auth);
@@ -156,7 +150,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
   
-  const pathname = usePathname(); // Get pathname here for currentRole memo
+  const pathname = usePathname(); 
   const currentRole = useMemo(() => {
     if (!userProfile) return null;
     const pathSegments = pathname.split('/');
@@ -257,15 +251,14 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
       </Sidebar>
 
       <div className={cn(
-          "flex flex-col flex-1 min-h-screen transition-[margin-left] duration-200 ease-linear",
+          "flex flex-col flex-1 w-0 min-h-screen transition-[margin-left] duration-200 ease-linear", // Added w-0 for better flex-1 behavior
           // Default for variant="sidebar" (which is used)
           "md:ml-[var(--sidebar-width)]", // Base for expanded
           "md:peer-data-[state=collapsed]:ml-[var(--sidebar-width-icon)]", // Override for collapsed
           
-          // Specifics for variant="inset" (these will only apply if Sidebar has data-variant="inset")
-          // These use !important essentially, via explicit attribute selectors, to override the general ones above if variant IS inset.
-          "md:peer-data-[variant=inset]:!m-2", // Margin for inset, ! to ensure it overrides individual ml if needed
-          "md:peer-data-[variant=inset]:!ml-0", // Reset base ml when inset and m-2 handles spacing
+          // Specifics for variant="inset" 
+          "md:peer-data-[variant=inset]:!m-2", 
+          "md:peer-data-[variant=inset]:!ml-0", 
           "md:peer-data-[variant=inset]:rounded-xl",
           "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))]",
           "md:peer-data-[variant=inset]:peer-data-[state=expanded]:!ml-[calc(var(--sidebar-width)_+_theme(spacing.4)_+2px)]", 
