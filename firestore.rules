@@ -10,12 +10,13 @@ service cloud.firestore {
     }
 
     function getUserData(userId) {
+      // This get() is cached within a single rule evaluation.
       return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
     function getUserRole(userId) {
-      // Ensure data and role exist to prevent null errors
       let userData = getUserData(userId);
+      // Check if userData itself is null before accessing .role
       return userData != null && userData.role != null ? userData.role : null;
     }
 
@@ -43,43 +44,45 @@ service cloud.firestore {
       return isUserAuthenticated() && request.auth.uid == userId;
     }
 
-    // Helper to check if a teacher is assigned to a specific class (by classId)
     function isTeacherAssignedToClass(teacherId, targetClassId) {
-      if (!isTeacher(teacherId)) { return false; }
-      let teacherAssignments = getUserData(teacherId).assignments;
-      return teacherAssignments != null && teacherAssignments.size() > 0 &&
-             teacherAssignments.filter(assignment => assignment.classId == targetClassId).size() > 0;
+      // isTeacher(teacherId) implies getUserData(teacherId) is not null and role is 'Teacher'.
+      // Safely access assignments after this check.
+      return isTeacher(teacherId) &&
+             getUserData(teacherId).assignments != null &&
+             getUserData(teacherId).assignments.size() > 0 &&
+             getUserData(teacherId).assignments.filter(assignment => assignment.classId == targetClassId).size() > 0;
     }
 
-    // Helper to check if a teacher is assigned to a specific student (more granular)
     function isTeacherAssignedToStudent(teacherId, targetClassId, studentData) {
-      if (!isTeacher(teacherId) || studentData == null) { return false; }
-      let teacherAssignments = getUserData(teacherId).assignments;
-      if (teacherAssignments == null || teacherAssignments.size() == 0) { return false; }
-
-      return teacherAssignments.filter(assignment =>
-        assignment.classId == targetClassId &&
-        (assignment.sectionId == null || assignment.sectionId == studentData.sectionId) &&
-        (assignment.groupId == null || assignment.groupId == studentData.groupId) &&
-        (
-          assignment.type == 'class_teacher' ||
-          assignment.type == 'mother_teacher' ||
-          (assignment.type == 'subject_teacher' && assignment.subjectId != null ) || // Subject teacher for any subject in that class/section/group
-          assignment.type == 'nios_teacher' ||
-          assignment.type == 'nclp_teacher'
-        )
-      ).size() > 0;
+      // isTeacher(teacherId) implies getUserData(teacherId) is not null and role is 'Teacher'.
+      // studentData must also not be null.
+      return isTeacher(teacherId) && studentData != null &&
+             getUserData(teacherId).assignments != null &&
+             getUserData(teacherId).assignments.size() > 0 &&
+             getUserData(teacherId).assignments.filter(assignment =>
+                assignment.classId == targetClassId &&
+                (assignment.sectionId == null || assignment.sectionId == studentData.sectionId) &&
+                (assignment.groupId == null || assignment.groupId == studentData.groupId) &&
+                (
+                  assignment.type == 'class_teacher' ||
+                  assignment.type == 'mother_teacher' ||
+                  (assignment.type == 'subject_teacher' && assignment.subjectId != null ) ||
+                  assignment.type == 'nios_teacher' ||
+                  assignment.type == 'nclp_teacher'
+                )
+              ).size() > 0;
     }
 
     // USER PROFILES (/users/{userId})
     match /users/{userId} {
       allow read: if isUserAuthenticated() &&
                      (isOwner(userId) || isAdmin(request.auth.uid) || isCoordinator(request.auth.uid) ||
-                      (isTeacher(request.auth.uid) && getUserData(userId).role == 'Student' && isTeacherAssignedToClass(request.auth.uid, getUserData(userId).classId)) // Teacher can read profiles of students in their assigned classes
+                      // Teacher can read profiles of students if user being read is a student and teacher is assigned to that student's class
+                      (isTeacher(request.auth.uid) && getUserData(userId).role == 'Student' && isTeacherAssignedToClass(request.auth.uid, getUserData(userId).classId))
                      );
-      allow list: if isAdmin(request.auth.uid) || isCoordinator(request.auth.uid); // Only admins/coordinators can list all users
+      allow list: if isAdmin(request.auth.uid) || isCoordinator(request.auth.uid);
       allow create: if isUserAuthenticated() &&
-                       (isOwner(userId) || isAdmin(request.auth.uid)); // User creates own, or Admin creates any.
+                       (isOwner(userId) || isAdmin(request.auth.uid));
       allow update: if isUserAuthenticated() &&
                       (
                         (isOwner(userId) && request.resource.data.role == resource.data.role) || // Owner can update their non-role fields
@@ -87,10 +90,10 @@ service cloud.firestore {
                         (isOwner(userId) && resource.data.role != 'Admin' && request.resource.data.role == 'Admin') || // Allow self-promotion to Admin if role was not Admin before
                         isAdmin(request.auth.uid) // Admins can update any user's role and other fields
                       );
-      allow delete: if isAdmin(request.auth.uid) && request.auth.uid != userId; // Admins can delete anyone except themselves
+      allow delete: if isAdmin(request.auth.uid) && request.auth.uid != userId;
     }
 
-    // TEACHER HR PROFILES (/teachers/{teacherAuthUid}) - teacherAuthUid is the same as user.id for teachers
+    // TEACHER HR PROFILES (/teachers/{teacherAuthUid})
     match /teachers/{teacherAuthUid} {
       allow read: if isUserAuthenticated() &&
                      (isAdmin(request.auth.uid) || isCoordinator(request.auth.uid) || (isTeacher(request.auth.uid) && request.auth.uid == teacherAuthUid));
@@ -103,18 +106,18 @@ service cloud.firestore {
 
     // STUDENT DATA (/student_data_by_class/{classId}/profiles/{studentProfileId})
     match /student_data_by_class/{classId} {
-      // Rules for the class document itself (if it stores any data directly)
       allow read, list: if isUserAuthenticated() && (isAdmin(request.auth.uid) || isCoordinator(request.auth.uid) || isTeacherAssignedToClass(request.auth.uid, classId));
 
       match /profiles/{studentProfileId} {
         allow read: if isUserAuthenticated() &&
                       (
-                        (isStudent(request.auth.uid) && getUserData(request.auth.uid).studentProfileId == studentProfileId && getUserData(request.auth.uid).classId == classId) || // Student reads their own profile
+                        (isStudent(request.auth.uid) && getUserData(request.auth.uid).studentProfileId == studentProfileId && getUserData(request.auth.uid).classId == classId) ||
                         isAdmin(request.auth.uid) ||
                         isCoordinator(request.auth.uid) ||
-                        (isTeacher(request.auth.uid) && isTeacherAssignedToStudent(request.auth.uid, classId, resource.data)) // Teacher assigned to this student
+                        (isTeacher(request.auth.uid) && isTeacherAssignedToStudent(request.auth.uid, classId, resource.data))
                       );
         allow list: if isUserAuthenticated() && (isAdmin(request.auth.uid) || isCoordinator(request.auth.uid) || isTeacherAssignedToClass(request.auth.uid, classId));
+        // Admin can create. Teacher can create if assigned to that class.
         allow create: if isUserAuthenticated() && (isAdmin(request.auth.uid) || (isTeacher(request.auth.uid) && isTeacherAssignedToClass(request.auth.uid, classId)));
         allow update: if isUserAuthenticated() &&
                       (
@@ -122,21 +125,22 @@ service cloud.firestore {
                         isCoordinator(request.auth.uid) ||
                         (isTeacher(request.auth.uid) && isTeacherAssignedToStudent(request.auth.uid, classId, resource.data))
                       );
+        // Admin can delete. Teacher can delete if assigned to that class.
         allow delete: if isUserAuthenticated() && (isAdmin(request.auth.uid) || (isTeacher(request.auth.uid) && isTeacherAssignedToClass(request.auth.uid, classId)));
-      } // Closes /profiles/{studentProfileId}
-    } // Closes /student_data_by_class/{classId}
+      }
+    }
 
     // APP SETTINGS (/app_settings/general)
     match /app_settings/general {
-      allow read: if true; // Publicly readable settings
-      allow write: if isUserAuthenticated() && isAdmin(request.auth.uid); // Only Admins can change settings
+      allow read: if true;
+      allow write: if isUserAuthenticated() && isAdmin(request.auth.uid);
     }
 
     // HALL OF FAME (/hall_of_fame_items/{itemId})
     match /hall_of_fame_items/{itemId} {
-      allow read: if true; // Publicly readable
+      allow read: if true;
       allow list: if true;
-      allow create, update, delete: if isUserAuthenticated() && isAdmin(request.auth.uid); // Only Admins manage hall of fame
+      allow create, update, delete: if isUserAuthenticated() && isAdmin(request.auth.uid);
     }
-  } // Closes /databases/{database}/documents
-} // Closes service cloud.firestore
+  }
+}
