@@ -49,7 +49,10 @@ export const navItems: NavItem[] = [
   { href: '/coordinator/students', label: 'All Student Management', icon: UsersIcon, roles: ['Coordinator'], tooltip: 'Students' },
   { href: '/coordinator/teacher-management', label: 'All Teacher Management', icon: UsersIcon, roles: ['Coordinator'], tooltip: 'Teachers' },
   { href: '/coordinator/data-entry', label: 'Global Data Entry', icon: Edit, roles: ['Coordinator'], tooltip: 'Data Entry' },
+  { href: '/coordinator/analytics', label: 'System Analytics', icon: LineChart, roles: ['Coordinator'], tooltip: 'Analytics' },
+
 
   // Shared
   { href: '/hall-of-fame', label: 'Hall of Fame', icon: Building, roles: ['Student', 'Teacher', 'Admin', 'Coordinator'], tooltip: 'Hall of Fame' },
 ];
+

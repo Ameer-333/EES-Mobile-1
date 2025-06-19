@@ -1,6 +1,10 @@
 
 'use client';
 
+// This page mirrors the Admin Analytics page for view-only purposes.
+// For actual data and more complex role-based views, backend integration
+// and more sophisticated frontend logic would be required.
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { BarChart, LineChartIcon, Users, Activity, PieChartIcon, User, UserCheck, UserCog, Shield, HeartPulse, Database } from "lucide-react";
@@ -65,7 +69,7 @@ const chartConfigSystemHealth = {
 };
 
 
-export default function AdminAnalyticsPage() {
+export default function CoordinatorAnalyticsPage() {
   const [studentEnrollmentData, setStudentEnrollmentData] = useState(initialStudentEnrollmentData);
   const [dailyActiveStudentsData, setDailyActiveStudentsData] = useState(initialDailyActiveStudentsData);
   const [systemHealthData, setSystemHealthData] = useState(initialSystemHealthData);
@@ -96,18 +100,15 @@ export default function AdminAnalyticsPage() {
     
     const generatedHealth = initialSystemHealthData.map(d => ({ ...d, healthScore: Math.floor(Math.random() * 15) + 85 }));
     setSystemHealthData(generatedHealth);
-
-    // Firebase usage data is now static, no longer generated in useEffect
-    // setFirebaseUsageData(staticFirebaseUsageData); // Already set in useState
-
   }, []);
 
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-headline font-bold">System Analytics Dashboard</h1>
+        <h1 className="text-3xl font-headline font-bold">System Analytics Overview</h1>
         <LineChartIcon className="h-8 w-8 text-primary" />
       </div>
+      <p className="text-muted-foreground">View key metrics and operational insights for the EES Education system. (View-only)</p>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <StatCard title="Total Students" value={totalStudents.toString()} icon={<Users className="h-6 w-6 text-primary" />} description="Enrolled students" />
