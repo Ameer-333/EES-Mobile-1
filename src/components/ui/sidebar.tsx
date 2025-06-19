@@ -26,6 +26,7 @@ const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+const SIDEBAR_AUTO_CLOSE_DELAY = 10000 // 10 seconds
 
 type SidebarContext = {
   state: "expanded" | "collapsed"
@@ -73,7 +74,7 @@ const SidebarProvider = React.forwardRef<
 
     const getInitialOpenState = React.useCallback(() => {
       if (typeof window === "undefined") {
-        return defaultOpen; // Default for SSR or if window is not available
+        return defaultOpen;
       }
       const cookieValue = document.cookie
         .split("; ")
@@ -82,7 +83,7 @@ const SidebarProvider = React.forwardRef<
 
       if (cookieValue === "true") return true;
       if (cookieValue === "false") return false;
-      return defaultOpen; // Fallback to prop if cookie not set or invalid
+      return defaultOpen;
     }, [defaultOpen]);
 
 
@@ -101,13 +102,12 @@ const SidebarProvider = React.forwardRef<
           document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
         }
       },
-      [setOpenProp, open]
+      [setOpenProp, open, _setOpen] // Added _setOpen
     )
 
-    // Effect to update state if cookie changes from another tab (or if defaultOpen changes and no cookie was set)
     React.useEffect(() => {
         const currentInitialState = getInitialOpenState();
-        if (_open !== currentInitialState && openProp === undefined) { // only if uncontrolled and different
+        if (_open !== currentInitialState && openProp === undefined) {
             _setOpen(currentInitialState);
         }
     }, [getInitialOpenState, _open, openProp]);
@@ -135,6 +135,43 @@ const SidebarProvider = React.forwardRef<
     }, [toggleSidebar])
 
     const state = open ? "expanded" : "collapsed"
+
+    // Auto-close logic for desktop
+    const [autoCloseTimeoutId, setAutoCloseTimeoutId] = React.useState<NodeJS.Timeout | null>(null);
+    React.useEffect(() => {
+      if (open && !isMobile) {
+        if (autoCloseTimeoutId) clearTimeout(autoCloseTimeoutId);
+        const newTimeoutId = setTimeout(() => {
+          setOpen(false);
+        }, SIDEBAR_AUTO_CLOSE_DELAY);
+        setAutoCloseTimeoutId(newTimeoutId);
+      } else if (autoCloseTimeoutId) {
+        clearTimeout(autoCloseTimeoutId);
+        setAutoCloseTimeoutId(null);
+      }
+      return () => {
+        if (autoCloseTimeoutId) clearTimeout(autoCloseTimeoutId);
+      };
+    }, [open, isMobile, setOpen]); // Removed autoCloseTimeoutId from deps
+
+    // Auto-close logic for mobile
+    const [autoCloseMobileTimeoutId, setAutoCloseMobileTimeoutId] = React.useState<NodeJS.Timeout | null>(null);
+    React.useEffect(() => {
+      if (openMobile && isMobile) {
+        if (autoCloseMobileTimeoutId) clearTimeout(autoCloseMobileTimeoutId);
+        const newTimeoutId = setTimeout(() => {
+          setOpenMobile(false);
+        }, SIDEBAR_AUTO_CLOSE_DELAY);
+        setAutoCloseMobileTimeoutId(newTimeoutId);
+      } else if (autoCloseMobileTimeoutId) {
+        clearTimeout(autoCloseMobileTimeoutId);
+        setAutoCloseMobileTimeoutId(null);
+      }
+      return () => {
+        if (autoCloseMobileTimeoutId) clearTimeout(autoCloseMobileTimeoutId);
+      };
+    }, [openMobile, isMobile, setOpenMobile]); // Removed autoCloseMobileTimeoutId from deps
+
 
     const contextValue = React.useMemo<SidebarContext>(
       () => ({
@@ -572,8 +609,14 @@ const SidebarMenuButton = React.forwardRef<
 
     const tooltipContentProps = React.useMemo(() => {
       if (!tooltip) return undefined;
-      return typeof tooltip === 'object' && tooltip !== null && 'children' in tooltip ? tooltip : { children: tooltip };
+      // If tooltip is an object with a 'children' prop, assume it's TooltipContentProps
+      if (typeof tooltip === 'object' && tooltip !== null && 'children' in tooltip) {
+        return tooltip as React.ComponentProps<typeof TooltipContent>;
+      }
+      // Otherwise, wrap the string in { children: tooltip }
+      return { children: tooltip } as React.ComponentProps<typeof TooltipContent>;
     }, [tooltip]);
+
 
     const buttonElement = (
       <Comp
@@ -595,7 +638,7 @@ const SidebarMenuButton = React.forwardRef<
           <TooltipContent
             side="right"
             align="center"
-            {...tooltipContentProps} // Spread the object here
+            {...tooltipContentProps}
           />
         </Tooltip>
       )
@@ -773,4 +816,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-
