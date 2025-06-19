@@ -187,6 +187,8 @@ export interface TeacherSalaryRecord {
   reasonForAbsence?: string;
 }
 
+export type AppraisalStatus = "Pending Review" | "Appraised" | "Rejected" | "No Active Appraisal";
+
 export interface Teacher {
   id: string; 
   authUid: string; 
@@ -201,6 +203,9 @@ export interface Teacher {
   salaryHistory?: TeacherSalaryRecord[];
   daysPresentThisMonth?: number;
   daysAbsentThisMonth?: number;
+  currentAppraisalStatus?: AppraisalStatus;
+  lastAppraisalDate?: string; // YYYY-MM-DD
+  lastAppraisalDetails?: string; // Notes from admin or coordinator
 }
 
 // Used by TeacherProfileFormDialog
@@ -251,4 +256,17 @@ export const assignmentTypeLabels: Record<TeacherAssignmentType, string> = {
   nios_teacher: "NIOS Program Teacher",
   nclp_teacher: "NCLP Program Teacher",
 };
+
+export interface TeacherAppraisalRequest {
+  id: string; // Firestore document ID
+  teacherId: string; // AuthUID of the teacher
+  teacherName: string;
+  requestedByCoordinatorId: string;
+  coordinatorName: string;
+  requestDate: string; // ISO Date string
+  justification: string;
+  status: "Pending Admin Review" | "Approved" | "Rejected";
+  adminNotes?: string;
+  processedDate?: string; // ISO Date string
+}
 

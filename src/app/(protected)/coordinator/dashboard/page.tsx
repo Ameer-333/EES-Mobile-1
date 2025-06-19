@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { Users, Edit3, Building, Activity } from 'lucide-react';
+import { Users, Briefcase, Building, Activity, FileText } from 'lucide-react'; // Changed Edit3 to Briefcase for Teacher Management
 import { useAppContext } from '@/app/(protected)/layout';
 
 interface ActionCardProps {
@@ -65,15 +65,15 @@ export default function CoordinatorDashboardPage() {
           />
           <ActionCard
             title="Teacher Management"
-            description="View and manage teacher profiles and their assignments system-wide."
+            description="View and manage teacher profiles, their assignments, and request salary appraisals."
             href="/coordinator/teacher-management"
-            icon={Users} 
+            icon={Briefcase} 
           />
           <ActionCard
-            title="Global Data Entry"
-            description="Enter or update academic marks and attendance for any student in the system."
-            href="/coordinator/data-entry"
-            icon={Edit3}
+            title="Teacher Data & Progress"
+            description="View teacher attendance records and overall progress across the system."
+            href="/coordinator/data-entry" // This page will be repurposed for teacher data view
+            icon={FileText} // Using FileText for data/progress view
           />
           <ActionCard
             title="View Hall of Fame"
@@ -91,8 +91,8 @@ export default function CoordinatorDashboardPage() {
         <CardContent>
           <ul className="list-disc list-inside space-y-1 text-muted-foreground text-sm">
             <li>Oversee comprehensive student data and progress.</li>
-            <li>Coordinate with teachers and manage their assignments.</li>
-            <li>Ensure accuracy and completeness of academic data through global entry.</li>
+            <li>Coordinate with teachers, manage their assignments, and initiate appraisal processes.</li>
+            <li>Monitor teacher attendance and progress.</li>
             <li>Facilitate communication between administration, teachers, and students.</li>
           </ul>
         </CardContent>

@@ -1,15 +1,16 @@
 
 'use client';
 
-import type { TeacherSalaryRecord } from '@/types';
+import type { TeacherSalaryRecord, Teacher, AppraisalStatus } from '@/types'; // Added Teacher and AppraisalStatus
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DollarSign, FileText, Edit, CheckCircle, XCircle } from 'lucide-react';
+import { DollarSign, FileText, Edit, CheckCircle, XCircle, TrendingUp, Info } from 'lucide-react'; // Added TrendingUp, Info
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge'; // Added Badge
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,6 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 
-// Mock data for demonstration
 const mockSalaryHistory: TeacherSalaryRecord[] = [
   { id: 'sal1', monthYear: 'June 2024', dateIssued: '2024-07-01', amountIssued: 50000, amountDeducted: 1000, daysAbsent: 1, reasonForAbsence: 'Sick leave' },
   { id: 'sal2', monthYear: 'May 2024', dateIssued: '2024-06-01', amountIssued: 50000, amountDeducted: 0, daysAbsent: 0 },
@@ -30,10 +30,11 @@ const mockSalaryHistory: TeacherSalaryRecord[] = [
 
 interface TeacherSalaryViewProps {
   salaryHistory?: TeacherSalaryRecord[];
-  onUpdateReason?: (recordId: string, reason: string) => Promise<void>; // Simulate update
+  teacherProfile?: Teacher; // Pass the full teacher profile to access appraisal status
+  onUpdateReason?: (recordId: string, reason: string) => Promise<void>; 
 }
 
-export function TeacherSalaryView({ salaryHistory = mockSalaryHistory, onUpdateReason }: TeacherSalaryViewProps) {
+export function TeacherSalaryView({ salaryHistory = mockSalaryHistory, teacherProfile, onUpdateReason }: TeacherSalaryViewProps) {
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [reasonText, setReasonText] = useState('');
   const { toast } = useToast();
@@ -47,8 +48,7 @@ export function TeacherSalaryView({ salaryHistory = mockSalaryHistory, onUpdateR
     if (!editingRecordId) return;
     // In a real app, call onUpdateReason here
     console.log(`Saving reason for ${editingRecordId}: ${reasonText}`);
-    // Simulate API call & update mock data locally
-    const recordIndex = salaryHistory.findIndex(r => r.id === editingRecordId); // Use salaryHistory prop
+    const recordIndex = salaryHistory.findIndex(r => r.id === editingRecordId);
     if (recordIndex !== -1) {
       salaryHistory[recordIndex].reasonForAbsence = reasonText;
     }
@@ -57,30 +57,54 @@ export function TeacherSalaryView({ salaryHistory = mockSalaryHistory, onUpdateR
     setEditingRecordId(null);
   };
 
-  if (!salaryHistory || salaryHistory.length === 0) {
-    return (
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold text-primary flex items-center">
-            <DollarSign className="mr-2 h-6 w-6" /> Salary History
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">No salary records available.</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const currentAppraisalStatus: AppraisalStatus = teacherProfile?.currentAppraisalStatus || "No Active Appraisal";
+  const lastAppraisalDate = teacherProfile?.lastAppraisalDate ? new Date(teacherProfile.lastAppraisalDate).toLocaleDateString('en-GB') : 'N/A';
+  const lastAppraisalDetails = teacherProfile?.lastAppraisalDetails || "No details available.";
+
+  const appraisalStatusBadgeVariant = (status: AppraisalStatus) => {
+    switch (status) {
+      case "Appraised": return "default"; // Greenish or success
+      case "Pending Review": return "secondary"; // Yellowish or warning
+      case "Rejected": return "destructive"; // Red
+      default: return "outline";
+    }
+  };
+  
+  const appraisalStatusTextClass = (status: AppraisalStatus) => {
+    switch (status) {
+      case "Appraised": return "text-green-600";
+      case "Pending Review": return "text-yellow-600";
+      case "Rejected": return "text-red-600";
+      default: return "text-muted-foreground";
+    }
+  };
+
 
   return (
     <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl font-semibold text-primary flex items-center">
-          <DollarSign className="mr-2 h-6 w-6" /> Salary History
-        </CardTitle>
-        <CardDescription>Your past salary statements and attendance details.</CardDescription>
+        <div className="flex justify-between items-start">
+            <div>
+                <CardTitle className="text-xl font-semibold text-primary flex items-center">
+                    <DollarSign className="mr-2 h-6 w-6" /> Salary & Appraisal
+                </CardTitle>
+                <CardDescription>Your past salary statements, attendance, and appraisal status.</CardDescription>
+            </div>
+            <Badge variant={appraisalStatusBadgeVariant(currentAppraisalStatus)} className={`px-3 py-1.5 text-sm ${appraisalStatusTextClass(currentAppraisalStatus)}`}>
+                <TrendingUp className="mr-1.5 h-4 w-4" /> Appraisal: {currentAppraisalStatus}
+            </Badge>
+        </div>
+         {currentAppraisalStatus !== "No Active Appraisal" && (
+            <div className="mt-3 text-xs text-muted-foreground border-t pt-2">
+                <p><span className="font-medium">Last Update:</span> {lastAppraisalDate}</p>
+                {teacherProfile?.lastAppraisalDetails && <p><span className="font-medium">Details:</span> {lastAppraisalDetails}</p>}
+            </div>
+        )}
       </CardHeader>
       <CardContent>
+        {!salaryHistory || salaryHistory.length === 0 ? (
+            <p className="text-muted-foreground py-4">No salary records available.</p>
+        ) : (
         <ScrollArea className="max-h-[400px]">
           <Table>
             <TableHeader>
@@ -137,6 +161,7 @@ export function TeacherSalaryView({ salaryHistory = mockSalaryHistory, onUpdateR
             </TableBody>
           </Table>
         </ScrollArea>
+        )}
       </CardContent>
     </Card>
   );

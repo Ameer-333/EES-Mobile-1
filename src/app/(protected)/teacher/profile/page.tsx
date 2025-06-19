@@ -7,6 +7,7 @@ import { User } from 'lucide-react';
 // Mock data for demonstration
 const mockTeacherData: Teacher = {
   id: 'T001',
+  authUid: 'T001_auth', // Added authUid for consistency
   name: 'Priya Sharma',
   email: 'priya.sharma@ees.com',
   phoneNumber: '+91 98765 43210',
@@ -19,10 +20,13 @@ const mockTeacherData: Teacher = {
     { id: 'sal1', monthYear: 'June 2024', dateIssued: '2024-07-01', amountIssued: 50000, amountDeducted: 1000, daysAbsent: 1, reasonForAbsence: 'Sick leave' },
     { id: 'sal2', monthYear: 'May 2024', dateIssued: '2024-06-01', amountIssued: 50000, amountDeducted: 0, daysAbsent: 0 },
   ],
+  currentAppraisalStatus: "Appraised", // Example appraisal status
+  lastAppraisalDate: "2024-03-15",    // Example appraisal date
+  lastAppraisalDetails: "Excellent performance in Q1, salary increased by 10%.",
 };
 
 export default function TeacherProfilePage() {
-  // In a real app, teacher data would be fetched here
+  // In a real app, teacher data would be fetched here based on authenticated user
   const teacher = mockTeacherData;
 
   return (
@@ -33,12 +37,8 @@ export default function TeacherProfilePage() {
       </div>
       
       <TeacherProfileDetails teacher={teacher} />
-      <TeacherSalaryView salaryHistory={teacher.salaryHistory} />
+      <TeacherSalaryView salaryHistory={teacher.salaryHistory} teacherProfile={teacher} />
       
-      {/* Potential future sections:
-        - Update personal details form
-        - Professional development records
-      */}
     </div>
   );
 }

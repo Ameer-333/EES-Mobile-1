@@ -2,24 +2,22 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users } from "lucide-react";
+import { FileText, Users } from "lucide-react"; // Users can be an alternative or complementary icon
 
-// This component remains a placeholder as its implementation details
-// for fetching and displaying ALL students with filters can be complex.
-// The user's current request is focused on teacher data and appraisals.
-
-export function CoordinatorStudentView() {
+export function CoordinatorTeacherDataView() {
+  // This component will be enhanced to display teacher attendance and progress.
+  // For now, it's a placeholder.
   return (
     <Card className="w-full shadow-lg rounded-lg border-primary/10">
       <CardHeader>
         <div className="flex items-center space-x-3">
-          <Users className="h-7 w-7 text-primary" />
+          <FileText className="h-7 w-7 text-primary" />
           <div>
             <CardTitle className="text-2xl font-headline text-primary">
-              All Students Overview
+              Teacher Data & Progress Overview
             </CardTitle>
             <CardDescription>
-              This section will display all students in the system for coordinator management.
+              This section will allow coordinators to view system-wide teacher attendance and performance metrics.
             </CardDescription>
           </div>
         </div>
@@ -28,14 +26,13 @@ export function CoordinatorStudentView() {
         <div className="text-center p-6 border-2 border-dashed border-muted rounded-lg">
           <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
           <p className="text-lg font-semibold text-muted-foreground">
-            Comprehensive Student View Feature Coming Soon
+            Teacher Data Viewing Feature Coming Soon
           </p>
           <p className="text-sm text-muted-foreground mt-1">
-            Coordinators will be able to view, search, and manage all student profiles and records from here.
+            Coordinators will be able to see aggregated and individual teacher attendance and progress reports here.
           </p>
         </div>
       </CardContent>
     </Card>
   );
 }
-
