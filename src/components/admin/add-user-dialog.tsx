@@ -33,9 +33,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Info } from 'lucide-react';
-import { firestore, auth as firebaseAuth } from '@/lib/firebase'; // Import firebaseAuth
-import { doc, setDoc } from 'firebase/firestore'; // Import setDoc
-import { createUserWithEmailAndPassword, type FirebaseError } from 'firebase/auth'; // Import createUserWithEmailAndPassword and FirebaseError
+import { firestore, auth as firebaseAuth } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app'; // Correct import for FirebaseError
 import { useToast } from "@/hooks/use-toast";
 import { getUsersCollectionPath } from '@/lib/firestore-paths';
 import { Card, CardHeader as UICardHeader, CardContent as UICardContent, CardTitle as UICardTitle } from '@/components/ui/card';
@@ -102,16 +103,15 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
       onUserAdded(newUserFirestoreData); 
       setGeneratedCredentials({ email: loginEmail, password: defaultPassword });
       
-      // Simplified toast message
       toast({
         title: "User Account Created!",
         description: (
-          <div>
-            <p>Account for {values.name} ({values.role}) created.</p>
-            <p className="mt-2"><strong>Login Email:</strong> {loginEmail}</p>
-            <p><strong>Default Password:</strong> {defaultPassword}</p>
-            <p className="text-xs mt-1 text-destructive">Advise user to change password on first login.</p>
-          </div>
+          React.createElement('div', null,
+            React.createElement('p', null, `Account for ${values.name} (${values.role}) created.`),
+            React.createElement('p', {className: "mt-2"}, React.createElement('strong', null, "Login Email: "), loginEmail),
+            React.createElement('p', null, React.createElement('strong', null, "Default Password: "), defaultPassword),
+            React.createElement('p', {className: "text-xs mt-1 text-destructive"}, "Advise user to change password on first login.")
+          )
         ),
         duration: 20000,
       });
@@ -119,7 +119,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     } catch (error: any) {
       console.error("Error adding user or creating auth account:", error);
       let errMsg = "Could not create user account. Please check the console for more details.";
-      if (error instanceof FirebaseError) { // More specific Firebase error check
+      if (error instanceof FirebaseError) { 
         switch (error.code) {
           case 'auth/email-already-in-use':
             errMsg = `The email ${loginEmail} is already in use. Please use a different email.`;
