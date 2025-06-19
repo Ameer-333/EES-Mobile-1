@@ -22,6 +22,7 @@ import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { auth } from '@/lib/firebase'; // Import Firebase auth
 import { signInWithEmailAndPassword, type FirebaseError } from 'firebase/auth';
+import type { UserRole } from '@/types'; // Import UserRole
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -29,7 +30,7 @@ const formSchema = z.object({
 });
 
 type LoginFormProps = {
-  role: 'Admin' | 'Teacher' | 'Student';
+  role: UserRole; // Use the UserRole type
 };
 
 export function LoginForm({ role }: LoginFormProps) {
@@ -53,7 +54,6 @@ export function LoginForm({ role }: LoginFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    console.log('Email being sent to Firebase:', values.email); // For debugging
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       
@@ -62,16 +62,27 @@ export function LoginForm({ role }: LoginFormProps) {
         description: `Welcome, ${role}! Redirecting to dashboard...`,
       });
 
-      if (role === 'Admin') {
-        router.push('/admin/dashboard');
-      } else if (role === 'Teacher') {
-        router.push('/teacher/dashboard');
-      } else {
-        router.push('/student/dashboard');
+      switch (role) {
+        case 'Admin':
+          router.push('/admin/dashboard');
+          break;
+        case 'Teacher':
+          router.push('/teacher/dashboard');
+          break;
+        case 'Student':
+          router.push('/student/dashboard');
+          break;
+        case 'Coordinator':
+          router.push('/coordinator/dashboard');
+          break;
+        default:
+          // Fallback or error, though UserRole type should prevent this
+          toast({ title: 'Error', description: 'Unknown role, cannot redirect.', variant: 'destructive' });
+          router.push('/'); 
+          break;
       }
     } catch (error) {
       let errorMessage = 'An unexpected error occurred. Please try again.';
-      // Log the full error object for detailed debugging
       console.error('Firebase Login Full Error:', error); 
 
       if (error instanceof FirebaseError) {
@@ -91,7 +102,7 @@ export function LoginForm({ role }: LoginFormProps) {
             errorMessage = 'Network error. Please check your internet connection and try again.';
             break;
           case 'auth/configuration-not-found': 
-          case 'auth/invalid-api-key': // Often related to SDK initialization problems
+          case 'auth/invalid-api-key': 
             errorMessage = 'Firebase configuration error. The application might not be set up correctly. Please contact support.';
             break;
           default:

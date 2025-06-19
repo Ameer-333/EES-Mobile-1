@@ -2,7 +2,7 @@
 'use client';
 
 import { LoginForm } from '@/components/auth/login-form';
-import { LogoIcon } from '@/components/icons/logo-icon';
+import { ClipboardUser } from 'lucide-react'; // Changed to ClipboardUser
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Home } from 'lucide-react';
@@ -47,7 +47,7 @@ export default function CoordinatorLoginPage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-accent/30 p-4">
       <div className="mb-8 text-center">
         {isLoading ? (
-          <LogoIcon className="h-20 w-20 text-primary mx-auto mb-2 animate-pulse" />
+          <ClipboardUser className="h-20 w-20 text-primary mx-auto mb-2 animate-pulse" />
         ) : logoUrl ? (
           <Image
             src={logoUrl}
@@ -59,7 +59,7 @@ export default function CoordinatorLoginPage() {
             onError={() => setLogoUrl(null)}
           />
         ) : (
-          <LogoIcon className="h-20 w-20 text-primary mx-auto mb-2" />
+          <ClipboardUser className="h-20 w-20 text-primary mx-auto mb-2" />
         )}
         <h1 className="text-4xl font-headline font-bold text-primary">
            {isLoading ? 'Loading...' : appName}

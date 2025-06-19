@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { LogoIcon } from '@/components/icons/logo-icon';
-import { ArrowRight, User, Briefcase, Shield } from 'lucide-react';
+import { ArrowRight, User, Briefcase, Shield, ClipboardUser } from 'lucide-react'; // Added ClipboardUser
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { firestore } from '@/lib/firebase';
@@ -76,7 +76,7 @@ export default function LandingPage() {
         </p>
       </header>
 
-      <main className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-5xl w-full px-4">
+      <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 max-w-7xl w-full px-4">
         <LoginOptionCard
           role="Student"
           description="Access your academic records, attendance, and learning resources."
@@ -88,6 +88,12 @@ export default function LandingPage() {
           description="Manage student data, enter marks, attendance, and access teaching tools."
           href="/login/teacher"
           icon={Briefcase}
+        />
+         <LoginOptionCard
+          role="Coordinator"
+          description="Oversee student progress, manage teacher data, and coordinate activities."
+          href="/login/coordinator"
+          icon={ClipboardUser}
         />
         <LoginOptionCard
           role="Admin"
@@ -139,5 +145,3 @@ function LoginOptionCard({ role, description, href, icon: Icon }: LoginOptionCar
     </Card>
   );
 }
-
-    
