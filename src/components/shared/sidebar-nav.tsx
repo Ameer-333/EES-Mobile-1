@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart, MessageSquarePlus, Mail, Award, MessageCircle, Building, BarChartHorizontalBig, CalendarCheck, DollarSign, CalendarClock } from 'lucide-react';
+import { Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart, MessageSquarePlus, Mail, Award, MessageCircle, Building, BarChartHorizontalBig, CalendarCheck, DollarSign, CalendarClock, ClipboardList } from 'lucide-react'; // Added ClipboardList
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -38,7 +38,7 @@ const navItems: NavItem[] = [
   // Admin
   { href: '/admin/dashboard', label: 'Dashboard', icon: Shield, roles: ['Admin'] },
   { href: '/admin/user-management', label: 'User Management', icon: UsersIcon, roles: ['Admin'] },
-  { href: '/admin/teacher-management', label: 'Teacher Payroll', icon: UsersIcon, roles: ['Admin'] },
+  { href: '/admin/teacher-management', label: 'Teacher Management', icon: UsersIcon, roles: ['Admin'] }, // Updated label
   { href: '/admin/hall-of-fame-management', label: 'Manage Hall of Fame', icon: Building, roles: ['Admin'] },
   { href: '/admin/analytics', label: 'Analytics', icon: LineChart, roles: ['Admin'] },
   { href: '/admin/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
