@@ -138,12 +138,12 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
             <div className="flex-shrink-0 w-full max-w-sm lg:max-w-md lg:w-2/5 mx-auto">
               <div className="relative aspect-square rounded-lg overflow-hidden shadow-xl border-4 border-primary/20 transform transition-transform duration-500 hover:scale-105">
                 {mainFounder.imageUrl.includes('placehold.co') ? (
-                  &lt;img
+                  <img
                     src={mainFounder.imageUrl}
                     alt={mainFounder.name}
                     className="object-cover w-full h-full"
                     data-ai-hint={mainFounder.dataAiHint || "founder portrait placeholder"}
-                  /&gt;
+                  />
                 ) : (
                   <NextImage
                     src={mainFounder.imageUrl}
@@ -162,7 +162,7 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
                 {mainFounder.name}
               </h2>
               <p className="text-xl font-semibold text-muted-foreground mb-6">
-                {mainFounder.title || 'Founder &amp; Visionary Leader'}
+                {mainFounder.title || 'Founder & Visionary Leader'}
               </p>
               <blockquote className="text-lg text-foreground/90 leading-relaxed border-l-4 border-accent pl-6 italic">
                 {mainFounder.description && mainFounder.description.length > 50 ? mainFounder.description :
@@ -191,12 +191,12 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
                         <Card key={item.id} className="card-hover-effect overflow-hidden flex flex-col group bg-card rounded-xl border border-border/60">
                             <div className="relative w-full h-60 md:h-64">
                                 {useRegularImg ? (
-                                    &lt;img
+                                    <img
                                         src={item.imageUrl}
                                         alt={item.name}
                                         className="object-cover w-full h-full transform transition-transform duration-300 group-hover:scale-105"
                                         data-ai-hint={item.dataAiHint || 'hall of fame image placeholder'}
-                                    /&gt;
+                                    />
                                 ) : (
                                     <NextImage
                                         src={item.imageUrl}
