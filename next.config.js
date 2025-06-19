@@ -1,4 +1,10 @@
-// This file is intentionally left minimal to ensure next.config.ts takes precedence.
-// If you have a next.config.ts, this file should ideally not be needed
-// or should export an empty object if Next.js requires its presence.
-module.exports = {};
+// This file defers to next.config.ts for all Next.js configuration.
+// Ensure next.config.ts exports its configuration as default.
+
+/** @type {import('next').NextConfig} */
+const tsConfig = require('./next.config.ts');
+
+// If tsConfig is an ESModule, its default export might be under tsConfig.default
+// Otherwise, it might be the module itself if it uses module.exports.
+// This handles both common scenarios.
+module.exports = tsConfig.default || tsConfig;
