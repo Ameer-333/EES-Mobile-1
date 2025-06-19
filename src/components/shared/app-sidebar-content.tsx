@@ -23,11 +23,9 @@ export function AppSidebarContent({ currentActualRole, navItems, onLinkClick }: 
 
   const filteredNavItems = navItems.filter(item => {
     if (currentActualRole && item.roles.includes(currentActualRole)) {
-      if (item.href === '/hall-of-fame') return true; // Hall of fame is always available if role matches
-      // For other links, ensure they start with the role's path
+      if (item.href === '/hall-of-fame') return true; 
       return item.href.startsWith(`/${currentActualRole.toLowerCase()}`);
     }
-    // Special case for /hall-of-fame when no specific role path is active but user has a role
     if (pathname.startsWith('/hall-of-fame') && item.href === '/hall-of-fame' && currentActualRole && item.roles.includes(currentActualRole)) {
        return true;
     }
@@ -45,8 +43,7 @@ export function AppSidebarContent({ currentActualRole, navItems, onLinkClick }: 
         return (
           <SidebarMenuItem key={item.href + item.label}>
             <Link href={item.href} asChild>
-              <SidebarMenuButton
-                asChild // SidebarMenuButton also needs asChild to pass props to the <a>
+              <SidebarMenuButton // Note: asChild is NOT used here
                 isActive={isActive}
                 className={cn(
                   isActive && 'bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/90'
@@ -54,10 +51,9 @@ export function AppSidebarContent({ currentActualRole, navItems, onLinkClick }: 
                 tooltip={item.tooltip || item.label}
                 onClick={onLinkClick}
               >
-                <a> {/* This <a> tag now correctly receives href from Link via SidebarMenuButton */}
-                  {IconComponent && <IconComponent />}
-                  <span>{item.label}</span>
-                </a>
+                {/* Icon and label are direct children of SidebarMenuButton */}
+                {IconComponent && <IconComponent />}
+                <span>{item.label}</span>
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
@@ -66,3 +62,5 @@ export function AppSidebarContent({ currentActualRole, navItems, onLinkClick }: 
     </SidebarMenu>
   );
 }
+
+    
