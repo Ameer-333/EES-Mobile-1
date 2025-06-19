@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { Users, Edit3, Building, ClipboardUser } from 'lucide-react'; // Users can be for both students and teachers
+import { Users, Edit3, Building, Activity } from 'lucide-react'; // Changed ClipboardUser to Activity, and added Activity
 import { useAppContext } from '@/app/(protected)/layout';
 
 interface ActionCardProps {
@@ -51,34 +51,34 @@ export default function CoordinatorDashboardPage() {
             Welcome, {userProfile?.name || 'Coordinator'}! Access your tools and manage system data.
           </p>
         </div>
-        <ClipboardUser className="h-12 w-12 text-primary hidden sm:block" />
+        <Activity className="h-12 w-12 text-primary hidden sm:block" /> {/* Changed ClipboardUser to Activity */}
       </div>
 
       <div>
         <h2 className="text-2xl font-semibold text-foreground mb-6">Key Management Areas</h2>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <ActionCard 
-            title="All Student Management" 
+          <ActionCard
+            title="All Student Management"
             description="View and manage records for all students across the entire system."
             href="/coordinator/students"
             icon={Users}
           />
-          <ActionCard 
-            title="Teacher Management" 
+          <ActionCard
+            title="Teacher Management"
             description="View and manage teacher profiles and their assignments system-wide."
             href="/coordinator/teacher-management"
-            icon={Users} 
+            icon={Users}
           />
-          <ActionCard 
-            title="Global Data Entry" 
+          <ActionCard
+            title="Global Data Entry"
             description="Enter or update academic marks and attendance for any student in the system."
             href="/coordinator/data-entry"
             icon={Edit3}
           />
-          <ActionCard 
-            title="View Hall of Fame" 
+          <ActionCard
+            title="View Hall of Fame"
             description="Explore the school's legacy and achievements in the Hall of Fame."
-            href="/hall-of-fame" 
+            href="/hall-of-fame"
             icon={Building}
           />
         </div>
@@ -100,3 +100,4 @@ export default function CoordinatorDashboardPage() {
     </div>
   );
 }
+    
