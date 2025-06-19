@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Edit, Search, UserPlus, Trash2, Loader2, Filter, Info } from 'lucide-react';
-import Image from 'next/image';
+import NextImage from 'next/image'; // Keep NextImage for non-placeholders
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { firestore } from '@/lib/firebase';
 import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData, query, where } from 'firebase/firestore';
 import { useAppContext } from '@/app/(protected)/layout';
-import { getStudentProfilesCollectionPath, getStudentDocPath, getUserDocPath } from '@/lib/firestore-paths'; // Ensure getUserDocPath is imported
+import { getStudentProfilesCollectionPath, getStudentDocPath, getUserDocPath } from '@/lib/firestore-paths';
 
 export function TeacherStudentManagement() {
   const { userProfile } = useAppContext();
@@ -49,9 +49,8 @@ export function TeacherStudentManagement() {
 
     setIsLoading(true);
     const unsubscribers: (() => void)[] = [];
-    const fetchedStudentsMap: Map<string, Student> = new Map(); // Keyed by student.id (studentProfileId)
+    const fetchedStudentsMap: Map<string, Student> = new Map();
 
-    // Get unique classIds the teacher is assigned to
     const uniqueClassIdsTeacherIsAssignedTo = Array.from(new Set(teacherAssignments.map(a => a.classId)));
 
     if (uniqueClassIdsTeacherIsAssignedTo.length === 0) {
@@ -76,20 +75,16 @@ export function TeacherStudentManagement() {
             }
         });
         
-        // Filter all fetched students based on the teacher's specific assignments
         const currentFilteredStudents = Array.from(fetchedStudentsMap.values()).filter(student => 
             teacherAssignments.some(assignment => {
-                if (student.classId !== assignment.classId) return false; // Student must be in an assigned classId
-
-                // For Class/Mother teacher, match sectionId if present in assignment
+                if (student.classId !== assignment.classId) return false; 
                 if ((assignment.type === 'class_teacher' || assignment.type === 'mother_teacher')) {
                     return !assignment.sectionId || student.sectionId === assignment.sectionId;
                 }
-                // For Subject teacher, NIOS, NCLP, they see all students in the classId unless further filtered by groupId
                 if (assignment.type === 'subject_teacher' || assignment.type === 'nios_teacher' || assignment.type === 'nclp_teacher') {
-                    if (assignment.sectionId && student.sectionId !== assignment.sectionId) return false; // if section is specified for these types
-                    if (assignment.groupId && student.groupId !== assignment.groupId) return false; // if group is specified
-                    return true; // Generally, they see all students in the assigned classId/sectionId/groupId
+                    if (assignment.sectionId && student.sectionId !== assignment.sectionId) return false; 
+                    if (assignment.groupId && student.groupId !== assignment.groupId) return false; 
+                    return true; 
                 }
                 return false;
             })
@@ -107,23 +102,19 @@ export function TeacherStudentManagement() {
       unsubscribers.push(unsubscribe);
     });
     
-    // Initial loading state update after setting up all listeners
-    // This might need refinement if listeners update student list incrementally
-    if (activeListeners > 0) { // Check if there were any listeners to begin with
+    if (activeListeners > 0) { 
         const initialLoadCheck = setInterval(() => {
-             // A simple heuristic: if after some time, students are still empty but no errors, 
-             // it might mean no students match or collections are empty.
-            if (unsubscribers.length === activeListeners) { // Ensure all listeners are attached
+            if (unsubscribers.length === activeListeners) { 
                 setIsLoading(false);
                 clearInterval(initialLoadCheck);
             }
-        }, 500); // Check every 500ms, clear after a few seconds or when students load
-         setTimeout(() => { // Fallback to stop loading indicator
+        }, 500); 
+         setTimeout(() => { 
             if(isLoading) setIsLoading(false);
             clearInterval(initialLoadCheck);
-        }, 5000); // Stop after 5 seconds regardless
+        }, 5000); 
     } else {
-        setIsLoading(false); // No assignments, so not loading
+        setIsLoading(false); 
     }
 
 
@@ -173,12 +164,10 @@ export function TeacherStudentManagement() {
   };
 
   const handleStudentAdded = (newStudent: Student) => {
-    // The onSnapshot listener should automatically update the list
     setIsAddStudentDialogOpen(false);
   };
 
   const handleStudentEdited = (editedStudent: Student) => {
-    // The onSnapshot listener should automatically update the list
     setIsEditStudentDialogOpen(false);
   };
 
@@ -187,151 +176,166 @@ export function TeacherStudentManagement() {
       <Card className="w-full shadow-lg rounded-lg">
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div> <Skeleton className="h-8 w-48 mb-2" /> <Skeleton className="h-4 w-72" /> </div>
-            <Skeleton className="h-10 w-40" />
+            &lt;div&gt; &lt;Skeleton className="h-8 w-48 mb-2" /&gt; &lt;Skeleton className="h-4 w-72" /&gt; &lt;/div&gt;
+            &lt;Skeleton className="h-10 w-40" /&gt;
           </div>
-          <div className="mt-4 relative"> <Skeleton className="h-10 w-full md:w-1/2" /> </div>
+          &lt;div className="mt-4 relative"&gt; &lt;Skeleton className="h-10 w-full md:w-1/2" /&gt; &lt;/div&gt;
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table><TableHeader><TableRow>{Array(7).fill(0).map((_, i) => <TableHead key={i}><Skeleton className="h-5 w-full" /></TableHead>)}</TableRow></TableHeader>
-              <TableBody>{Array(3).fill(0).map((_, i) => (
-                  <TableRow key={`skel-stud-${i}`}><TableCell colSpan={6} className="p-4">
-                      <div className="flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /><span className="ml-2">Loading assigned students...</span></div>
-                  </TableCell></TableRow>))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+          &lt;div className="rounded-md border"&gt;
+            &lt;Table&gt;&lt;TableHeader&gt;&lt;TableRow&gt;{Array(7).fill(0).map((_, i) =&gt; &lt;TableHead key={i}&gt;&lt;Skeleton className="h-5 w-full" /&gt;&lt;/TableHead&gt;)}&lt;/TableRow&gt;&lt;/TableHeader&gt;
+              &lt;TableBody&gt;{Array(3).fill(0).map((_, i) =&gt; (
+                  &lt;TableRow key={`skel-stud-${i}`}&gt;&lt;TableCell colSpan={6} className="p-4"&gt;
+                      &lt;div className="flex items-center justify-center"&gt;&lt;Loader2 className="h-6 w-6 animate-spin text-primary" /&gt;&lt;span className="ml-2"&gt;Loading assigned students...&lt;/span&gt;&lt;/div&gt;
+                  &lt;/TableCell&gt;&lt;/TableRow&gt;))
+              }&lt;/TableBody&gt;
+            &lt;/Table&gt;
+          &lt;/div&gt;
+        &lt;/CardContent&gt;
+      &lt;/Card&gt;
     );
   }
 
   const canAddStudents = teacherAssignments.some(a => a.type === 'class_teacher' || a.type === 'mother_teacher');
 
   return (
-    <>
-    <Card className="w-full shadow-lg rounded-lg">
-      <CardHeader>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <CardTitle className="text-2xl font-headline text-primary">My Assigned Students</CardTitle>
-            <CardDescription>
+    &lt;&gt;
+    &lt;Card className="w-full shadow-lg rounded-lg"&gt;
+      &lt;CardHeader&gt;
+        &lt;div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"&gt;
+          &lt;div&gt;
+            &lt;CardTitle className="text-2xl font-headline text-primary"&gt;My Assigned Students&lt;/CardTitle&gt;
+            &lt;CardDescription&gt;
               {teacherAssignments.length === 0
                 ? "You are not currently assigned to any classes or students. Please contact an administrator."
                 : "View, search, and manage records for students based on your teaching assignments."}
-            </CardDescription>
-          </div>
+            &lt;/CardDescription&gt;
+          &lt;/div&gt;
           {canAddStudents && (
-            <Button onClick={() => setIsAddStudentDialogOpen(true)} disabled={teacherAssignments.length === 0}>
-                <UserPlus className="mr-2 h-4 w-4" /> Add New Student
-            </Button>
+            &lt;Button onClick={() =&gt; setIsAddStudentDialogOpen(true)} disabled={teacherAssignments.length === 0}&gt;
+                &lt;UserPlus className="mr-2 h-4 w-4" /&gt; Add New Student
+            &lt;/Button&gt;
            )}
-           {!canAddStudents && teacherAssignments.length > 0 && (
-             <div className="text-sm text-muted-foreground p-2 border border-dashed rounded-md flex items-center gap-2">
-                <Info size={16} /> Student addition is typically handled by Class/Mother Teachers.
-             </div>
+           {!canAddStudents && teacherAssignments.length &gt; 0 && (
+             &lt;div className="text-sm text-muted-foreground p-2 border border-dashed rounded-md flex items-center gap-2"&gt;
+                &lt;Info size={16} /&gt; Student addition is typically handled by Class/Mother Teachers.
+             &lt;/div&gt;
            )}
-        </div>
-        <div className="mt-4 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input
+        &lt;/div&gt;
+        &lt;div className="mt-4 relative"&gt;
+          &lt;Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" /&gt;
+          &lt;Input
             placeholder="Search by name, SATS, or class display name..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) =&gt; setSearchTerm(e.target.value)}
             className="pl-10 w-full md:w-1/2"
             disabled={teacherAssignments.length === 0}
-          />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[60px]">Avatar</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>SATS No.</TableHead>
-                <TableHead>Class (Display)</TableHead>
-                <TableHead>Section/Group</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredStudentsToDisplay.length > 0 ? filteredStudentsToDisplay.map((student) => (
-                <TableRow key={student.id}> 
-                  <TableCell>
-                    <Image
-                      src={student.profilePictureUrl || `https://placehold.co/40x40.png`}
-                      alt={student.name || 'Student'}
-                      width={40}
-                      height={40}
-                      className="rounded-full"
-                      data-ai-hint="student avatar"
-                    />
-                  </TableCell>
-                  <TableCell>{student.name || 'N/A'}</TableCell>
-                  <TableCell>{student.satsNumber || 'N/A'}</TableCell>
-                  <TableCell>{student.className || student.classId || 'N/A'}</TableCell>
-                  <TableCell>{student.sectionId || student.groupId || 'N/A'}</TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(student)}>
-                      <Edit className="h-4 w-4 mr-1" /> Edit
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm">
-                          <Trash2 className="h-4 w-4 mr-1" /> Delete
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
+          /&gt;
+        &lt;/div&gt;
+      &lt;/CardHeader&gt;
+      &lt;CardContent&gt;
+        &lt;div className="rounded-md border"&gt;
+          &lt;Table&gt;
+            &lt;TableHeader&gt;
+              &lt;TableRow&gt;
+                &lt;TableHead className="w-[60px]"&gt;Avatar&lt;/TableHead&gt;
+                &lt;TableHead&gt;Name&lt;/TableHead&gt;
+                &lt;TableHead&gt;SATS No.&lt;/TableHead&gt;
+                &lt;TableHead&gt;Class (Display)&lt;/TableHead&gt;
+                &lt;TableHead&gt;Section/Group&lt;/TableHead&gt;
+                &lt;TableHead className="text-right"&gt;Actions&lt;/TableHead&gt;
+              &lt;/TableRow&gt;
+            &lt;/TableHeader&gt;
+            &lt;TableBody&gt;
+              {filteredStudentsToDisplay.length &gt; 0 ? filteredStudentsToDisplay.map((student) =&gt; {
+                const imgSrc = student.profilePictureUrl || `https://placehold.co/40x40.png`;
+                const useRegularImg = imgSrc.includes('placehold.co');
+                return (
+                &lt;TableRow key={student.id}&gt; 
+                  &lt;TableCell&gt;
+                    {useRegularImg ? (
+                        &lt;img
+                          src={imgSrc}
+                          alt={student.name || 'Student'}
+                          width={40}
+                          height={40}
+                          className="rounded-full object-cover"
+                          data-ai-hint="student avatar placeholder"
+                        /&gt;
+                      ) : (
+                        &lt;NextImage
+                          src={imgSrc}
+                          alt={student.name || 'Student'}
+                          width={40}
+                          height={40}
+                          className="rounded-full object-cover"
+                          data-ai-hint="student avatar"
+                        /&gt;
+                      )}
+                  &lt;/TableCell&gt;
+                  &lt;TableCell&gt;{student.name || 'N/A'}&lt;/TableCell&gt;
+                  &lt;TableCell&gt;{student.satsNumber || 'N/A'}&lt;/TableCell&gt;
+                  &lt;TableCell&gt;{student.className || student.classId || 'N/A'}&lt;/TableCell&gt;
+                  &lt;TableCell&gt;{student.sectionId || student.groupId || 'N/A'}&lt;/TableCell&gt;
+                  &lt;TableCell className="text-right space-x-2"&gt;
+                    &lt;Button variant="outline" size="sm" onClick={() =&gt; handleOpenEditDialog(student)}&gt;
+                      &lt;Edit className="h-4 w-4 mr-1" /&gt; Edit
+                    &lt;/Button&gt;
+                    &lt;AlertDialog&gt;
+                      &lt;AlertDialogTrigger asChild&gt;
+                        &lt;Button variant="destructive" size="sm"&gt;
+                          &lt;Trash2 className="h-4 w-4 mr-1" /&gt; Delete
+                        &lt;/Button&gt;
+                      &lt;/AlertDialogTrigger&gt;
+                      &lt;AlertDialogContent&gt;
+                        &lt;AlertDialogHeader&gt;
+                          &lt;AlertDialogTitle&gt;Are you sure?&lt;/AlertDialogTitle&gt;
+                          &lt;AlertDialogDescription&gt;
                             This action cannot be undone. This will permanently delete the student
                             record for {student.name || 'this student'} from Firestore (path: {getStudentDocPath(student.classId, student.id)}) and their main user record (path: {getUserDocPath(student.authUid)}).
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteStudent(student)}>
+                          &lt;/AlertDialogDescription&gt;
+                        &lt;/AlertDialogHeader&gt;
+                        &lt;AlertDialogFooter&gt;
+                          &lt;AlertDialogCancel&gt;Cancel&lt;/AlertDialogCancel&gt;
+                          &lt;AlertDialogAction onClick={() =&gt; handleDeleteStudent(student)}&gt;
                             Continue
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </TableCell>
-                </TableRow>
-              )) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
+                          &lt;/AlertDialogAction&gt;
+                        &lt;/AlertDialogFooter&gt;
+                      &lt;/AlertDialogContent&gt;
+                    &lt;/AlertDialog&gt;
+                  &lt;/TableCell&gt;
+                &lt;/TableRow&gt;
+              )}) : (
+                &lt;TableRow&gt;
+                  &lt;TableCell colSpan={6} className="text-center h-24 text-muted-foreground"&gt;
                     {teacherAssignments.length === 0
                       ? "No classes assigned to you."
                       : "No students found matching your assignments or search criteria."}
-                  </TableCell>
-                </TableRow>
+                  &lt;/TableCell&gt;
+                &lt;/TableRow&gt;
               )}
-            </TableBody>
-          </Table>
-        </div>
-        {filteredStudentsToDisplay.length > 0 && (
-          <div className="mt-4 text-right text-sm text-muted-foreground">
+            &lt;/TableBody&gt;
+          &lt;/Table&gt;
+        &lt;/div&gt;
+        {filteredStudentsToDisplay.length &gt; 0 && (
+          &lt;div className="mt-4 text-right text-sm text-muted-foreground"&gt;
             Showing {filteredStudentsToDisplay.length} of {assignedStudents.length} total assigned students.
-          </div>
+          &lt;/div&gt;
         )}
-      </CardContent>
-    </Card>
-    <AddStudentDialog
+      &lt;/CardContent&gt;
+    &lt;/Card&gt;
+    &lt;AddStudentDialog
         isOpen={isAddStudentDialogOpen}
         onOpenChange={setIsAddStudentDialogOpen}
         onStudentAdded={handleStudentAdded}
-    />
-    <EditStudentDialog
+    /&gt;
+    &lt;EditStudentDialog
         isOpen={isEditStudentDialogOpen}
         onOpenChange={setIsEditStudentDialogOpen}
         onStudentEdited={handleStudentEdited}
         studentToEdit={currentStudentToEdit}
-    />
-    </>
+    /&gt;
+    &lt;/&gt;
   );
 }
+

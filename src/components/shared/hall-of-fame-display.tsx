@@ -2,9 +2,9 @@
 'use client';
 
 import type { HallOfFameItem, UserRole } from '@/types';
-import Image from 'next/image';
+import NextImage from 'next/image'; // Keep NextImage for non-placeholders
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Award, Briefcase, Users as UsersIconLucide, Edit, Crown, Loader2, Star, Building } from 'lucide-react'; // Renamed Users to UsersIconLucide
+import { Award, Briefcase, Users as UsersIconLucide, Edit, Crown, Loader2, Star, Building } from 'lucide-react';
 import { Button } from '../ui/button';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
@@ -137,15 +137,24 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
             <div className="flex-shrink-0 w-full max-w-sm lg:max-w-md lg:w-2/5 mx-auto">
               <div className="relative aspect-square rounded-lg overflow-hidden shadow-xl border-4 border-primary/20 transform transition-transform duration-500 hover:scale-105">
-                <Image
-                  src={mainFounder.imageUrl}
-                  alt={mainFounder.name}
-                  fill
-                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  className="object-cover"
-                  data-ai-hint={mainFounder.dataAiHint || "founder portrait"}
-                  priority 
-                />
+                {mainFounder.imageUrl.includes('placehold.co') ? (
+                  &lt;img
+                    src={mainFounder.imageUrl}
+                    alt={mainFounder.name}
+                    className="object-cover w-full h-full"
+                    data-ai-hint={mainFounder.dataAiHint || "founder portrait placeholder"}
+                  /&gt;
+                ) : (
+                  <NextImage
+                    src={mainFounder.imageUrl}
+                    alt={mainFounder.name}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="object-cover"
+                    data-ai-hint={mainFounder.dataAiHint || "founder portrait"}
+                    priority 
+                  />
+                )}
               </div>
             </div>
             <div className="lg:w-3/5 text-center lg:text-left">
@@ -153,7 +162,7 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
                 {mainFounder.name}
               </h2>
               <p className="text-xl font-semibold text-muted-foreground mb-6">
-                {mainFounder.title || 'Founder & Visionary Leader'}
+                {mainFounder.title || 'Founder &amp; Visionary Leader'}
               </p>
               <blockquote className="text-lg text-foreground/90 leading-relaxed border-l-4 border-accent pl-6 italic">
                 {mainFounder.description && mainFounder.description.length > 50 ? mainFounder.description :
@@ -176,17 +185,28 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
                     <IconToUse className="mr-3 h-7 w-7 md:h-8 md:w-8 text-primary"/> {groupTitle}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8 xl:gap-x-8 xl:gap-y-10">
-                    {itemsInGroup.map(item => (
+                    {itemsInGroup.map(item => {
+                      const useRegularImg = item.imageUrl.includes('placehold.co');
+                      return (
                         <Card key={item.id} className="card-hover-effect overflow-hidden flex flex-col group bg-card rounded-xl border border-border/60">
                             <div className="relative w-full h-60 md:h-64">
-                                <Image
-                                    src={item.imageUrl}
-                                    alt={item.name}
-                                    fill
-                                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                                    className="object-cover transform transition-transform duration-300 group-hover:scale-105"
-                                    data-ai-hint={item.dataAiHint || 'hall of fame image'}
-                                />
+                                {useRegularImg ? (
+                                    &lt;img
+                                        src={item.imageUrl}
+                                        alt={item.name}
+                                        className="object-cover w-full h-full transform transition-transform duration-300 group-hover:scale-105"
+                                        data-ai-hint={item.dataAiHint || 'hall of fame image placeholder'}
+                                    /&gt;
+                                ) : (
+                                    <NextImage
+                                        src={item.imageUrl}
+                                        alt={item.name}
+                                        fill
+                                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                        className="object-cover transform transition-transform duration-300 group-hover:scale-105"
+                                        data-ai-hint={item.dataAiHint || 'hall of fame image'}
+                                    />
+                                )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                             </div>
                             <CardHeader className="flex-grow pb-2 pt-5 px-5">
@@ -198,7 +218,7 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
                                 <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3 group-hover:line-clamp-none transition-all">{item.description}</p>
                             </CardContent>
                         </Card>
-                    ))}
+                    )})}
                 </div>
             </section>
         );
@@ -206,5 +226,4 @@ export function HallOfFameDisplay({ currentRole }: HallOfFameDisplayProps) {
     </div>
   );
 }
-
     

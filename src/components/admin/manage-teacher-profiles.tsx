@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Edit, Search, UserPlus, Trash2, Loader2, Briefcase, Info } from 'lucide-react';
+import NextImage from 'next/image'; // Keep NextImage for non-placeholders
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,13 +19,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TeacherProfileFormDialog } from './teacher-profile-form-dialog';
-import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Added Tooltip
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { firestore } from '@/lib/firebase';
 import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData, getDoc } from 'firebase/firestore';
 import { getTeachersCollectionPath, getUserDocPath, getTeacherDocPath } from '@/lib/firestore-paths';
@@ -76,7 +75,7 @@ export function ManageTeacherProfiles() {
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     const managedUserData = userDocSnap.data() as ManagedUser;
-                    if (managedUserData.role === 'Teacher') { // Ensure it's actually a teacher's user record
+                    if (managedUserData.role === 'Teacher') { 
                          assignments = managedUserData.assignments || [];
                     } else {
                         console.warn(`User record for Auth ID ${teacherData.authUid} is not a Teacher. Skipping assignments.`);
@@ -221,7 +220,7 @@ export function ManageTeacherProfiles() {
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <CardTitle className="text-2xl font-headline text-primary">Teacher HR Profiles & Assignments</CardTitle>
+              <CardTitle className="text-2xl font-headline text-primary">Teacher HR Profiles &amp; Assignments</CardTitle>
               <CardDescription>Manage teacher HR info, contact details, and teaching assignments. Auth accounts are created/managed via this interface.</CardDescription>
             </div>
             {canAddTeachers && (
@@ -269,17 +268,31 @@ export function ManageTeacherProfiles() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTeachers.length > 0 ? filteredTeachers.map((teacher) => (
+                {filteredTeachers.length > 0 ? filteredTeachers.map((teacher) => {
+                  const imgSrc = teacher.profilePictureUrl || `https://placehold.co/40x40.png`;
+                  const useRegularImg = imgSrc.includes('placehold.co');
+                  return (
                   <TableRow key={teacher.authUid}>
                     <TableCell>
-                      <Image
-                        src={teacher.profilePictureUrl || `https://placehold.co/40x40.png`}
-                        alt={teacher.name}
-                        width={40}
-                        height={40}
-                        className="rounded-full"
-                        data-ai-hint="teacher avatar"
-                      />
+                      {useRegularImg ? (
+                        <img
+                          src={imgSrc}
+                          alt={teacher.name}
+                          width={40}
+                          height={40}
+                          className="rounded-full object-cover"
+                          data-ai-hint="teacher avatar placeholder"
+                        />
+                      ) : (
+                        <NextImage
+                          src={imgSrc}
+                          alt={teacher.name}
+                          width={40}
+                          height={40}
+                          className="rounded-full object-cover"
+                          data-ai-hint="teacher avatar"
+                        />
+                      )}
                     </TableCell>
                     <TableCell className="font-medium truncate max-w-[100px] text-xs">{teacher.authUid}</TableCell>
                     <TableCell>{teacher.name}</TableCell>
@@ -312,8 +325,8 @@ export function ManageTeacherProfiles() {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                This will permanently delete the HR profile from the 'teachers' collection and the user record (role, assignments) from the 'users' collection for <strong>{teacher.name}</strong> (Auth ID: {teacher.authUid}).
-                                <br/><strong className="text-destructive mt-2 block">The Firebase Authentication account for this teacher needs to be deleted manually from the Firebase Console.</strong>
+                                This will permanently delete the HR profile from the 'teachers' collection and the user record (role, assignments) from the 'users' collection for &lt;strong&gt;{teacher.name}&lt;/strong&gt; (Auth ID: {teacher.authUid}).
+                                &lt;br/&gt;&lt;strong className="text-destructive mt-2 block"&gt;The Firebase Authentication account for this teacher needs to be deleted manually from the Firebase Console.&lt;/strong&gt;
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -341,7 +354,7 @@ export function ManageTeacherProfiles() {
                        )}
                     </TableCell>
                   </TableRow>
-                )) : (
+                )}) : (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center h-24 text-muted-foreground">
                       {isLoading ? 'Loading teachers...' : 'No teachers found matching your criteria or no teachers in Firestore.'}

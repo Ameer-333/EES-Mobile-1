@@ -3,14 +3,13 @@ import type { Student } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { User, MapPin, BookUser, Users, Landmark, Church, Cake, Briefcase, Phone, Mail, UsersRound, Edit3, Banknote } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
+import NextImage from 'next/image'; // Keep NextImage for non-placeholders
 
 interface StudentProfileCardProps {
   student: Student;
-  isFullPage?: boolean; // To control styling for dashboard vs full profile page
+  isFullPage?: boolean; 
 }
 
-// Comprehensive mock data for demonstration
 const mockStudent: Student = {
   id: 'S12345',
   name: 'Ravi Kumar Sharma',
@@ -32,7 +31,8 @@ const mockStudent: Student = {
   profilePictureUrl: 'https://placehold.co/150x150.png',
   remarks: [],
   scholarships: [],
-  backgroundInfo: "A bright and inquisitive student with a passion for science and coding."
+  backgroundInfo: "A bright and inquisitive student with a passion for science and coding.",
+  authUid: "mockAuthUid"
 };
 
 
@@ -51,20 +51,34 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
     }
   };
 
+  const profileSrc = student.profilePictureUrl || `https://placehold.co/${isFullPage ? '140x140' : '100x100'}.png`;
+  const useRegularImg = profileSrc.includes('placehold.co');
+
   return (
     <Card className={cn("w-full shadow-xl rounded-xl border-primary/10 overflow-hidden", isFullPage ? " " : "lg:col-span-1")}>
       <CardHeader className="bg-gradient-to-br from-primary/15 via-primary/5 to-background p-6 relative">
         <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
           <div className="relative flex-shrink-0">
-            <Image
-              src={student.profilePictureUrl || `https://placehold.co/${isFullPage ? '140x140' : '100x100'}.png`}
-              alt={`${student.name || 'Student'}'s Profile Picture`}
-              width={isFullPage ? 140 : 100}
-              height={isFullPage ? 140 : 100}
-              className="rounded-full border-4 border-primary/50 shadow-lg object-cover"
-              data-ai-hint="student portrait"
-              priority
-            />
+            {useRegularImg ? (
+              &lt;img
+                src={profileSrc}
+                alt={`${student.name || 'Student'}'s Profile Picture`}
+                width={isFullPage ? 140 : 100}
+                height={isFullPage ? 140 : 100}
+                className="rounded-full border-4 border-primary/50 shadow-lg object-cover"
+                data-ai-hint="student portrait placeholder"
+              /&gt;
+            ) : (
+              <NextImage
+                src={profileSrc}
+                alt={`${student.name || 'Student'}'s Profile Picture`}
+                width={isFullPage ? 140 : 100}
+                height={isFullPage ? 140 : 100}
+                className="rounded-full border-4 border-primary/50 shadow-lg object-cover"
+                data-ai-hint="student portrait"
+                priority
+              />
+            )}
           </div>
           <div className="text-center sm:text-left pt-1">
             <CardTitle className={cn("font-headline text-primary tracking-tight", isFullPage ? "text-3xl md:text-4xl" : "text-2xl")}>
@@ -79,7 +93,6 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
       </CardHeader>
 
       <CardContent className="p-6 space-y-6">
-        {/* Personal Details */}
         <Section title="Personal Details" icon={User} isFullPage={isFullPage}>
           <ProfileItem icon={Cake} label="Date of Birth" value={formatDate(student.dateOfBirth)} />
           <ProfileItem icon={Church} label="Religion" value={student.religion} />
@@ -87,7 +100,6 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
           {isFullPage && student.email && <ProfileItem icon={Mail} label="Student Email" value={student.email} className="md:col-span-2"/>}
         </Section>
 
-        {/* Family Details */}
         <Section title="Family Information" icon={UsersRound} isFullPage={isFullPage}>
           <ProfileItem icon={User} label="Father's Name" value={student.fatherName} />
           <ProfileItem icon={Briefcase} label="Father's Occupation" value={student.fatherOccupation} />
@@ -96,7 +108,6 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
           {isFullPage && <ProfileItem icon={Banknote} label="Parents' Annual Income" value={formatCurrency(student.parentsAnnualIncome)} className="md:col-span-2" />}
         </Section>
 
-        {/* Contact Details */}
         <Section title="Contact Information" icon={Phone} isFullPage={isFullPage}>
           {isFullPage && student.parentContactNumber && <ProfileItem icon={Phone} label="Parent's Contact" value={student.parentContactNumber}/>}
           <ProfileItem icon={MapPin} label="Address" value={student.address} className="md:col-span-2" />
@@ -108,14 +119,13 @@ export function StudentProfileCard({ student = mockStudent, isFullPage = false }
             </Section>
         )}
 
-        {!isFullPage && ( // Show minimal info for dashboard
+        {!isFullPage && ( 
             <div className="mt-4 pt-4 border-t border-muted/30">
                  <ProfileItem icon={MapPin} label="Address" value={student.address} className="text-sm"/>
             </div>
         )}
 
       </CardContent>
-      {/* Removed edit button from footer for students */}
     </Card>
   );
 }
@@ -161,3 +171,4 @@ function ProfileItem({ icon: Icon, label, value, className }: ProfileItemProps) 
     </div>
   );
 }
+
