@@ -35,7 +35,7 @@ import {
 import { Loader2, Info } from 'lucide-react';
 import { firestore, auth as firebaseAuth } from '@/lib/firebase'; // Import firebaseAuth
 import { doc, setDoc } from 'firebase/firestore'; // Import setDoc
-import { createUserWithEmailAndPassword } from 'firebase/auth'; // Import createUserWithEmailAndPassword
+import { createUserWithEmailAndPassword, type FirebaseError } from 'firebase/auth'; // Import createUserWithEmailAndPassword and FirebaseError
 import { useToast } from "@/hooks/use-toast";
 import { getUsersCollectionPath } from '@/lib/firestore-paths';
 import { Card, CardHeader as UICardHeader, CardContent as UICardContent, CardTitle as UICardTitle } from '@/components/ui/card';
@@ -64,7 +64,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     defaultValues: {
       name: '',
       email: '',
-      role: 'Student',
+      role: 'Student', // Default role
     },
   });
 
@@ -73,7 +73,6 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     setGeneratedCredentials(null);
 
     const loginEmail = values.email;
-    // Generate a simple default password, e.g., RoleDefault@YYYY
     const roleNameCapitalized = values.role.charAt(0).toUpperCase() + values.role.slice(1);
     const defaultPassword = `${roleNameCapitalized}Default@${new Date().getFullYear()}`;
 
@@ -84,20 +83,16 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
 
       // 2. Prepare Firestore data
       const newUserFirestoreData: ManagedUser = {
-        id: authUid, // Use authUid as the document ID and the id field
+        id: authUid, // Ensure Firestore document ID and 'id' field match Auth UID
         name: values.name,
-        email: loginEmail, // Store the login email
+        email: loginEmail,
         role: values.role,
-        status: 'Active', // Default new users to Active
+        status: 'Active',
         lastLogin: 'N/A',
-         // For students, these might be set later or if role is Student, could prompt for them
-        classId: values.role === 'Student' ? 'TO_BE_ASSIGNED' : undefined, 
+        classId: values.role === 'Student' ? 'TO_BE_ASSIGNED' : undefined,
         studentProfileId: values.role === 'Student' ? 'TO_BE_ASSIGNED' : undefined,
+        assignments: values.role === 'Teacher' ? [] : undefined,
       };
-      if (values.role === 'Teacher') {
-        newUserFirestoreData.assignments = []; // Initialize assignments for teachers
-      }
-
 
       // 3. Save user profile to Firestore, using authUid as document ID
       const usersCollectionPath = getUsersCollectionPath();
@@ -107,26 +102,38 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
       onUserAdded(newUserFirestoreData); 
       setGeneratedCredentials({ email: loginEmail, password: defaultPassword });
       
+      // Simplified toast message
       toast({
         title: "User Account Created!",
-        description: React.createElement('div', null,
-            React.createElement('p', null, `Account for ${values.name} (${values.role}) created.`),
-            React.createElement('p', {className: "mt-2 font-semibold"}, `Login Email: ${loginEmail}`),
-            React.createElement('p', {className: "font-semibold"}, `Password: ${defaultPassword}`),
-            React.createElement('p', {className: "text-xs mt-1 text-destructive"}, "Advise user to change password on first login.")
+        description: (
+          <div>
+            <p>Account for {values.name} ({values.role}) created.</p>
+            <p className="mt-2"><strong>Login Email:</strong> {loginEmail}</p>
+            <p><strong>Default Password:</strong> {defaultPassword}</p>
+            <p className="text-xs mt-1 text-destructive">Advise user to change password on first login.</p>
+          </div>
         ),
-        duration: 20000, // Longer duration to view credentials
+        duration: 20000,
       });
-      // Don't reset form or close dialog immediately if credentials are shown
-      // form.reset();
-      // onOpenChange(false); 
+      
     } catch (error: any) {
       console.error("Error adding user or creating auth account:", error);
-      let errMsg = "Could not create user account.";
-      if (error.code === 'auth/email-already-in-use') {
-        errMsg = `The email ${loginEmail} is already in use. Please use a different email.`;
-      } else if (error.code === 'auth/weak-password') {
-        errMsg = "The auto-generated password is too weak (this is a system issue). Please contact support.";
+      let errMsg = "Could not create user account. Please check the console for more details.";
+      if (error instanceof FirebaseError) { // More specific Firebase error check
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errMsg = `The email ${loginEmail} is already in use. Please use a different email.`;
+            break;
+          case 'auth/weak-password':
+            errMsg = "The auto-generated password is too weak (this is a system issue). Please contact support.";
+            break;
+          case 'auth/invalid-email':
+            errMsg = `The email ${loginEmail} is not valid. Please check and try again.`;
+            break;
+          default:
+            errMsg = `Firebase Auth Error: ${error.message} (Code: ${error.code})`;
+            break;
+        }
       } else if (error.message) {
         errMsg = error.message;
       }
@@ -141,7 +148,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
   }
 
   const handleCloseDialog = () => {
-    if (!isSubmitting) {
+    if (!isSubmitting) { // Only allow close if not submitting
         form.reset();
         setGeneratedCredentials(null);
         onOpenChange(false);
@@ -241,3 +248,4 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     </Dialog>
   );
 }
+
