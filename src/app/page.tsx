@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { LogoIcon } from '@/components/icons/logo-icon';
-import { ArrowRight, User, Briefcase, Shield, ClipboardUser } from 'lucide-react'; // Added ClipboardUser
+import { ArrowRight, User, Briefcase, Shield, ClipboardUser } from 'lucide-react';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { firestore } from '@/lib/firebase';
@@ -63,7 +63,7 @@ export default function LandingPage() {
             className="mx-auto mb-4 rounded-lg object-contain shadow-md"
             data-ai-hint="school logo custom large"
             priority
-            onError={() => setLogoUrl(null)} 
+            onError={() => setLogoUrl(null)}
           />
         ) : (
           <LogoIcon className="h-24 w-24 md:h-28 md:w-28 text-primary mx-auto mb-4" />
