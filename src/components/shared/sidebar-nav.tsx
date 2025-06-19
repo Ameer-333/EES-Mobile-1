@@ -9,7 +9,7 @@ import {
   Home, User, BookOpen, Edit, Settings, Shield, Users as UsersIcon, LineChart,
   MessageSquarePlus, Mail, Award, Building, MessageSquareText,
   CalendarCheck, CalendarClock, ClipboardUser
-} from 'lucide-react'; // Removed MessageCircle, DollarSign, ClipboardList as they are not used in navItems
+} from 'lucide-react';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -19,6 +19,7 @@ interface NavItem {
   roles: UserRole[];
 }
 
+// All icons used here are confirmed to be in the import list above.
 const navItems: NavItem[] = [
   // Student
   { href: '/student/dashboard', label: 'Dashboard', icon: Home, roles: ['Student'] },
@@ -56,6 +57,8 @@ const navItems: NavItem[] = [
 ];
 
 
+// This function is not directly used by SidebarNav_Corrected based on the implementation below.
+// It was likely for a previous version or for debugging.
 function getCurrentRole(pathname: string): UserRole | null {
   if (pathname.startsWith('/student')) return 'Student';
   if (pathname.startsWith('/teacher')) return 'Teacher';
@@ -64,6 +67,8 @@ function getCurrentRole(pathname: string): UserRole | null {
   return null;
 }
 
+// This function is also not directly used by SidebarNav_Corrected below.
+// This appears to be an older or alternative implementation not currently active for the layout.
 export function SidebarNav() {
   const pathname = usePathname();
   const currentRole = getCurrentRole(pathname);
@@ -78,11 +83,6 @@ export function SidebarNav() {
 
   const effectiveRole = getEffectiveRoleForFiltering();
 
-  const filteredNavItems = navItems.filter(item => {
-    if (effectiveRole) return item.roles.includes(effectiveRole);
-    return false;
-  });
-
   return (
     <nav className="flex flex-col space-y-1">
       {navItems.filter(item => {
@@ -91,7 +91,7 @@ export function SidebarNav() {
         return false;
       }).map((item) => (
         <Button
-          key={item.href + (currentRole || '')}
+          key={item.href + (currentRole || '')} 
           asChild
           variant={pathname.startsWith(item.href) ? 'secondary' : 'ghost'}
           className={cn(
@@ -109,25 +109,21 @@ export function SidebarNav() {
   );
 }
 
-
+// This is the version of SidebarNav being used in the layout.tsx (aliased as SidebarNav)
 export function SidebarNav_Corrected() {
   const pathname = usePathname();
-  const rolePathSegment = usePathname().split('/')[1] as UserRole | undefined;
+  const rolePathSegment = pathname.split('/')[1] as UserRole | undefined;
 
   let currentActualRole: UserRole | null = null;
   if (rolePathSegment && ['student', 'teacher', 'admin', 'coordinator'].includes(rolePathSegment)) {
     currentActualRole = rolePathSegment.charAt(0).toUpperCase() + rolePathSegment.slice(1) as UserRole;
-  } else if (pathname.startsWith('/hall-of-fame')) {
-    // Logic for /hall-of-fame without a role prefix
   }
-
 
   return (
     <nav className="flex flex-col space-y-1">
       {navItems.filter(item => {
         if (currentActualRole && item.roles.includes(currentActualRole)) {
             if (item.href === '/hall-of-fame') return true;
-            // For other role-specific items
             return item.href.startsWith(`/${currentActualRole.toLowerCase()}`) || item.href === '/hall-of-fame';
         }
         if (pathname.startsWith('/hall-of-fame') && item.href === '/hall-of-fame') {
@@ -136,12 +132,12 @@ export function SidebarNav_Corrected() {
         return false;
       }).map((item) => {
           const isActive = item.href === '/hall-of-fame'
-                            ? pathname === item.href
+                            ? pathname === item.href 
                             : pathname.startsWith(item.href);
 
           return (
             <Button
-              key={item.href + item.label + (currentActualRole || '')}
+              key={item.href + item.label + (currentActualRole || '')} 
               asChild
               variant={isActive ? 'secondary' : 'ghost'}
               className={cn(
