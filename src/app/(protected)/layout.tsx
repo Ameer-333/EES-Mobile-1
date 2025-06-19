@@ -126,7 +126,19 @@ function AppProvider({ children }: { children: React.ReactNode }) {
         setAuthUser(user);
         const userDocPath = getUserDocPath(user.uid);
         const userDocRef = doc(firestore, userDocPath);
-        const userDocSnap = await getDoc(userDocRef);
+        let userDocSnap = await getDoc(userDocRef); // First attempt
+
+        // Retry mechanism for newly created users
+        if (!userDocSnap.exists() && user.metadata.creationTime) {
+          const now = new Date().getTime();
+          const creationTimestamp = new Date(user.metadata.creationTime).getTime();
+          // If user was created in the last 5 seconds, it might be a propagation delay
+          if (now - creationTimestamp < 5000) { // 5 seconds grace period
+            console.log(`User profile for ${user.uid} not found immediately. Retrying after 1.5s as user is new.`);
+            await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5 seconds
+            userDocSnap = await getDoc(userDocRef); // Second attempt
+          }
+        }
 
         if (userDocSnap.exists()) {
           const userDataFromFirestore = userDocSnap.data() as ManagedUser; 
@@ -344,5 +356,4 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode; }) {
     </div>
   );
 }
-
     
