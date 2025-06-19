@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Search, UserPlus, Trash2, Loader2, Briefcase } from 'lucide-react';
+import { Edit, Search, UserPlus, Trash2, Loader2, Briefcase, Info } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added missing import
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TeacherProfileFormDialog } from './teacher-profile-form-dialog';
@@ -27,6 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { firestore } from '@/lib/firebase';
 import { collection, onSnapshot, deleteDoc, doc, QuerySnapshot, DocumentData, getDoc } from 'firebase/firestore';
 import { getTeachersCollectionPath, getUserDocPath, getTeacherDocPath } from '@/lib/firestore-paths';
+import { useAppContext } from '@/app/(protected)/layout';
 
 interface TeacherWithAssignments extends Teacher {
     assignments?: TeacherAssignment[];
@@ -34,12 +35,15 @@ interface TeacherWithAssignments extends Teacher {
 
 
 export function ManageTeacherProfiles() {
+  const { userProfile } = useAppContext();
   const [teachersWithAssignments, setTeachersWithAssignments] = useState<TeacherWithAssignments[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [teacherToEdit, setTeacherToEdit] = useState<Teacher | null>(null);
   const { toast } = useToast();
+
+  const canManageTeachers = userProfile?.role === 'Admin' || userProfile?.role === 'Coordinator';
 
   useEffect(() => {
     setIsLoading(true);
@@ -56,20 +60,22 @@ export function ManageTeacherProfiles() {
           return null;
         }
 
-        // Construct Teacher object.
-        // 'id' is the document ID of the HR profile.
-        // 'authUid' is the Firebase Auth UID, which *is* the document ID for /teachers collection by design.
         const teacherData: Teacher = {
           ...data,
           id: docId,
-          authUid: docId, // Explicitly set authUid to the document ID
+          authUid: docId, 
         } as Teacher;
 
-        // Fetch assignments from the 'users' collection using this authUid (docId)
-        // getUserDocPath will throw an error if teacherData.authUid is falsy, but we've ensured it's docId.
-        const userDocRef = doc(firestore, getUserDocPath(teacherData.authUid));
-        const userDocSnap = await getDoc(userDocRef);
-        const assignments = userDocSnap.exists() ? (userDocSnap.data() as ManagedUser).assignments || [] : [];
+        let assignments: TeacherAssignment[] = [];
+        if (teacherData.authUid) {
+            try {
+                const userDocRef = doc(firestore, getUserDocPath(teacherData.authUid));
+                const userDocSnap = await getDoc(userDocRef);
+                assignments = userDocSnap.exists() ? (userDocSnap.data() as ManagedUser).assignments || [] : [];
+            } catch (error) {
+                console.warn(`Could not fetch assignments for teacher ${teacherData.authUid}:`, error)
+            }
+        }
         
         return { ...teacherData, assignments };
       });
@@ -118,9 +124,12 @@ export function ManageTeacherProfiles() {
   };
 
   const handleDeleteTeacher = async (teacherAuthUid: string, teacherName: string) => {
-    // teacherAuthUid here is teacher.authUid, which is now guaranteed to be the docId.
     if (!teacherAuthUid) {
         toast({ title: "Error", description: "Teacher Auth ID is missing, cannot delete.", variant: "destructive" });
+        return;
+    }
+    if (userProfile?.role !== 'Admin') {
+        toast({ title: "Permission Denied", description: "Only Admins can delete teacher records.", variant: "destructive" });
         return;
     }
     try {
@@ -151,9 +160,7 @@ export function ManageTeacherProfiles() {
   };
 
   const handleTeacherSaved = (savedTeacher: Teacher, isEditing: boolean) => {
-    // The onSnapshot listener will update the list automatically.
-    // We just need to close the form.
-    if (isEditing || !isEditing) { // Close form on both add and edit
+    if (isEditing || !isEditing) { 
       setIsFormOpen(false);
     }
   };
@@ -199,9 +206,11 @@ export function ManageTeacherProfiles() {
               <CardTitle className="text-2xl font-headline text-primary">Teacher HR Profiles & Assignments</CardTitle>
               <CardDescription>Manage teacher HR info, contact details, and teaching assignments. Auth accounts are created/managed via this interface.</CardDescription>
             </div>
-            <Button onClick={handleAddTeacher} className="bg-primary hover:bg-primary/90">
-              <UserPlus className="mr-2 h-4 w-4" /> Add New Teacher
-            </Button>
+            {canManageTeachers && (
+                <Button onClick={handleAddTeacher} className="bg-primary hover:bg-primary/90">
+                    <UserPlus className="mr-2 h-4 w-4" /> Add New Teacher
+                </Button>
+            )}
           </div>
           <div className="mt-4">
             <div className="relative">
@@ -257,31 +266,52 @@ export function ManageTeacherProfiles() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditTeacher(teacher)}>
-                        <Edit className="h-3.5 w-3.5 mr-1" /> Edit
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm" disabled={!teacher.authUid}>
-                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete the HR profile from the 'teachers' collection and the user record (role, assignments) from the 'users' collection for <strong>{teacher.name}</strong> (Auth ID: {teacher.authUid}).
-                              <br/><strong className="text-destructive mt-2 block">The Firebase Authentication account for this teacher needs to be deleted manually from the Firebase Console.</strong>
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.authUid, teacher.name)} disabled={!teacher.authUid}>
-                              Yes, delete Firestore records
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      {canManageTeachers && (
+                        <Button variant="outline" size="sm" onClick={() => handleEditTeacher(teacher)}>
+                            <Edit className="h-3.5 w-3.5 mr-1" /> Edit
+                        </Button>
+                      )}
+                      {userProfile?.role === 'Admin' && (
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" disabled={!teacher.authUid}>
+                                <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                            </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                This will permanently delete the HR profile from the 'teachers' collection and the user record (role, assignments) from the 'users' collection for <strong>{teacher.name}</strong> (Auth ID: {teacher.authUid}).
+                                <br/><strong className="text-destructive mt-2 block">The Firebase Authentication account for this teacher needs to be deleted manually from the Firebase Console.</strong>
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.authUid, teacher.name)} disabled={!teacher.authUid}>
+                                Yes, delete Firestore records
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                       {userProfile?.role === 'Coordinator' && !canManageTeachers && ( 
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span tabIndex={0}> 
+                                            <Button variant="outline" size="sm" disabled className="cursor-not-allowed">
+                                                <Info className="h-3.5 w-3.5 mr-1" /> View (Read-only)
+                                            </Button>
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Coordinators can view profiles here. Editing is enabled.</p>
+                                        <p>Deletion is Admin-only.</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                       )}
                     </TableCell>
                   </TableRow>
                 )) : (
@@ -311,6 +341,4 @@ export function ManageTeacherProfiles() {
     </>
   );
 }
-
-
     
