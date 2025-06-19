@@ -149,7 +149,7 @@ export function TeacherProfileFormDialog({
       const userRecord: ManagedUser = {
         id: authUid,
         name: values.name,
-        email: teacherAuthEmail, 
+        email: teacherAuthEmail,
         role: 'Teacher',
         status: 'Active',
         assignments: values.assignments,
@@ -160,7 +160,7 @@ export function TeacherProfileFormDialog({
 
       const savedTeacherDataForCallback: Teacher = {
         ...teacherHRProfile,
-        id: authUid, 
+        id: authUid,
       };
       onTeacherSaved(savedTeacherDataForCallback, isEditing);
 
@@ -177,7 +177,7 @@ export function TeacherProfileFormDialog({
         });
       } else {
         toast({ title: "Teacher Updated", description: `${values.name}'s profile and assignments have been successfully updated.` });
-        onOpenChange(false); 
+        onOpenChange(false);
       }
 
     } catch (error: any) {
@@ -197,8 +197,8 @@ export function TeacherProfileFormDialog({
   };
 
   useEffect(() => {
-    (async () => {
-      if (isOpen) {
+    if (isOpen) {
+      (async () => {
         if (teacherToEdit) {
           setIsLoadingAssignments(true);
           if (!teacherToEdit.authUid) {
@@ -226,11 +226,11 @@ export function TeacherProfileFormDialog({
             setGeneratedCredentials(null);
           } catch (error) {
             console.error("Error in useEffect fetching teacher assignments:", error);
-            toast({ title: "Data Load Error", description: "Could not load teacher's assignment details.", variant: "destructive"});
+            toast({ title: "Data Load Error", description: "Could not load teacher's assignment details.", variant: "destructive" });
           } finally {
             setIsLoadingAssignments(false);
           }
-        } else { 
+        } else {
           form.reset({
             name: '', email: '', phoneNumber: '', address: '',
             yearOfJoining: currentYear, subjectsTaught: [], profilePictureUrl: '', assignments: [],
@@ -238,8 +238,8 @@ export function TeacherProfileFormDialog({
           setGeneratedCredentials(null);
           setIsLoadingAssignments(false);
         }
-      }
-    })();
+      })();
+    }
   }, [teacherToEdit, isOpen, form, isEditing, currentYear, toast, onOpenChange]);
 
   return (
@@ -367,7 +367,8 @@ export function TeacherProfileFormDialog({
                            )}
                         </div>
                       </Card>
-                    )}})}
+                    );
+                  })}
                     <Button type="button" variant="outline" onClick={() => appendAssignment({ id: Date.now().toString() + Math.random().toString(36).substring(2,9) , type: 'class_teacher', classId: '', className: '', sectionId: '', subjectId: undefined, groupId: '' })} className="mt-3 w-full border-dashed hover:border-primary">
                       <PlusCircle className="mr-2 h-4 w-4" /> Add New Teaching Assignment
                     </Button>
@@ -410,5 +411,3 @@ export function TeacherProfileFormDialog({
     </Dialog>
   );
 }
-
-    
