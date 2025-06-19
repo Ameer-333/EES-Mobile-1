@@ -43,9 +43,9 @@ const navItems: NavItem[] = [
   
   // Coordinator
   { href: '/coordinator/dashboard', label: 'Dashboard', icon: ClipboardUser, roles: ['Coordinator'] },
-  { href: '/coordinator/students', label: 'All Students', icon: UsersIcon, roles: ['Coordinator'] }, // Placeholder, will link to a modified student management page
-  { href: '/coordinator/teachers', label: 'All Teachers', icon: UsersIcon, roles: ['Coordinator'] }, // Placeholder, will link to a modified teacher management page
-  { href: '/coordinator/data-entry', label: 'Global Data Entry', icon: Edit, roles: ['Coordinator'] }, // Placeholder
+  { href: '/coordinator/students', label: 'All Student Management', icon: UsersIcon, roles: ['Coordinator'] },
+  { href: '/coordinator/teacher-management', label: 'All Teacher Management', icon: UsersIcon, roles: ['Coordinator'] },
+  { href: '/coordinator/data-entry', label: 'Global Data Entry', icon: Edit, roles: ['Coordinator'] },
 
   // Shared
   { href: '/hall-of-fame', label: 'Hall of Fame', icon: Building, roles: ['Student', 'Teacher', 'Admin', 'Coordinator'] },

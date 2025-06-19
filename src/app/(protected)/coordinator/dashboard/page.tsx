@@ -30,21 +30,21 @@ export default function CoordinatorDashboardPage() {
           title="Student Management (All)"
           description="View and manage profiles, academic records, and remarks for all students across classes."
           icon={<Users className="h-8 w-8 text-primary" />}
-          link="/teacher/students" // Placeholder, will need specific coordinator view
+          link="/coordinator/students"
           linkText="Manage Students"
         />
         <DashboardActionCard
           title="Teacher Management"
           description="View teacher profiles, assignments, and add new teachers to the system."
           icon={<Users className="h-8 w-8 text-primary" />}
-          link="/admin/teacher-management" // Placeholder, will need specific coordinator view or permissions
+          link="/coordinator/teacher-management"
           linkText="Manage Teachers"
         />
          <DashboardActionCard
           title="Data Entry (All Students)"
           description="Enter marks and attendance for any student in the system."
           icon={<Edit3 className="h-8 w-8 text-primary" />}
-          link="/teacher/data-entry" // Placeholder, will need specific coordinator view
+          link="/coordinator/data-entry"
           linkText="Enter Student Data"
         />
          <DashboardActionCard
