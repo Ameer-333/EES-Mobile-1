@@ -1,9 +1,4 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  // No images configuration here.
-  // This file is intended to be superseded by next.config.ts.
-  // Adding a minimal valid config to avoid potential conflicts if Next.js still tries to read this file.
-  reactStrictMode: true,
-};
-
-module.exports = nextConfig;
+// This file is intentionally left minimal to ensure next.config.ts takes precedence.
+// If you have a next.config.ts, this file should ideally not be needed
+// or should export an empty object if Next.js requires its presence.
+module.exports = {};
