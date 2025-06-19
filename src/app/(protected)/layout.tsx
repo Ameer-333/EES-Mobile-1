@@ -90,6 +90,7 @@ function getDashboardTitle(pathname: string, actualRole: UserRole | null, appNam
     // Coordinator specific (can reuse some descriptions if pages are shared)
     if (pathname === `/coordinator/students`) return `All Student Management`; // Example for coordinator
     if (pathname === `/coordinator/teachers`) return `All Teacher Management`; // Example for coordinator
+    if (pathname === `/coordinator/data-entry`) return `Global Student Data Entry`;
     
     if (pathname.startsWith(`/hall-of-fame`)) return `EES Hall of Fame`;
 
@@ -134,17 +135,15 @@ function AppProvider({ children }: { children: React.ReactNode }) {
         setAuthUser(user);
         const userDocPath = getUserDocPath(user.uid);
         const userDocRef = doc(firestore, userDocPath);
-        let userDocSnap = await getDoc(userDocRef); // First attempt
+        let userDocSnap = await getDoc(userDocRef); 
 
-        // Retry mechanism for newly created users
         if (!userDocSnap.exists() && user.metadata.creationTime) {
           const now = new Date().getTime();
           const creationTimestamp = new Date(user.metadata.creationTime).getTime();
-          // If user was created in the last 5 seconds, it might be a propagation delay
-          if (now - creationTimestamp < 5000) { // 5 seconds grace period
+          if (now - creationTimestamp < 5000) { 
             console.log(`User profile for ${user.uid} not found immediately. Retrying after 1.5s as user is new.`);
-            await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5 seconds
-            userDocSnap = await getDoc(userDocRef); // Second attempt
+            await new Promise(resolve => setTimeout(resolve, 1500)); 
+            userDocSnap = await getDoc(userDocRef); 
           }
         }
 
@@ -169,20 +168,25 @@ function AppProvider({ children }: { children: React.ReactNode }) {
                return; 
             }
             if (expectedRole && roleFromDb !== expectedRole) {
-              toast({ title: "Access Denied", description: `Your role (${roleFromDb}) does not permit access to this ${expectedRole} page.`, variant: "destructive" });
+              toast({ title: "Access Denied", description: `Your role (${roleFromDb}) does not permit access to this ${expectedRole} page. Redirecting...`, variant: "destructive" });
               router.push('/'); 
             } else if (!expectedRole && !pathname.startsWith('/hall-of-fame') && !pathname.startsWith('/login') && pathname !== '/') {
-               toast({ title: "Page Not Found", description: `The page (${pathname}) you are trying to access is not valid for your role.`, variant: "destructive" });
+               toast({ title: "Page Not Found", description: `The page (${pathname}) you are trying to access is not valid for your role. Redirecting...`, variant: "destructive" });
                router.push('/');
             }
           } else {
-            toast({ title: "Access Denied", description: `Your user role ('${roleFromDb || 'Not Set'}') is not configured correctly. Contact admin.`, variant: "destructive" });
+            toast({ title: "Role Configuration Error", description: `Your user role ('${roleFromDb || 'Not Set'}') is not configured correctly. Please contact an administrator.`, variant: "destructive" });
             await signOut(auth); 
             setAuthUser(null); setUserProfile(null);
             router.push('/'); 
           }
         } else {
-          toast({ title: "Access Denied", description: "User profile not found in Firestore. Contact admin.", variant: "destructive" });
+          toast({ 
+            title: "Profile Error", 
+            description: `Your user profile (${user.email}) was not found in Firestore. This is required for app access. Please contact an administrator to ensure your profile is correctly set up. You will be logged out.`, 
+            variant: "destructive",
+            duration: 10000 
+          });
           await signOut(auth);
           setAuthUser(null); setUserProfile(null);
           router.push('/'); 
@@ -345,7 +349,7 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode; }) {
                      <SettingsIcon className="mr-2 h-4 w-4 text-muted-foreground" /> Settings
                   </DropdownMenuItem>
                 )}
-                 {userProfile.role === 'Coordinator' && ( // Example: Coordinator might not have a dedicated profile page but can see settings
+                 {userProfile.role === 'Coordinator' && ( 
                   <DropdownMenuItem onClick={() => router.push(`/admin/settings`)}>
                      <SettingsIcon className="mr-2 h-4 w-4 text-muted-foreground" /> View Settings (Read-only example)
                   </DropdownMenuItem>
