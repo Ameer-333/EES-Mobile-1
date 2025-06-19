@@ -12,6 +12,11 @@ import { doc, getDoc } from 'firebase/firestore';
 import { getGeneralSettingsDocPath } from '@/lib/firestore-paths';
 
 export default function LandingPage() {
+  console.log("Imported User icon:", User);
+  console.log("Imported Briefcase icon:", Briefcase);
+  console.log("Imported Shield icon:", Shield);
+  console.log("Imported ClipboardUser icon:", ClipboardUser);
+
   const [appName, setAppName] = useState('EES Education');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -119,6 +124,36 @@ interface LoginOptionCardProps {
 }
 
 function LoginOptionCard({ role, description, href, icon: Icon }: LoginOptionCardProps) {
+  if (!Icon) {
+    console.error(`LoginOptionCard for role "${role}" received an undefined icon. This is likely the cause of the "Element type is invalid" error.`);
+    // Fallback rendering to prevent a complete crash, though the icon will be missing.
+    return (
+        <Card className="card-hover-effect flex flex-col group bg-card/80 backdrop-blur-sm border-border/50 rounded-xl">
+        <CardHeader className="items-center text-center pb-4">
+            {/* Icon rendering skipped due to error */}
+            <div className="p-4 bg-destructive/10 text-destructive rounded-full mb-4">
+                <ArrowRight className="h-8 w-8" /> {/* Fallback icon */}
+            </div>
+            <CardTitle className="text-2xl font-headline text-primary group-hover:text-primary/90 transition-colors">
+            {role} Portal (Icon Error)
+            </CardTitle>
+        </CardHeader>
+        <CardContent className="flex-grow text-center">
+            <CardDescription className="text-muted-foreground h-16 leading-relaxed">
+            {description}
+            </CardDescription>
+        </CardContent>
+        <CardFooter className="p-4 mt-auto">
+            <Button asChild className="w-full text-base py-3 group-hover:bg-primary/90 transition-colors duration-300">
+            <Link href={href}>
+                Login as {role}
+                <ArrowRight className="ml-2 h-5 w-5 transform transition-transform duration-300 group-hover:translate-x-1" />
+            </Link>
+            </Button>
+        </CardFooter>
+        </Card>
+    );
+  }
   return (
     <Card className="card-hover-effect flex flex-col group bg-card/80 backdrop-blur-sm border-border/50 rounded-xl">
       <CardHeader className="items-center text-center pb-4">
@@ -145,4 +180,3 @@ function LoginOptionCard({ role, description, href, icon: Icon }: LoginOptionCar
     </Card>
   );
 }
-
