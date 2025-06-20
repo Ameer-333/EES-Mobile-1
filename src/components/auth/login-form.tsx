@@ -1,6 +1,7 @@
 
 'use client';
 
+import React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -20,10 +21,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, LogIn, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { auth } from '@/lib/firebase'; // Import Firebase auth
+import { auth } from '@/lib/firebase'; 
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { FirebaseError } from 'firebase/app'; // Correct import for FirebaseError
-import type { UserRole } from '@/types'; // Import UserRole
+import { FirebaseError } from 'firebase/app'; 
+import type { UserRole } from '@/types'; 
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -31,7 +32,7 @@ const formSchema = z.object({
 });
 
 type LoginFormProps = {
-  role: UserRole; // Use the UserRole type
+  role: UserRole; 
 };
 
 export function LoginForm({ role }: LoginFormProps) {
@@ -77,7 +78,7 @@ export function LoginForm({ role }: LoginFormProps) {
           router.push('/coordinator/dashboard');
           break;
         default:
-          // Fallback or error, though UserRole type should prevent this
+          
           toast({ title: 'Error', description: 'Unknown role, cannot redirect.', variant: 'destructive' });
           router.push('/'); 
           break;
