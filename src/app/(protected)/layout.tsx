@@ -66,6 +66,8 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   const [appName, setAppName] = useState('EES Education');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const router = useRouter();
+  const { toast } = useToast(); // Moved toast higher as it's used in the effect
+  const pathname = usePathname(); // Get pathname once
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -95,27 +97,34 @@ function AppProvider({ children }: { children: React.ReactNode }) {
             }
           } else {
             setUserProfile(null);
-            console.error("User profile not found in Firestore.");
-            await firebaseSignOut(auth);
-            router.push('/'); 
+            console.error("User profile not found in Firestore for UID:", firebaseUser.uid);
+            // Only sign out and redirect if not already on a public/login page
+            if (!window.location.pathname.startsWith('/login/') && window.location.pathname !== '/') {
+                await firebaseSignOut(auth);
+                router.push('/'); 
+            }
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
           setUserProfile(null);
-          await firebaseSignOut(auth);
-          router.push('/');
+          if (!window.location.pathname.startsWith('/login/') && window.location.pathname !== '/') {
+            await firebaseSignOut(auth);
+            router.push('/');
+          }
         }
       } else {
         setUser(null);
         setUserProfile(null);
-        const currentPath = window.location.pathname;
-        if (!currentPath.startsWith('/login/') && currentPath !== '/') {
+        // const currentPath = window.location.pathname; // No need to get pathname again if using outer scope `pathname`
+        if (!pathname.startsWith('/login/') && pathname !== '/') {
             router.push('/');
         }
       }
       setIsLoadingAuth(false);
     });
     return () => unsubscribe();
+  // Removed pathname and toast from dependencies as they might cause loops or unnecessary re-runs.
+  // Router is stable, and the effect's core logic depends on auth state.
   }, [router]); 
 
 
@@ -135,8 +144,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
     };
     fetchAppSettings();
   }, []);
-
-  const { toast } = useToast(); 
+ 
   const handleSignOut = async () => {
     try {
       await firebaseSignOut(auth);
@@ -150,7 +158,6 @@ function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
   
-  const pathname = usePathname(); 
   const currentRole = useMemo(() => {
     if (!userProfile) return null;
     const pathSegments = pathname.split('/');
@@ -176,13 +183,31 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   if (!user || !userProfile) {
-    return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-background space-y-4 p-4">
-            <Loader2 className="h-16 w-16 animate-spin text-destructive" />
-            <p className="text-lg text-muted-foreground">Redirecting to login...</p>
-        </div>
+    // Check if already on a login page or the root landing page to avoid redirect loop
+    const isPublicPage = pathname.startsWith('/login/') || pathname === '/';
+    if (!isPublicPage) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-background space-y-4 p-4">
+                <Loader2 className="h-16 w-16 animate-spin text-destructive" />
+                <p className="text-lg text-muted-foreground">Redirecting to login...</p>
+            </div>
+        );
+    }
+    // If on a public page, allow children to render (which would be the login page itself)
+    // This relies on the assumption that public pages don't try to use AppContext for userProfile
+    // For now, we return a minimal loader or null if children are expected to handle this.
+    // To avoid issues if a public page _tries_ to use context and fails, it's safer to return a loader here too.
+    // Or, ideally, AppProvider itself wouldn't wrap truly public pages.
+    // Given the current structure, if !user and on a public page, we might just be waiting for the redirect.
+    // Let's stick to a loader if !user and not on a specific error-handling page.
+     return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background space-y-4 p-4">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="text-lg text-muted-foreground">Loading...</p>
+      </div>
     );
   }
+
 
   return (
     <AppContext.Provider value={{ user, userProfile, isLoadingAuth, appName, logoUrl, signOut: handleSignOut, currentRole }}>
@@ -220,9 +245,17 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
   
   const pageTitle = getPageTitle();
 
+  // This check is crucial. userProfile might be null if AppContext hasn't fully initialized
+  // or if there was an error fetching the profile, despite the guards in AppProvider.
   if (!userProfile) { 
-    return <div className="flex items-center justify-center h-screen">Critical Error: No user profile available.</div>;
+    return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-background space-y-4 p-4">
+            <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            <p className="text-lg text-muted-foreground">Loading user session...</p>
+        </div>
+    );
   }
+
 
   return (
     <SidebarProvider>
@@ -251,12 +284,10 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
       </Sidebar>
 
       <div className={cn(
-          "flex flex-col flex-1 w-0 min-h-screen transition-[margin-left] duration-200 ease-linear", // Added w-0 for better flex-1 behavior
-          // Default for variant="sidebar" (which is used)
-          "md:ml-[var(--sidebar-width)]", // Base for expanded
-          "md:peer-data-[state=collapsed]:ml-[var(--sidebar-width-icon)]", // Override for collapsed
+          "flex flex-col flex-1 w-0 min-h-screen transition-[margin-left] duration-200 ease-linear", 
+          "md:ml-[var(--sidebar-width)]", 
+          "md:peer-data-[state=collapsed]:ml-[var(--sidebar-width-icon)]", 
           
-          // Specifics for variant="inset" 
           "md:peer-data-[variant=inset]:!m-2", 
           "md:peer-data-[variant=inset]:!ml-0", 
           "md:peer-data-[variant=inset]:rounded-xl",
@@ -308,17 +339,27 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
 }
 
 function UserNav({ userProfile, signOut }: { userProfile: ManagedUser; signOut: () => Promise<void>; }) {
-  if (!userProfile) return null;
+  // This guard should ideally prevent UserNav from rendering if userProfile is null.
+  // The error implies userProfile is an object, but userProfile.name is undefined.
+  if (!userProfile) return null; 
+
+  const userName = userProfile.name || "User";
+  const userEmail = userProfile.email || "No email";
+  const avatarFallbackChar = userName && userName.length > 0 ? userName.charAt(0).toUpperCase() : "U";
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-auto px-2 space-x-2">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={userProfile.profilePictureUrl || `https://placehold.co/40x40.png`} alt={userProfile.name} data-ai-hint="user avatar small"/>
-            <AvatarFallback>{userProfile.name.charAt(0)}</AvatarFallback>
+            <AvatarImage 
+                src={userProfile.profilePictureUrl || `https://placehold.co/40x40.png`} 
+                alt={userName + " Avatar"} // Use safe userName
+                data-ai-hint="user avatar small"/>
+            <AvatarFallback>{avatarFallbackChar}</AvatarFallback>
           </Avatar>
           <div className="hidden sm:flex flex-col items-start">
-             <span className="text-sm font-medium text-foreground">{userProfile.name}</span>
+             <span className="text-sm font-medium text-foreground">{userName}</span>
              <span className="text-xs text-muted-foreground -mt-0.5">{userProfile.role}</span>
           </div>
           <ChevronDown className="h-4 w-4 text-muted-foreground ml-1 hidden sm:block"/>
@@ -327,9 +368,9 @@ function UserNav({ userProfile, signOut }: { userProfile: ManagedUser; signOut: 
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{userProfile.name}</p>
+            <p className="text-sm font-medium leading-none">{userName}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {userProfile.email}
+              {userEmail}
             </p>
           </div>
         </DropdownMenuLabel>
