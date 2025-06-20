@@ -81,7 +81,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, loginEmail, defaultPassword);
       const authUid = userCredential.user.uid;
 
-      const newUserFirestoreData: Partial<ManagedUser> = { // Use Partial to build the object
+      const newUserFirestoreData: Partial<ManagedUser> = {
         id: authUid,
         name: values.name,
         email: loginEmail,
@@ -93,11 +93,12 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
       if (values.role === 'Student') {
         newUserFirestoreData.classId = 'TO_BE_ASSIGNED';
         newUserFirestoreData.studentProfileId = 'TO_BE_ASSIGNED';
-      } else if (values.role === 'Teacher') {
+      }
+      
+      if (values.role === 'Teacher') {
         newUserFirestoreData.assignments = [];
       }
-      // For Admin and Coordinator, no extra fields (classId, studentProfileId, assignments) are added.
-
+      
       const usersCollectionPath = getUsersCollectionPath();
       const userDocRef = doc(firestore, usersCollectionPath, authUid);
       await setDoc(userDocRef, newUserFirestoreData);
@@ -120,7 +121,6 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
         additionalActionsMessage += " Basic teacher HR profile also created.";
       }
       
-      // Cast to ManagedUser for the callback, assuming the object structure is now correct.
       onUserAdded(newUserFirestoreData as ManagedUser); 
       setGeneratedCredentials({ email: loginEmail, password: defaultPassword });
       
