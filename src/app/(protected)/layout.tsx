@@ -66,8 +66,8 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   const [appName, setAppName] = useState('EES Education');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const router = useRouter();
-  const { toast } = useToast(); // Moved toast higher as it's used in the effect
-  const pathname = usePathname(); // Get pathname once
+  const { toast } = useToast(); 
+  const pathname = usePathname(); 
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -98,7 +98,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
           } else {
             setUserProfile(null);
             console.error("User profile not found in Firestore for UID:", firebaseUser.uid);
-            // Only sign out and redirect if not already on a public/login page
+            
             if (!window.location.pathname.startsWith('/login/') && window.location.pathname !== '/') {
                 await firebaseSignOut(auth);
                 router.push('/'); 
@@ -115,7 +115,6 @@ function AppProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUser(null);
         setUserProfile(null);
-        // const currentPath = window.location.pathname; // No need to get pathname again if using outer scope `pathname`
         if (!pathname.startsWith('/login/') && pathname !== '/') {
             router.push('/');
         }
@@ -123,9 +122,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingAuth(false);
     });
     return () => unsubscribe();
-  // Removed pathname and toast from dependencies as they might cause loops or unnecessary re-runs.
-  // Router is stable, and the effect's core logic depends on auth state.
-  }, [router]); 
+  }, [router, pathname]); 
 
 
   useEffect(() => {
@@ -183,7 +180,6 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   if (!user || !userProfile) {
-    // Check if already on a login page or the root landing page to avoid redirect loop
     const isPublicPage = pathname.startsWith('/login/') || pathname === '/';
     if (!isPublicPage) {
         return (
@@ -193,13 +189,6 @@ function AppProvider({ children }: { children: React.ReactNode }) {
             </div>
         );
     }
-    // If on a public page, allow children to render (which would be the login page itself)
-    // This relies on the assumption that public pages don't try to use AppContext for userProfile
-    // For now, we return a minimal loader or null if children are expected to handle this.
-    // To avoid issues if a public page _tries_ to use context and fails, it's safer to return a loader here too.
-    // Or, ideally, AppProvider itself wouldn't wrap truly public pages.
-    // Given the current structure, if !user and on a public page, we might just be waiting for the redirect.
-    // Let's stick to a loader if !user and not on a specific error-handling page.
      return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background space-y-4 p-4">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -245,8 +234,6 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
   
   const pageTitle = getPageTitle();
 
-  // This check is crucial. userProfile might be null if AppContext hasn't fully initialized
-  // or if there was an error fetching the profile, despite the guards in AppProvider.
   if (!userProfile) { 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-background space-y-4 p-4">
@@ -285,15 +272,9 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
 
       <div className={cn(
           "flex flex-col flex-1 w-0 min-h-screen transition-[margin-left] duration-200 ease-linear", 
-          "md:ml-[var(--sidebar-width)]", 
-          "md:peer-data-[state=collapsed]:ml-[var(--sidebar-width-icon)]", 
-          
-          "md:peer-data-[variant=inset]:!m-2", 
-          "md:peer-data-[variant=inset]:!ml-0", 
-          "md:peer-data-[variant=inset]:rounded-xl",
-          "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))]",
-          "md:peer-data-[variant=inset]:peer-data-[state=expanded]:!ml-[calc(var(--sidebar-width)_+_theme(spacing.4)_+2px)]", 
-          "md:peer-data-[variant=inset]:peer-data-[state=collapsed]:!ml-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
+          "md:ml-[var(--sidebar-width)]", // Default margin for expanded sidebar
+          "md:peer-data-[state=collapsed]:ml-[var(--sidebar-width-icon)]" // Margin for collapsed sidebar
+          // Removed inset-specific classes to simplify for default "sidebar" variant
         )}>
         <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 md:px-6 shadow-sm">
             <div className="md:hidden">
@@ -330,7 +311,7 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
             <UserNav userProfile={userProfile} signOut={signOut} />
         </header>
-        <main className="flex-1 p-4 md:p-6 lg:p-8 bg-muted/20">
+        <main className="flex-1 p-4 md:p-6 bg-muted/20">
           {children}
         </main>
       </div>
@@ -339,8 +320,6 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
 }
 
 function UserNav({ userProfile, signOut }: { userProfile: ManagedUser; signOut: () => Promise<void>; }) {
-  // This guard should ideally prevent UserNav from rendering if userProfile is null.
-  // The error implies userProfile is an object, but userProfile.name is undefined.
   if (!userProfile) return null; 
 
   const userName = userProfile.name || "User";
@@ -354,7 +333,7 @@ function UserNav({ userProfile, signOut }: { userProfile: ManagedUser; signOut: 
           <Avatar className="h-8 w-8">
             <AvatarImage 
                 src={userProfile.profilePictureUrl || `https://placehold.co/40x40.png`} 
-                alt={userName + " Avatar"} // Use safe userName
+                alt={userName + " Avatar"}
                 data-ai-hint="user avatar small"/>
             <AvatarFallback>{avatarFallbackChar}</AvatarFallback>
           </Avatar>
