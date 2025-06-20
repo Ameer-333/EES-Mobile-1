@@ -1,25 +1,22 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: true, // As per existing config
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: true, // As per existing config
   },
-  // The images configuration is now handled in next.config.js
-  // to resolve the persistent issue as per user request.
-  // images: {
-  //   remotePatterns: [
-  //     {
-  //       protocol: 'https',
-  //       hostname: 'placehold.co',
-  //       port: '',
-  //       pathname: '/**', 
-  //     },
-  //   ],
-  // },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+        port: '', // Empty string means any port for that protocol
+        pathname: '/**', // Allow any path on this hostname
+      },
+    ],
+  },
 };
 
 export default nextConfig;
