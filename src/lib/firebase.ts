@@ -1,7 +1,7 @@
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getFirestore, type Firestore } from 'firebase/firestore'; // Changed from 'firebase/firestore/lite'
 import { getFunctions, type Functions } from 'firebase/functions';
 
 const firebaseConfigValues = {
@@ -27,8 +27,6 @@ for (const key of essentialKeys) {
 if (missingOrInvalidConfigs.length > 0) {
   const errorMessage = `Critical Error: Missing or invalid Firebase configuration for: ${missingOrInvalidConfigs.join(', ')}. Please ensure these NEXT_PUBLIC_ environment variables are correctly set in your deployment environment and .env files. App cannot start.`;
   console.error(errorMessage);
-  // This error will stop the application if critical Firebase configs are missing.
-  // No need to proceed with initialization if these are not set.
   throw new Error(errorMessage);
 }
 
@@ -45,7 +43,6 @@ try {
   }
   console.log("Firebase app initialized with effective config for project ID:", app.options.projectId);
 
-
   if (!app || typeof app.name === 'undefined') {
     throw new Error("Firebase app object is invalid after initialization. Check NEXT_PUBLIC_ environment variables.");
   }
@@ -56,11 +53,18 @@ try {
   }
 
   firestore = getFirestore(app);
-  console.log("Firestore instance obtained:", firestore, "Expected type: firestore-lite, Actual type reported:", firestore?.type);
+  console.log("Firestore instance obtained:", firestore); // Log the raw instance
+  if (firestore && typeof (firestore as any).type === 'string') { // Check if type property exists (full SDK should have type 'firestore')
+    console.log("Actual Firestore instance type reported by SDK:", (firestore as any).type);
+  } else {
+    console.log("Firestore instance does not have a 'type' property or is not an object.");
+  }
 
-
-  if (!firestore || typeof firestore.type !== 'string' || firestore.type !== 'firestore-lite') {
-     throw new Error(`Firebase Firestore service instance appears to be invalid after initialization. Expected type 'firestore-lite' but got '${firestore?.type}'. Ensure Firestore is enabled for project '${app.options.projectId}' and config is correct.`);
+  // More specific check for Firestore instance validity - collection method should exist on full SDK
+  if (!firestore || typeof (firestore as any).collection !== 'function') {
+     throw new Error(
+       `Firebase Firestore service instance appears to be invalid after initialization. Expected a Firestore client with a 'collection' method. Project ID: ${app.options.projectId}. Ensure Firestore is enabled and config is correct.`
+     );
   }
 
   functionsInstance = getFunctions(app);
@@ -74,4 +78,3 @@ try {
 }
 
 export { app, auth, firestore, functionsInstance as functions };
-
