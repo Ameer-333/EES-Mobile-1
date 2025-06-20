@@ -10,7 +10,7 @@ export default function CoordinatorTeacherDataPage() {
         <FileText className="h-8 w-8 text-primary" />
       </div>
       <p className="text-muted-foreground">
-        View teacher attendance records and overall progress across the system. This is a read-only view.
+        View teacher qualifications, recent attendance summaries, and appraisal statuses across the system. This is a read-only view.
       </p>
       <CoordinatorTeacherDataView />
     </div>
