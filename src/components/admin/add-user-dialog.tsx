@@ -35,7 +35,7 @@ import {
 import { Loader2, Info } from 'lucide-react';
 import { firestore, auth as firebaseAuth } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser, type User as FirebaseAuthUser } from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
 import { useToast } from "@/hooks/use-toast";
 import { getUsersCollectionPath, getTeacherDocPath } from '@/lib/firestore-paths';
@@ -44,7 +44,7 @@ import { Card, CardHeader as UICardHeader, CardContent as UICardContent, CardTit
 const addUserSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'This email will be used for login. Ensure it is unique.' }),
-  role: z.custom<UserRole>(val => ['Admin', 'Teacher', 'Student', 'Coordinator'].includes(val as UserRole), 'Role is required.'),
+  role: z.custom<UserRole>(val => ['Teacher', 'Student', 'Coordinator'].includes(val as UserRole), 'Role is required. Admin role cannot be created here.'),
 });
 
 type AddUserFormValues = z.infer<typeof addUserSchema>;
@@ -76,11 +76,17 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     const loginEmail = values.email;
     const roleNameCapitalized = values.role.charAt(0).toUpperCase() + values.role.slice(1);
     const defaultPassword = `${roleNameCapitalized}Default@${new Date().getFullYear()}`;
+    let firebaseAuthUser: FirebaseAuthUser | null = null;
+    let userDocCreated = false;
+    let teacherDocCreated = false;
 
     try {
+      // Step 1: Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, loginEmail, defaultPassword);
-      const authUid = userCredential.user.uid;
+      firebaseAuthUser = userCredential.user;
+      const authUid = firebaseAuthUser.uid;
 
+      // Step 2: Create Firestore document in /users collection
       const newUserFirestoreData: Partial<ManagedUser> = {
         id: authUid,
         name: values.name,
@@ -94,7 +100,6 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
         newUserFirestoreData.classId = 'TO_BE_ASSIGNED';
         newUserFirestoreData.studentProfileId = 'TO_BE_ASSIGNED';
       }
-      
       if (values.role === 'Teacher') {
         newUserFirestoreData.assignments = [];
       }
@@ -102,17 +107,19 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
       const usersCollectionPath = getUsersCollectionPath();
       const userDocRef = doc(firestore, usersCollectionPath, authUid);
       await setDoc(userDocRef, newUserFirestoreData);
+      userDocCreated = true;
       
-      let additionalActionsMessage = `Account for ${values.name} (${values.role}) created.`;
+      let additionalActionsMessage = `User account for ${values.name} (${values.role}) created.`;
 
+      // Step 3: If role is Teacher, create document in /teachers collection
       if (values.role === 'Teacher') {
         const teacherHRProfile: Partial<Teacher> = {
           id: authUid,
           authUid: authUid,
           name: values.name,
-          email: loginEmail, // Using loginEmail as the contact email for this basic profile
-          phoneNumber: "", // Default empty string for required field
-          address: "",     // Default empty string for required field
+          email: loginEmail,
+          phoneNumber: "", 
+          address: "",     
           yearOfJoining: new Date().getFullYear(),
           subjectsTaught: [],
           salaryHistory: [],
@@ -120,6 +127,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
         };
         const teacherDocFirestorePath = getTeacherDocPath(authUid);
         await setDoc(doc(firestore, teacherDocFirestorePath), teacherHRProfile);
+        teacherDocCreated = true;
         additionalActionsMessage += " Basic teacher HR profile also created.";
       }
       
@@ -146,25 +154,53 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
         switch (error.code) {
           case 'auth/email-already-in-use':
             errMsg = `The email ${loginEmail} is already in use. Please use a different email.`;
+            firebaseAuthUser = null; // Auth user creation failed, no rollback needed for auth user
             break;
           case 'auth/weak-password':
             errMsg = "The auto-generated password is too weak (this is a system issue). Please contact support.";
+            firebaseAuthUser = null;
             break;
           case 'auth/invalid-email':
             errMsg = `The email ${loginEmail} is not valid. Please check and try again.`;
+            firebaseAuthUser = null;
             break;
           default:
             errMsg = `Firebase Auth Error: ${error.message} (Code: ${error.code})`;
+            // If firebaseAuthUser is set, it means Auth user was created but a subsequent Firestore write failed.
             break;
         }
       } else if (error.message) {
         errMsg = error.message;
       }
-      toast({
-        title: "Error Adding User",
-        description: errMsg,
-        variant: "destructive",
-      });
+
+      // Rollback: If Firebase Auth user was created but Firestore operations failed
+      if (firebaseAuthUser && (!userDocCreated || (values.role === 'Teacher' && !teacherDocCreated))) {
+        try {
+          await deleteUser(firebaseAuthUser);
+          errMsg += " Firebase Auth user creation was rolled back.";
+          toast({
+            title: "User Creation Failed (Rolled Back)",
+            description: errMsg,
+            variant: "destructive",
+            duration: 10000,
+          });
+        } catch (rollbackError: any) {
+          console.error("Error rolling back Firebase Auth user:", rollbackError);
+          errMsg += " Failed to roll back Firebase Auth user. Please check Firebase console.";
+           toast({
+            title: "User Creation Failed (Rollback Failed)",
+            description: errMsg,
+            variant: "destructive",
+            duration: 15000,
+          });
+        }
+      } else if (!firebaseAuthUser) { // Auth creation itself failed
+        toast({
+          title: "Error Adding User",
+          description: errMsg,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -191,7 +227,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
         <DialogHeader>
           <DialogTitle>Add New User Account</DialogTitle>
           <DialogDescription>
-            Enter details to create a Firestore profile and a Firebase Authentication login.
+            Enter details to create a Firestore profile and a Firebase Authentication login. Admins must be created manually in Firebase console.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -237,7 +273,6 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
                     <SelectContent>
                       <SelectItem value="Student">Student</SelectItem>
                       <SelectItem value="Teacher">Teacher</SelectItem>
-                      <SelectItem value="Admin">Admin</SelectItem>
                       <SelectItem value="Coordinator">Coordinator</SelectItem>
                     </SelectContent>
                   </Select>
@@ -278,5 +313,4 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     </Dialog>
   );
 }
-
     

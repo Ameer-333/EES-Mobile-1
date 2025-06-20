@@ -28,14 +28,17 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Save, PlusCircle, Trash2, Info, Briefcase, GraduationCap, Users } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, Info, Briefcase, GraduationCap, Users, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { firestore, auth as firebaseAuth } from '@/lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser, type User as FirebaseAuthUser } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader as UICardHeader, CardContent as UICardContent, CardTitle as UICardTitle, CardDescription as UICardDescription } from '@/components/ui/card';
 import { getUsersCollectionPath, getTeacherDocPath } from '@/lib/firestore-paths';
+import { useAppContext } from '@/app/(protected)/layout';
+
 
 // Helper function at the top-level
 function getSubjectOptionsForAssignment(assignmentType?: TeacherAssignmentType): SubjectName[] {
@@ -53,12 +56,13 @@ const teacherAssignmentItemSchema = z.object({
   subjectId: z.custom<SubjectName>(val => allSubjectNamesArray.includes(val as SubjectName)).optional(),
   groupId: z.string().optional().or(z.literal('')),
 }).refine(data => {
-  if (data.type === 'subject_teacher' && !data.subjectId) {
+  const needsSubject = data.type === 'subject_teacher' || ((data.type === 'nios_teacher' || data.type === 'nclp_teacher') && getSubjectOptionsForAssignment(data.type).length > 0);
+  if (needsSubject && !data.subjectId) {
     return false;
   }
   return true;
 }, {
-  message: "Subject is required for 'Subject Teacher' assignment type.",
+  message: "Subject is required for this assignment type if subjects are applicable.",
   path: ["subjectId"],
 });
 
@@ -89,6 +93,7 @@ export function TeacherProfileFormDialog({
   onTeacherSaved,
   teacherToEdit,
 }: TeacherProfileFormDialogProps) {
+  const { userProfile: currentUserProfile } = useAppContext(); // Used to check if current user is Admin
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState<{email: string, password: string} | null>(null);
@@ -112,59 +117,65 @@ export function TeacherProfileFormDialog({
   const currentYear = new Date().getFullYear();
 
   const onSubmit = async (values: TeacherProfileFormValues) => {
+    if (currentUserProfile?.role !== 'Admin' && !isEditing) {
+      toast({ title: "Permission Denied", description: "Only Admins can create new teacher profiles.", variant: "destructive" });
+      return;
+    }
     setIsSubmitting(true);
     setGeneratedCredentials(null);
     const teacherHREmail = values.email;
     const teacherAuthEmail = `${values.name.toLowerCase().replace(/\s+/g, '.')}.${values.yearOfJoining}@eesedu.com`;
     const defaultPassword = `${values.name.split(' ')[0]}@${values.yearOfJoining}!EES`;
 
+    let firebaseAuthUser: FirebaseAuthUser | null = null;
+    let teacherHRDocCreated = false;
+    let userDocCreated = false;
+    let authUid = teacherToEdit?.authUid;
+
     try {
-      let authUid = teacherToEdit?.authUid;
-
-      if (!isEditing) {
+      if (!isEditing) { // Creating a new teacher
+        if (currentUserProfile?.role !== 'Admin') {
+            toast({ title: "Permission Denied", description: "Only Admins can create new teacher Auth accounts.", variant: "destructive" });
+            setIsSubmitting(false);
+            return;
+        }
         const userCredential = await createUserWithEmailAndPassword(firebaseAuth, teacherAuthEmail, defaultPassword);
-        authUid = userCredential.user.uid;
-        setGeneratedCredentials({email: teacherAuthEmail, password: defaultPassword});
+        firebaseAuthUser = userCredential.user;
+        authUid = firebaseAuthUser.uid;
       }
 
-      if (!authUid) {
-        throw new Error("Authentication UID is missing.");
-      }
+      if (!authUid) throw new Error("Authentication UID is missing.");
 
+      // Create/Update Teacher HR Profile (/teachers/{uid})
       const teacherHRProfile: Omit<Teacher, 'id'> = {
-        authUid: authUid,
-        name: values.name,
-        email: teacherHREmail,
-        phoneNumber: values.phoneNumber,
-        address: values.address,
-        yearOfJoining: values.yearOfJoining,
-        totalYearsWorked: currentYear - values.yearOfJoining,
-        subjectsTaught: values.subjectsTaught,
+        authUid: authUid, name: values.name, email: teacherHREmail,
+        phoneNumber: values.phoneNumber, address: values.address, yearOfJoining: values.yearOfJoining,
+        totalYearsWorked: currentYear - values.yearOfJoining, subjectsTaught: values.subjectsTaught,
         profilePictureUrl: values.profilePictureUrl || `https://placehold.co/100x100.png?text=${values.name.charAt(0)}`,
         salaryHistory: teacherToEdit?.salaryHistory || [],
+        currentAppraisalStatus: teacherToEdit?.currentAppraisalStatus || 'No Active Appraisal',
+        lastAppraisalDate: teacherToEdit?.lastAppraisalDate,
+        lastAppraisalDetails: teacherToEdit?.lastAppraisalDetails,
       };
       const teacherHRDocRef = doc(firestore, getTeacherDocPath(authUid));
       await setDoc(teacherHRDocRef, teacherHRProfile, { merge: true });
+      teacherHRDocCreated = true;
 
-      const userRecord: ManagedUser = {
-        id: authUid,
-        name: values.name,
-        email: teacherAuthEmail,
-        role: 'Teacher',
-        status: 'Active',
+      // Create/Update User Record (/users/{uid})
+      const userRecord: Partial<ManagedUser> = {
+        id: authUid, name: values.name, email: teacherAuthEmail, role: 'Teacher', status: 'Active',
         assignments: values.assignments,
-        lastLogin: teacherToEdit && (teacherToEdit as unknown as ManagedUser).lastLogin ? (teacherToEdit as unknown as ManagedUser).lastLogin : 'N/A',
+        lastLogin: isEditing ? ((teacherToEdit as unknown as ManagedUser)?.lastLogin || 'N/A') : 'N/A',
       };
       const userDocRef = doc(firestore, getUsersCollectionPath(), authUid);
       await setDoc(userDocRef, userRecord, { merge: true });
+      userDocCreated = true;
 
-      const savedTeacherDataForCallback: Teacher = {
-        ...teacherHRProfile,
-        id: authUid,
-      };
+      const savedTeacherDataForCallback: Teacher = { ...teacherHRProfile, id: authUid };
       onTeacherSaved(savedTeacherDataForCallback, isEditing);
 
       if (!isEditing) {
+        setGeneratedCredentials({email: teacherAuthEmail, password: defaultPassword});
         toast({
           title: "Teacher Added & Account Created!",
           description: React.createElement('div', null,
@@ -177,7 +188,7 @@ export function TeacherProfileFormDialog({
         });
       } else {
         toast({ title: "Teacher Updated", description: `${values.name}'s profile and assignments have been successfully updated.` });
-        onOpenChange(false);
+        onOpenChange(false); // Close dialog on successful edit
       }
 
     } catch (error: any) {
@@ -185,12 +196,39 @@ export function TeacherProfileFormDialog({
       let errMsg = "Could not save teacher data. Please check console for details.";
       if (error.code === 'auth/email-already-in-use') {
         errMsg = `The generated login email ${teacherAuthEmail} is already in use. Please modify the teacher's name or year of joining slightly to ensure a unique login email, or check if this teacher already exists.`;
+        firebaseAuthUser = null; // Auth user creation failed
       } else if (error.code === 'auth/weak-password') {
         errMsg = "The auto-generated password is too weak. This is an unexpected system issue. Please contact an admin.";
+        firebaseAuthUser = null;
       } else if (error.message) {
         errMsg = error.message;
       }
-      toast({ title: "Save Failed", description: errMsg, variant: "destructive", duration: 10000 });
+
+      if (firebaseAuthUser && (!teacherHRDocCreated || !userDocCreated)) {
+        try {
+          await deleteUser(firebaseAuthUser);
+          errMsg += " Firebase Auth user creation was rolled back.";
+           toast({
+            title: "Teacher Creation Failed (Rolled Back)",
+            description: errMsg,
+            variant: "destructive",
+            duration: 10000
+          });
+        } catch (rollbackError: any) {
+          console.error("Error rolling back Firebase Auth user:", rollbackError);
+          errMsg += " Failed to roll back Firebase Auth user. Please check Firebase console.";
+          toast({
+            title: "Teacher Creation Failed (Rollback Failed)",
+            description: errMsg,
+            variant: "destructive",
+            duration: 15000
+          });
+        }
+      } else if (!firebaseAuthUser && !isEditing) { // Auth creation itself failed during new teacher add
+         toast({ title: "Save Failed", description: errMsg, variant: "destructive", duration: 10000 });
+      } else if (isEditing) { // Firestore write failed during edit
+         toast({ title: "Update Failed", description: errMsg, variant: "destructive", duration: 10000 });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -240,7 +278,10 @@ export function TeacherProfileFormDialog({
         }
       })();
     }
-  }, [teacherToEdit, isOpen, form, isEditing, currentYear, onOpenChange]); // Removed toast
+  }, [teacherToEdit, isOpen, form, currentYear, onOpenChange, toast]); 
+
+  const canEditForm = currentUserProfile?.role === 'Admin' || (isEditing && currentUserProfile?.role === 'Coordinator');
+  const canCreateAuthUser = currentUserProfile?.role === 'Admin';
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -254,7 +295,8 @@ export function TeacherProfileFormDialog({
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Teacher Profile & Assignments" : "Add New Teacher & Assign Roles"}</DialogTitle>
           <DialogDescription>
-            {isEditing ? "Modify HR details and teaching assignments. Login email cannot be changed here." : "Enter HR details, assign roles/classes. A unique login email & default password will be auto-generated."}
+            {isEditing ? "Modify HR details and teaching assignments. Login email cannot be changed here." : 
+             (canCreateAuthUser ? "Enter HR details, assign roles/classes. A unique login email & default password will be auto-generated." : "Coordinators cannot create new teacher Auth accounts.")}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -267,22 +309,22 @@ export function TeacherProfileFormDialog({
 
               <TabsContent value="profile" className="space-y-4">
                 <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. Priya Sharma" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. Priya Sharma" {...field} disabled={!canEditForm || isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Contact Email (HR Records)</FormLabel><FormControl><Input type="email" placeholder="e.g. priya.sharma.contact@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Contact Email (HR Records)</FormLabel><FormControl><Input type="email" placeholder="e.g. priya.sharma.contact@example.com" {...field} disabled={!canEditForm || isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={form.control} name="phoneNumber" render={({ field }) => (
-                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g. 9876543210" {...field} disabled={!canEditForm || isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={form.control} name="address" render={({ field }) => (
-                  <FormItem><FormLabel>Address</FormLabel><FormControl><Textarea placeholder="Full address" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Address</FormLabel><FormControl><Textarea placeholder="Full address" {...field} disabled={!canEditForm || isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={form.control} name="yearOfJoining" render={({ field }) => (
-                  <FormItem><FormLabel>Year of Joining</FormLabel><FormControl><Input type="number" placeholder={currentYear.toString()} {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Year of Joining</FormLabel><FormControl><Input type="number" placeholder={currentYear.toString()} {...field} disabled={!canEditForm || isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={form.control} name="profilePictureUrl" render={({ field }) => (
-                  <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} disabled={!canEditForm || isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={form.control} name="subjectsTaught" render={() => (
                     <FormItem><FormLabel>General Subject Qualifications (Tick all applicable)</FormLabel>
@@ -291,7 +333,11 @@ export function TeacherProfileFormDialog({
                         <FormField key={subject} control={form.control} name="subjectsTaught" render={({ field }) => (
                             <FormItem className="flex flex-row items-center space-x-2 space-y-0">
                             <FormControl><Checkbox checked={field.value?.includes(subject)}
-                                onCheckedChange={(checked) => checked ? field.onChange([...(field.value || []), subject]) : field.onChange((field.value || []).filter(v => v !== subject))}
+                                onCheckedChange={(checked) => {
+                                    if (!canEditForm || isSubmitting || !!generatedCredentials) return;
+                                    checked ? field.onChange([...(field.value || []), subject]) : field.onChange((field.value || []).filter(v => v !== subject))
+                                }}
+                                disabled={!canEditForm || isSubmitting || !!generatedCredentials}
                             /></FormControl>
                             <FormLabel className="font-normal text-sm">{subject}</FormLabel></FormItem>
                         )}/> ))}
@@ -315,7 +361,7 @@ export function TeacherProfileFormDialog({
                       <Card key={item.id} className="p-3.5 border-dashed bg-card shadow-sm">
                         <div className="flex justify-between items-center mb-2.5">
                           <FormLabel className="text-sm font-medium text-foreground">Assignment {index + 1}</FormLabel>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => removeAssignment(index)} className="text-destructive hover:text-destructive/80 h-7 px-2">
+                          <Button type="button" variant="ghost" size="sm" onClick={() => canEditForm && removeAssignment(index)} className="text-destructive hover:text-destructive/80 h-7 px-2" disabled={!canEditForm || isSubmitting || !!generatedCredentials}>
                             <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
                           </Button>
                         </div>
@@ -323,6 +369,7 @@ export function TeacherProfileFormDialog({
                           <FormField control={form.control} name={`assignments.${index}.type`} render={({ field }) => (
                             <FormItem><FormLabel>Assignment Type</FormLabel><Select
                                 onValueChange={(value) => {
+                                    if (!canEditForm) return;
                                     field.onChange(value);
                                     const newType = value as TeacherAssignmentType;
                                     const oldValues = form.getValues(`assignments.${index}`);
@@ -332,22 +379,23 @@ export function TeacherProfileFormDialog({
                                       subjectId: (newType !== 'subject_teacher' && newType !== 'nios_teacher' && newType !== 'nclp_teacher') ? undefined : oldValues.subjectId
                                     });
                                 }}
-                                defaultValue={field.value}>
+                                defaultValue={field.value}
+                                disabled={!canEditForm || isSubmitting || !!generatedCredentials}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Select assignment type" /></SelectTrigger></FormControl>
                                 <SelectContent>{Object.entries(assignmentTypeLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
                             </Select><FormMessage /></FormItem> )}/>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <FormField control={form.control} name={`assignments.${index}.classId`} render={({ field }) => (
-                                <FormItem><FormLabel>Class/Program ID</FormLabel><FormControl><Input placeholder="e.g., LKG, 9, NIOS_A" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                                <FormItem><FormLabel>Class/Program ID</FormLabel><FormControl><Input placeholder="e.g., LKG, 9, NIOS_A" {...field} disabled={!canEditForm || isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem> )}/>
                             <FormField control={form.control} name={`assignments.${index}.className`} render={({ field }) => (
-                                <FormItem><FormLabel>Display Name (Opt.)</FormLabel><FormControl><Input placeholder="e.g., LKG Sunshine, Class 9B" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                                <FormItem><FormLabel>Display Name (Opt.)</FormLabel><FormControl><Input placeholder="e.g., LKG Sunshine, Class 9B" {...field} disabled={!canEditForm || isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem> )}/>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                              <FormField control={form.control} name={`assignments.${index}.sectionId`} render={({ field }) => (
-                                <FormItem><FormLabel>Section ID (Opt.)</FormLabel><FormControl><Input placeholder="e.g., A, B" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                                <FormItem><FormLabel>Section ID (Opt.)</FormLabel><FormControl><Input placeholder="e.g., A, B" {...field} disabled={!canEditForm || isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem> )}/>
                               <FormField control={form.control} name={`assignments.${index}.groupId`} render={({ field }) => (
-                                <FormItem><FormLabel>Group ID (Opt. for NIOS/NCLP)</FormLabel><FormControl><Input placeholder="e.g., Alpha, Painting_Batch1" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                                <FormItem><FormLabel>Group ID (Opt. for NIOS/NCLP)</FormLabel><FormControl><Input placeholder="e.g., Alpha, Painting_Batch1" {...field} disabled={!canEditForm || isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem> )}/>
                           </div>
                           {showSubjectField && (
                             <Controller
@@ -356,7 +404,7 @@ export function TeacherProfileFormDialog({
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Subject (if applicable)</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                                    <Select onValueChange={field.onChange} value={field.value || ''} disabled={!canEditForm || isSubmitting || !!generatedCredentials}>
                                         <FormControl><SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger></FormControl>
                                         <SelectContent>{getSubjectOptionsForAssignment(currentAssignmentType).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                                     </Select>
@@ -369,7 +417,7 @@ export function TeacherProfileFormDialog({
                       </Card>
                     );
                   })}
-                    <Button type="button" variant="outline" onClick={() => appendAssignment({ id: Date.now().toString() + Math.random().toString(36).substring(2,9) , type: 'class_teacher', classId: '', className: '', sectionId: '', subjectId: undefined, groupId: '' })} className="mt-3 w-full border-dashed hover:border-primary">
+                    <Button type="button" variant="outline" onClick={() => appendAssignment({ id: Date.now().toString() + Math.random().toString(36).substring(2,9) , type: 'class_teacher', classId: '', className: '', sectionId: '', subjectId: undefined, groupId: '' })} className="mt-3 w-full border-dashed hover:border-primary" disabled={!canEditForm || isSubmitting || !!generatedCredentials}>
                       <PlusCircle className="mr-2 h-4 w-4" /> Add New Teaching Assignment
                     </Button>
                   </UICardContent>
@@ -399,9 +447,9 @@ export function TeacherProfileFormDialog({
                 {generatedCredentials ? "Close" : "Cancel"}
               </Button>
               {!generatedCredentials && (
-                <Button type="submit" disabled={isSubmitting || isLoadingAssignments}>
+                <Button type="submit" disabled={!canEditForm || isSubmitting || isLoadingAssignments || ( !isEditing && !canCreateAuthUser )}>
                   {isSubmitting || isLoadingAssignments ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  {isSubmitting ? "Saving..." : isLoadingAssignments ? "Loading..." : (isEditing ? "Save Changes" : "Add Teacher & Create Account")}
+                  {isSubmitting ? "Saving..." : isLoadingAssignments ? "Loading..." : (isEditing ? "Save Changes" : (canCreateAuthUser ? "Add Teacher & Create Account" : "Permission Denied"))}
                 </Button>
               )}
             </DialogFooter>
@@ -411,4 +459,3 @@ export function TeacherProfileFormDialog({
     </Dialog>
   );
 }
-

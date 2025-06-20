@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -31,7 +31,8 @@ import { Loader2, Info, AlertTriangle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { firestore, auth as firebaseAuth } from '@/lib/firebase';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser, type User as FirebaseAuthUser } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 import { getStudentProfilesCollectionPath, getUserDocPath } from '@/lib/firestore-paths';
 import { useAppContext } from '@/app/(protected)/layout';
 
@@ -123,30 +124,26 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     const generatedPassword = `${values.satsNumber.toUpperCase()}Default@123`;
     
     const studentProfilesCollectionPath = getStudentProfilesCollectionPath(classId);
+    let firebaseAuthUser: FirebaseAuthUser | null = null;
+    let userDocCreated = false;
+    let studentProfileDocCreated = false;
 
     try {
+      // Step 1: Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, generatedLoginEmail, generatedPassword);
-      const authUid = userCredential.user.uid;
+      firebaseAuthUser = userCredential.user;
+      const authUid = firebaseAuthUser.uid;
 
+      // Step 2: Prepare student profile data
       const studentProfileDataForDb: any = {
-        authUid: authUid,
-        name: values.name,
-        satsNumber: values.satsNumber,
-        className: finalClassName,
-        classId: classId,
-        class: finalClassName, 
-        section: finalSectionId || 'N/A',
-        caste: values.caste,
-        religion: values.religion,
+        authUid: authUid, name: values.name, satsNumber: values.satsNumber,
+        className: finalClassName, classId: classId, class: finalClassName, 
+        section: finalSectionId || 'N/A', caste: values.caste, religion: values.religion,
         address: values.address,
         profilePictureUrl: values.profilePictureUrl || `https://placehold.co/150x150.png?text=${values.name.charAt(0)}`,
-        parentsAnnualIncome: values.parentsAnnualIncome, // Zod defaults to 0
-        remarks: [], 
-        scholarships: [], 
-        examRecords: [], 
-        rawAttendanceRecords: [], 
+        parentsAnnualIncome: values.parentsAnnualIncome,
+        remarks: [], scholarships: [], examRecords: [], rawAttendanceRecords: [],
       };
-
       if (finalSectionId) studentProfileDataForDb.sectionId = finalSectionId;
       if (values.groupId) studentProfileDataForDb.groupId = values.groupId;
       if (values.dateOfBirth) studentProfileDataForDb.dateOfBirth = values.dateOfBirth;
@@ -159,23 +156,20 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       if (values.siblingReference) studentProfileDataForDb.siblingReference = values.siblingReference;
       if (values.backgroundInfo) studentProfileDataForDb.backgroundInfo = values.backgroundInfo;
       
+      // Step 3: Create student profile document in /student_data_by_class/.../profiles
       const studentDocRef = await addDoc(collection(firestore, studentProfilesCollectionPath), studentProfileDataForDb as Omit<Student, 'id'>);
       const studentProfileId = studentDocRef.id; 
+      studentProfileDocCreated = true;
 
+      // Step 4: Create user document in /users
       const userDocData: Partial<ManagedUser> = { 
-        name: values.name,
-        email: generatedLoginEmail,
-        role: 'Student',
-        status: 'Active',
-        classId: classId,
-        studentProfileId: studentProfileId,
+        name: values.name, email: generatedLoginEmail, role: 'Student', status: 'Active',
+        classId: classId, studentProfileId: studentProfileId,
       };
       await setDoc(doc(firestore, getUserDocPath(authUid)), userDocData); 
+      userDocCreated = true;
 
-      const newStudentForCallback: Student = {
-        ...studentProfileDataForDb,
-        id: studentProfileId, 
-      };
+      const newStudentForCallback: Student = { ...studentProfileDataForDb, id: studentProfileId };
       onStudentAdded(newStudentForCallback);
 
       setGeneratedCredentials({ email: generatedLoginEmail, password: generatedPassword });
@@ -195,18 +189,48 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     } catch (error: any) {
       console.error("Error adding student or creating auth user:", error);
       let errorMessage = "Could not add student. Please check console for details.";
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = `The login email ${generatedLoginEmail} is already in use. This student (SATS: ${values.satsNumber}) might already exist or there's an email conflict. Please verify.`;
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = "The auto-generated password is too weak. This is a system issue, please contact an admin.";
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = `The login email ${generatedLoginEmail} is already in use. This student (SATS: ${values.satsNumber}) might already exist or there's an email conflict. Please verify.`;
+            firebaseAuthUser = null; 
+            break;
+          // Add other specific Firebase Auth error codes if needed
+          default:
+            errorMessage = `Firebase error: ${error.message} (Code: ${error.code})`;
+            break;
+        }
       } else if (error.message) {
         errorMessage = error.message;
       }
-      toast({
-        title: "Error Adding Student",
-        description: errorMessage,
-        variant: "destructive",
-      });
+
+      if (firebaseAuthUser && (!userDocCreated || !studentProfileDocCreated)) {
+        try {
+          await deleteUser(firebaseAuthUser);
+          errorMessage += " Firebase Auth user creation was rolled back.";
+           toast({
+            title: "Student Creation Failed (Rolled Back)",
+            description: errorMessage,
+            variant: "destructive",
+            duration: 10000,
+          });
+        } catch (rollbackError: any) {
+          console.error("Error rolling back Firebase Auth user:", rollbackError);
+          errorMessage += " Failed to roll back Firebase Auth user. Please check Firebase console.";
+           toast({
+            title: "Student Creation Failed (Rollback Failed)",
+            description: errorMessage,
+            variant: "destructive",
+            duration: 15000,
+          });
+        }
+      } else if (!firebaseAuthUser) { // Auth creation itself failed
+         toast({
+          title: "Error Adding Student",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -214,9 +238,16 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
   
   const noAddableClasses = teacherAddableClasses.length === 0;
 
+  useEffect(() => {
+    if (!isOpen) {
+      form.reset();
+      setGeneratedCredentials(null);
+    }
+  }, [isOpen, form]);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-        if (!open) {
+        if (!open && !isSubmitting) { // Prevent reset if dialog closed due to submission success
           form.reset();
           setGeneratedCredentials(null);
         }
@@ -245,7 +276,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Assign to Class/Section</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={noAddableClasses}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={noAddableClasses || isSubmitting || !!generatedCredentials}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={noAddableClasses ? "No assignable classes" : "Select your class/section"} />
@@ -265,67 +296,67 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                  <FormField control={form.control} name="sectionIdManual" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Enter Section ID for {selectedAssignedClassInfo.split('|')[2] || selectedAssignedClassInfo.split('|')[0]}</FormLabel>
-                        <FormControl><Input placeholder="e.g. A, B, Sunshine" {...field} /></FormControl>
+                        <FormControl><Input placeholder="e.g. A, B, Sunshine" {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl>
                         <FormMessage />
                     </FormItem>
                 )}/>
             )}
             <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. Priya Sharma" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. Priya Sharma" {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="satsNumber" render={({ field }) => (
-              <FormItem><FormLabel>SATS Number (Alphanumeric)</FormLabel><FormControl><Input placeholder="e.g. SAT00123" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>SATS Number (Alphanumeric)</FormLabel><FormControl><Input placeholder="e.g. SAT00123" {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="groupId" render={({ field }) => (
-                <FormItem><FormLabel>Group ID (Optional, for NIOS/NCLP specific sub-groups)</FormLabel><FormControl><Input placeholder="e.g. Alpha, Batch1" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Group ID (Optional, for NIOS/NCLP specific sub-groups)</FormLabel><FormControl><Input placeholder="e.g. Alpha, Batch1" {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
              <FormField control={form.control} name="email" render={({ field }) => (
-              <FormItem><FormLabel>Student Personal Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="student.personal@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Student Personal Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="student.personal@example.com" {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
              <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
-              <FormItem><FormLabel>Date of Birth (Optional, YYYY-MM-DD)</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Date of Birth (Optional, YYYY-MM-DD)</FormLabel><FormControl><Input type="date" {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
             <div className="grid grid-cols-2 gap-3">
               <FormField control={form.control} name="caste" render={({ field }) => (
-                <FormItem><FormLabel>Caste</FormLabel><FormControl><Input placeholder="e.g. General" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Caste</FormLabel><FormControl><Input placeholder="e.g. General" {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
               )}/>
               <FormField control={form.control} name="religion" render={({ field }) => (
                 <FormItem><FormLabel>Religion</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select religion" /></SelectTrigger></FormControl>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting || !!generatedCredentials}><FormControl><SelectTrigger><SelectValue placeholder="Select religion" /></SelectTrigger></FormControl>
                     <SelectContent>{religionOptions.map(option => (<SelectItem key={option} value={option}>{option}</SelectItem>))}</SelectContent>
                   </Select><FormMessage />
                 </FormItem>
               )}/>
             </div>
             <FormField control={form.control} name="fatherName" render={({ field }) => (
-              <FormItem><FormLabel>Father's Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Father's Name (Optional)</FormLabel><FormControl><Input {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="fatherOccupation" render={({ field }) => (
-              <FormItem><FormLabel>Father's Occupation (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Father's Occupation (Optional)</FormLabel><FormControl><Input {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="motherName" render={({ field }) => (
-              <FormItem><FormLabel>Mother's Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Mother's Name (Optional)</FormLabel><FormControl><Input {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="motherOccupation" render={({ field }) => (
-              <FormItem><FormLabel>Mother's Occupation (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Mother's Occupation (Optional)</FormLabel><FormControl><Input {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="parentsAnnualIncome" render={({ field }) => (
-              <FormItem><FormLabel>Parents' Annual Income (Optional, INR)</FormLabel><FormControl><Input type="number" placeholder="e.g. 500000" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Parents' Annual Income (Optional, INR)</FormLabel><FormControl><Input type="number" placeholder="e.g. 500000" {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="parentContactNumber" render={({ field }) => (
-              <FormItem><FormLabel>Parent's Contact Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="+91..." {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Parent's Contact Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="+91..." {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="address" render={({ field }) => (
-              <FormItem><FormLabel>Address</FormLabel><FormControl><Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Address</FormLabel><FormControl><Textarea placeholder="Enter student's full address" {...field} className="min-h-[80px]" disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
              <FormField control={form.control} name="siblingReference" render={({ field }) => (
-              <FormItem><FormLabel>Sibling Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., Sister: Ananya, Class 8B" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Sibling Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., Sister: Ananya, Class 8B" {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="profilePictureUrl" render={({ field }) => (
-              <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Profile Picture URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="backgroundInfo" render={({ field }) => (
-              <FormItem><FormLabel>Background Info (Optional)</FormLabel><FormControl><Textarea placeholder="Any additional notes or background..." {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Background Info (Optional)</FormLabel><FormControl><Textarea placeholder="Any additional notes or background..." {...field} disabled={isSubmitting || !!generatedCredentials} /></FormControl><FormMessage /></FormItem>
             )}/>
 
             {generatedCredentials && (
@@ -346,7 +377,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
                   {generatedCredentials ? "Close" : "Cancel"}
                 </Button>
               {!generatedCredentials && (
-                <Button type="submit" disabled={isSubmitting || noAddableClasses}>
+                <Button type="submit" disabled={isSubmitting || noAddableClasses || !!generatedCredentials}>
                   {isSubmitting ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : null}
                   Add Student & Create Account
                 </Button>
