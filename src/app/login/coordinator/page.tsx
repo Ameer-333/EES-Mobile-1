@@ -1,6 +1,7 @@
 
 'use client';
 
+import React from 'react';
 import { LoginForm } from '@/components/auth/login-form';
 import { Users, Home } from 'lucide-react'; // Changed ClipboardUser to Users
 import Link from 'next/link';
@@ -19,6 +20,13 @@ export default function CoordinatorLoginPage() {
   useEffect(() => {
     const fetchAppSettings = async () => {
       setIsLoading(true);
+      if (!firestore) {
+        console.warn("Firestore instance not available in CoordinatorLoginPage. Using defaults.");
+        setAppName('EES Education');
+        setLogoUrl(null);
+        setIsLoading(false);
+        return;
+      }
       try {
         const settingsDocPath = getGeneralSettingsDocPath();
         const settingsDocRef = doc(firestore, settingsDocPath);
@@ -28,6 +36,7 @@ export default function CoordinatorLoginPage() {
           setAppName(appData.appName || 'EES Education');
           setLogoUrl(appData.logoUrl || null);
         } else {
+          console.warn("App settings document not found for CoordinatorLoginPage. Using defaults.");
           setAppName('EES Education');
           setLogoUrl(null);
         }
@@ -75,3 +84,4 @@ export default function CoordinatorLoginPage() {
     </div>
   );
 }
+

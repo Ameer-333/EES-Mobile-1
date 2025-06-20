@@ -63,8 +63,9 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<ManagedUser | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  // Use static defaults to avoid build-time Firestore fetch for these
   const [appName, setAppName] = useState('EES Education');
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null); // Default to null, or a local path like '/default-logo.png'
   const router = useRouter();
   const { toast } = useToast();
   const pathname = usePathname();
@@ -75,46 +76,60 @@ function AppProvider({ children }: { children: React.ReactNode }) {
       if (firebaseUser) {
         setUser(firebaseUser);
         try {
+          if (!firestore) {
+            console.error("Firestore instance is not available in AppProvider for fetching user profile.");
+            // Potentially set userProfile to null or a default, and redirect or show error.
+            // For now, this path leads to potential redirect if profile not found.
+            throw new Error("Firestore not initialized");
+          }
           const userDocRef = doc(firestore, getUserDocPath(firebaseUser.uid));
           const userDocSnap = await getDoc(userDocRef);
           if (userDocSnap.exists()) {
             const profileData = userDocSnap.data() as ManagedUser;
             setUserProfile(profileData);
 
-            const currentPath = window.location.pathname;
+            // Role-based redirect logic
+            const currentPath = window.location.pathname; // Use window.location.pathname for client-side routing checks
             const currentBasePath = currentPath.split('/')[1]?.toLowerCase();
             const userRolePath = profileData.role.toLowerCase();
 
+            // Only redirect if not already on a login page, the root page, or a valid role path for the user
             if (currentBasePath && currentBasePath !== userRolePath) {
-              if (currentPath !== `/login/${userRolePath}` && !currentPath.startsWith(`/${userRolePath}/`)) {
-                if (currentPath.startsWith('/hall-of-fame')) {
-                  // Allow access
-                } else {
-                  console.log(`Redirecting to ${profileData.role} dashboard.`);
-                  router.push(`/${userRolePath}/dashboard`);
+                // Check if the current path is not one of the allowed public/login paths or special paths like /hall-of-fame
+                const isLoginPath = /^\/login\/(admin|teacher|student|coordinator)$/.test(currentPath);
+                const isRootPath = currentPath === '/';
+                const isHallOfFame = currentPath.startsWith('/hall-of-fame');
+
+
+                if (!isLoginPath && !isRootPath && !isHallOfFame && !currentPath.startsWith(`/${userRolePath}/`)) {
+                    console.log(`Redirecting to ${profileData.role} dashboard from ${currentPath} as currentBasePath (${currentBasePath}) !== userRolePath (${userRolePath}).`);
+                    router.push(`/${userRolePath}/dashboard`);
                 }
-              }
             }
+
           } else {
             setUserProfile(null);
             console.error("User profile not found in Firestore for UID:", firebaseUser.uid);
-
-            if (!window.location.pathname.startsWith('/login/') && window.location.pathname !== '/') {
+            // If user is authenticated but profile is missing, sign out and redirect to root
+            // unless they are trying to access a login page or the root page.
+             if (!window.location.pathname.startsWith('/login/') && window.location.pathname !== '/') {
                 await firebaseSignOut(auth);
-                router.push('/');
+                router.push('/'); // Redirect to landing page after sign out
             }
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
           setUserProfile(null);
+          // If there's an error fetching profile (e.g., Firestore unavailable), sign out and redirect
           if (!window.location.pathname.startsWith('/login/') && window.location.pathname !== '/') {
-            await firebaseSignOut(auth);
-            router.push('/');
+            await firebaseSignOut(auth); // Sign out the user
+            router.push('/'); // Redirect to landing page
           }
         }
       } else {
         setUser(null);
         setUserProfile(null);
+        // If not authenticated, redirect to landing page, unless already on a public page
         if (!pathname.startsWith('/login/') && pathname !== '/') {
             router.push('/');
         }
@@ -122,25 +137,10 @@ function AppProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingAuth(false);
     });
     return () => unsubscribe();
-  }, [router, pathname]);
+  }, [router, pathname]); // Added pathname to dependencies
 
-
-  useEffect(() => {
-    const fetchAppSettings = async () => {
-      try {
-        const settingsDocRef = doc(firestore, getGeneralSettingsDocPath());
-        const settingsDocSnap = await getDoc(settingsDocRef);
-        if (settingsDocSnap.exists()) {
-          const appData = settingsDocSnap.data();
-          setAppName(appData.appName || 'EES Education');
-          setLogoUrl(appData.logoUrl || null);
-        }
-      } catch (error) {
-        console.error("Error fetching app settings:", error);
-      }
-    };
-    fetchAppSettings();
-  }, []);
+  // Removed useEffect that fetches appName and logoUrl from Firestore to improve build stability.
+  // AppName and logoUrl now use static defaults.
 
   const handleSignOut = async () => {
     try {
@@ -157,14 +157,17 @@ function AppProvider({ children }: { children: React.ReactNode }) {
 
   const currentRole = useMemo(() => {
     if (!userProfile) return null;
+    // Determine current role context based on path and user's actual role
     const pathSegments = pathname.split('/');
     if (pathSegments.length > 1) {
         const roleSegment = pathSegments[1].toLowerCase();
+        // If on a role-specific path matching user's role, or on hall-of-fame, use user's role
         if (roleSegment === userProfile.role.toLowerCase() || roleSegment === 'hall-of-fame') {
             return userProfile.role;
         }
+        // Fallback or if on a non-role-specific path but still protected, use user's role
     }
-    return userProfile.role;
+    return userProfile.role; // Default to user's actual role if path doesn't clearly indicate another context
   }, [pathname, userProfile]);
 
 
@@ -179,9 +182,14 @@ function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // If still loading or no user/profile, and not on a public page, show loading/redirect.
+  // This check needs to be robust.
   if (!user || !userProfile) {
+    // Allow access to public pages like login or root even if user is not fully loaded or missing profile.
     const isPublicPage = pathname.startsWith('/login/') || pathname === '/';
     if (!isPublicPage) {
+        // If not on a public page and no user/profile, implies a redirect might be needed or in progress.
+        // Show a generic loading state to avoid rendering protected content prematurely.
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-background space-y-4 p-4">
                 <Loader2 className="h-16 w-16 animate-spin text-destructive" />
@@ -189,6 +197,8 @@ function AppProvider({ children }: { children: React.ReactNode }) {
             </div>
         );
     }
+     // If on a public page and still loading/no user, show a simple loader.
+     // This case is less common if redirects are handled above but serves as a fallback.
      return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background space-y-4 p-4">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -211,29 +221,38 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const pathname = usePathname();
 
+  // Function to determine the page title based on navigation items and current path
   const getPageTitle = () => {
+    // Try to find an exact match or a parent match in navItems
+    // Note: navItems are filtered by role in AppSidebarContent, this is a general lookup
     const item = navItems.find(navItem => {
+        // Direct match or if path starts with navItem.href (for nested routes)
         if (pathname === navItem.href || pathname === `${navItem.href}/`) return true;
         if (navItem.href !== '/' && pathname.startsWith(navItem.href + '/')) return true;
+        // Special case for Hall of Fame as it's a shared route
         if (navItem.href === '/hall-of-fame' && pathname.startsWith('/hall-of-fame')) return true;
         return false;
     });
 
     if (item) return item.label;
 
+    // Fallback: Construct title from path segments if a role context exists
     if (currentRole) {
         const rolePath = `/${currentRole.toLowerCase()}`;
         if (pathname.startsWith(`${rolePath}/dashboard`)) return "Dashboard";
         if (pathname.startsWith(`${rolePath}/`)) {
+            // Attempt to create a title from the first segment after the role
             const section = pathname.substring(rolePath.length + 1).split('/')[0];
             return section.charAt(0).toUpperCase() + section.slice(1).replace(/-/g, ' ');
         }
     }
+    // Default title if no specific match is found
     return 'EES Education';
   };
 
   const pageTitle = getPageTitle();
 
+  // This check should ideally not be hit if AppProvider handles unauthorized access
   if (!userProfile) {
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-background space-y-4 p-4">
@@ -260,6 +279,7 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
             </Link>
           </SidebarHeader>
           <SidebarContent className="flex-1 p-2">
+             {/* Pass currentActualRole to ensure correct nav items are displayed */}
              <AppSidebarContent currentActualRole={currentRole} navItems={navItems} />
           </SidebarContent>
           <SidebarFooter className="p-2 border-t border-sidebar-border">
@@ -273,8 +293,14 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
       {/* Main content wrapper: flex-1 ensures it takes remaining space. w-0 helps flex-1 behave correctly. */}
       <div className={cn(
           "flex flex-col flex-1 w-0 min-h-screen"
+          // Apply left margin based on sidebar state for desktop if sidebar is not 'inset' or 'floating'
+          // Adjust as per your Sidebar component's actual behavior if it pushes content
+          // "md:group-data-[variant=sidebar]/sidebar-wrapper:group-data-[state=expanded]/sidebar-wrapper:ml-[var(--sidebar-width)]",
+          // "md:group-data-[variant=sidebar]/sidebar-wrapper:group-data-[state=collapsed]/sidebar-wrapper:ml-[var(--sidebar-width-icon)]",
+          // "transition-[margin-left] ease-in-out duration-300" // Smooth transition for margin change
         )}>
         <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 md:px-6 shadow-sm">
+            {/* Mobile Menu Button */}
             <div className="md:hidden">
                 <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
                     <SheetTrigger asChild>
@@ -303,7 +329,8 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
                     </SheetContent>
                 </Sheet>
             </div>
-            <SidebarTrigger className="hidden md:flex" />
+            {/* Desktop Sidebar Trigger (if your sidebar component has one) */}
+            <SidebarTrigger className="hidden md:flex" /> {/* Example, adjust if your sidebar has a different trigger mechanism */}
             <div className="flex-1">
                 <h1 className="text-lg font-semibold text-foreground">{pageTitle}</h1>
             </div>
@@ -318,7 +345,7 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
 }
 
 function UserNav({ userProfile, signOut }: { userProfile: ManagedUser; signOut: () => Promise<void>; }) {
-  if (!userProfile) return null;
+  if (!userProfile) return null; // Should not happen if AppProvider logic is correct
 
   const userName = userProfile.name || "User";
   const userEmail = userProfile.email || "No email";
@@ -330,7 +357,7 @@ function UserNav({ userProfile, signOut }: { userProfile: ManagedUser; signOut: 
         <Button variant="ghost" className="relative h-10 w-auto px-2 space-x-2">
           <Avatar className="h-8 w-8">
             <AvatarImage
-                src={userProfile.profilePictureUrl || `https://placehold.co/40x40.png`}
+                src={userProfile.profilePictureUrl || `https://placehold.co/40x40.png`} // Provide a default placeholder
                 alt={userName + " Avatar"}
                 data-ai-hint="user avatar small"/>
             <AvatarFallback>{avatarFallbackChar}</AvatarFallback>
@@ -353,6 +380,7 @@ function UserNav({ userProfile, signOut }: { userProfile: ManagedUser; signOut: 
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
+            {/* Ensure dynamic path based on role */}
             <Link href={`/${userProfile.role.toLowerCase()}/profile`} className="cursor-pointer">
                 <UserCircle2 className="mr-2 h-4 w-4" />
                 Profile
@@ -383,4 +411,5 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     </AppProvider>
   );
 }
+
 

@@ -14,13 +14,11 @@ const firebaseConfigValues = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Validate essential Firebase configuration
 const essentialKeys: (keyof typeof firebaseConfigValues)[] = ['apiKey', 'authDomain', 'projectId'];
 const missingOrInvalidConfigs: string[] = [];
 
 for (const key of essentialKeys) {
   const value = firebaseConfigValues[key];
-  // Check if the value is undefined, null, an empty string, or the literal string "undefined"
   if (value === undefined || value === null || String(value).trim() === "" || String(value).trim().toLowerCase() === "undefined") {
     missingOrInvalidConfigs.push(key);
   }
@@ -29,8 +27,6 @@ for (const key of essentialKeys) {
 if (missingOrInvalidConfigs.length > 0) {
   const errorMessage = `Critical Error: Missing or invalid Firebase configuration for: ${missingOrInvalidConfigs.join(', ')}. Please ensure these NEXT_PUBLIC_ environment variables are correctly set in your deployment environment and .env files. App cannot start.`;
   console.error(errorMessage);
-  // This error will halt execution, which is important for server-side startup
-  // or client-side if these vars are truly missing.
   throw new Error(errorMessage);
 }
 
@@ -46,18 +42,31 @@ try {
     app = getApp();
   }
 
-  auth = getAuth(app);
-  firestore = getFirestore(app);
-  functionsInstance = getFunctions(app); // Initialize Functions
+  if (!app || typeof app.name === 'undefined') {
+    throw new Error("Firebase app object is invalid after initialization. Check NEXT_PUBLIC_ environment variables.");
+  }
 
-  // Additional check to ensure functionsInstance is usable
+  auth = getAuth(app);
+  // Check if auth object has a known method or property (e.g., onAuthStateChanged).
+  // Note: auth.currentUser can legitimately be null.
+  if (!auth || typeof auth.onAuthStateChanged !== 'function') {
+     throw new Error("Firebase Auth service instance appears to be invalid after initialization.");
+  }
+
+  firestore = getFirestore(app);
+  // Firestore instance has a 'type' property which is 'firestore'.
+  if (!firestore || typeof firestore.type !== 'string' || firestore.type !== 'firestore-lite') { // firestore.type is 'firestore-lite' for web SDK v9+
+     throw new Error("Firebase Firestore service instance appears to be invalid after initialization.");
+  }
+
+  functionsInstance = getFunctions(app);
+  // functionsInstance has an 'app' property.
   if (!functionsInstance || typeof functionsInstance.app === 'undefined') {
-      throw new Error("Firebase Functions service instance appears to be invalid after initialization.");
+     throw new Error("Firebase Functions service instance appears to be invalid after initialization.");
   }
 
 } catch (e: any) {
   console.error("Firebase initialization failed:", e.message, e.stack);
-  // Provide a more user-friendly error or re-throw if critical
   throw new Error(`Firebase initialization failed. Please check your Firebase configuration and environment variables. Original error: ${e.message}`);
 }
 

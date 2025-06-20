@@ -1,6 +1,7 @@
 
 'use client';
 
+import React from 'react';
 import { LoginForm } from '@/components/auth/login-form';
 import { LogoIcon } from '@/components/icons/logo-icon';
 import Link from 'next/link';
@@ -20,6 +21,13 @@ export default function StudentLoginPage() {
   useEffect(() => {
     const fetchAppSettings = async () => {
       setIsLoading(true);
+      if (!firestore) {
+        console.warn("Firestore instance not available in StudentLoginPage. Using defaults.");
+        setAppName('EES Education');
+        setLogoUrl(null);
+        setIsLoading(false);
+        return;
+      }
       try {
         const settingsDocPath = getGeneralSettingsDocPath();
         const settingsDocRef = doc(firestore, settingsDocPath);
@@ -29,6 +37,7 @@ export default function StudentLoginPage() {
           setAppName(appData.appName || 'EES Education');
           setLogoUrl(appData.logoUrl || null);
         } else {
+          console.warn("App settings document not found for StudentLoginPage. Using defaults.");
           setAppName('EES Education');
           setLogoUrl(null);
         }

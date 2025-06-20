@@ -1,9 +1,9 @@
 
 'use client';
 
-import React from 'react';
+import React from 'react'; // Keep React import for JSX
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+// Removed useState, useEffect, firestore, doc, getDoc, getGeneralSettingsDocPath as they are no longer used here for dynamic settings
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,42 +11,15 @@ import {
 } from '@/components/ui/card';
 import { LogoIcon } from '@/components/icons/logo-icon';
 import { ArrowRight, User, Briefcase, Shield, Users } from 'lucide-react';
-import { firestore } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { getGeneralSettingsDocPath } from '@/lib/firestore-paths';
 
 export default function LandingPage() {
-  const [appName, setAppName] = useState('EES Education');
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Using static defaults directly, removed Firestore fetch for build stability diagnosis
+  const appName = 'EES Education';
+  const logoUrl: string | null = null; // Or your actual default local path like '/default-school-logo.png' if you have one
+  const isLoading = false; // No longer loading from Firestore here
 
-  useEffect(() => {
-    const fetchAppSettings = async () => {
-      try {
-        const settingsDocRef = doc(firestore, getGeneralSettingsDocPath());
-        const settingsDocSnap = await getDoc(settingsDocRef);
-        if (settingsDocSnap.exists()) {
-          const appData = settingsDocSnap.data();
-          setAppName(appData.appName || 'EES Education');
-          setLogoUrl(appData.logoUrl || null);
-        }
-      } catch (error) {
-        console.error("Error fetching app settings:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchAppSettings();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-accent/20 p-6">
-        <LogoIcon className="h-28 w-28 text-primary mx-auto mb-4 animate-pulse" />
-        <h1 className="text-5xl font-headline font-bold text-primary animate-pulse">Loading...</h1>
-      </div>
-    );
-  }
+  // isLoading state is removed as we are using static values now.
+  // The original loading skeleton for dynamic appName/logoUrl is also removed for simplicity in this diagnostic step.
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background via-accent/10 to-background p-6 overflow-hidden">
@@ -60,7 +33,7 @@ export default function LandingPage() {
             className="mx-auto mb-4 rounded-lg object-contain shadow-md"
             data-ai-hint="school logo custom large"
             priority
-            onError={() => setLogoUrl(null)}
+            // Removed onError={() => setLogoUrl(null)} as logoUrl is static or null here
           />
         ) : (
           <LogoIcon className="h-24 w-24 md:h-28 md:w-28 text-primary mx-auto mb-4" />
