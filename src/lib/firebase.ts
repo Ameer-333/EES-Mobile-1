@@ -27,6 +27,8 @@ for (const key of essentialKeys) {
 if (missingOrInvalidConfigs.length > 0) {
   const errorMessage = `Critical Error: Missing or invalid Firebase configuration for: ${missingOrInvalidConfigs.join(', ')}. Please ensure these NEXT_PUBLIC_ environment variables are correctly set in your deployment environment and .env files. App cannot start.`;
   console.error(errorMessage);
+  // This error will stop the application if critical Firebase configs are missing.
+  // No need to proceed with initialization if these are not set.
   throw new Error(errorMessage);
 }
 
@@ -41,26 +43,27 @@ try {
   } else {
     app = getApp();
   }
+  console.log("Firebase app initialized with effective config for project ID:", app.options.projectId);
+
 
   if (!app || typeof app.name === 'undefined') {
     throw new Error("Firebase app object is invalid after initialization. Check NEXT_PUBLIC_ environment variables.");
   }
 
   auth = getAuth(app);
-  // Check if auth object has a known method or property (e.g., onAuthStateChanged).
-  // Note: auth.currentUser can legitimately be null.
   if (!auth || typeof auth.onAuthStateChanged !== 'function') {
      throw new Error("Firebase Auth service instance appears to be invalid after initialization.");
   }
 
   firestore = getFirestore(app);
-  // Firestore instance has a 'type' property which is 'firestore'.
-  if (!firestore || typeof firestore.type !== 'string' || firestore.type !== 'firestore-lite') { // firestore.type is 'firestore-lite' for web SDK v9+
-     throw new Error("Firebase Firestore service instance appears to be invalid after initialization.");
+  console.log("Firestore instance obtained:", firestore, "Expected type: firestore-lite, Actual type reported:", firestore?.type);
+
+
+  if (!firestore || typeof firestore.type !== 'string' || firestore.type !== 'firestore-lite') {
+     throw new Error(`Firebase Firestore service instance appears to be invalid after initialization. Expected type 'firestore-lite' but got '${firestore?.type}'. Ensure Firestore is enabled for project '${app.options.projectId}' and config is correct.`);
   }
 
   functionsInstance = getFunctions(app);
-  // functionsInstance has an 'app' property.
   if (!functionsInstance || typeof functionsInstance.app === 'undefined') {
      throw new Error("Firebase Functions service instance appears to be invalid after initialization.");
   }
@@ -71,3 +74,4 @@ try {
 }
 
 export { app, auth, firestore, functionsInstance as functions };
+
