@@ -2,7 +2,7 @@
 // src/app/(protected)/layout.tsx
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { auth, firestore } from '@/lib/firebase';
 import { onAuthStateChanged, signOut as firebaseSignOut, type User as FirebaseUser } from 'firebase/auth';
@@ -66,8 +66,8 @@ function AppProvider({ children }: { children: React.ReactNode }) {
   const [appName, setAppName] = useState('EES Education');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const router = useRouter();
-  const { toast } = useToast(); 
-  const pathname = usePathname(); 
+  const { toast } = useToast();
+  const pathname = usePathname();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -81,7 +81,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
             const profileData = userDocSnap.data() as ManagedUser;
             setUserProfile(profileData);
 
-            const currentPath = window.location.pathname; 
+            const currentPath = window.location.pathname;
             const currentBasePath = currentPath.split('/')[1]?.toLowerCase();
             const userRolePath = profileData.role.toLowerCase();
 
@@ -98,10 +98,10 @@ function AppProvider({ children }: { children: React.ReactNode }) {
           } else {
             setUserProfile(null);
             console.error("User profile not found in Firestore for UID:", firebaseUser.uid);
-            
+
             if (!window.location.pathname.startsWith('/login/') && window.location.pathname !== '/') {
                 await firebaseSignOut(auth);
-                router.push('/'); 
+                router.push('/');
             }
           }
         } catch (error) {
@@ -122,7 +122,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingAuth(false);
     });
     return () => unsubscribe();
-  }, [router, pathname]); 
+  }, [router, pathname]);
 
 
   useEffect(() => {
@@ -141,7 +141,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
     };
     fetchAppSettings();
   }, []);
- 
+
   const handleSignOut = async () => {
     try {
       await firebaseSignOut(auth);
@@ -154,7 +154,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
       toast({ title: 'Sign Out Error', description: 'Failed to sign out.', variant: 'destructive' });
     }
   };
-  
+
   const currentRole = useMemo(() => {
     if (!userProfile) return null;
     const pathSegments = pathname.split('/');
@@ -164,7 +164,7 @@ function AppProvider({ children }: { children: React.ReactNode }) {
             return userProfile.role;
         }
     }
-    return userProfile.role; 
+    return userProfile.role;
   }, [pathname, userProfile]);
 
 
@@ -218,23 +218,23 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
         if (navItem.href === '/hall-of-fame' && pathname.startsWith('/hall-of-fame')) return true;
         return false;
     });
-    
+
     if (item) return item.label;
 
     if (currentRole) {
         const rolePath = `/${currentRole.toLowerCase()}`;
         if (pathname.startsWith(`${rolePath}/dashboard`)) return "Dashboard";
-        if (pathname.startsWith(`${rolePath}/`)) { 
+        if (pathname.startsWith(`${rolePath}/`)) {
             const section = pathname.substring(rolePath.length + 1).split('/')[0];
             return section.charAt(0).toUpperCase() + section.slice(1).replace(/-/g, ' ');
         }
     }
     return 'EES Education';
   };
-  
+
   const pageTitle = getPageTitle();
 
-  if (!userProfile) { 
+  if (!userProfile) {
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-background space-y-4 p-4">
             <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -270,11 +270,9 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
       </Sidebar>
 
+      {/* Main content wrapper: flex-1 ensures it takes remaining space. w-0 helps flex-1 behave correctly. */}
       <div className={cn(
-          "flex flex-col flex-1 w-0 min-h-screen transition-[margin-left] duration-200 ease-linear", 
-          "md:ml-[var(--sidebar-width)]", // Default margin for expanded sidebar
-          "md:peer-data-[state=collapsed]:ml-[var(--sidebar-width-icon)]" // Margin for collapsed sidebar
-          // Removed inset-specific classes to simplify for default "sidebar" variant
+          "flex flex-col flex-1 w-0 min-h-screen"
         )}>
         <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur-sm px-4 md:px-6 shadow-sm">
             <div className="md:hidden">
@@ -320,7 +318,7 @@ function ProtectedLayoutContent({ children }: { children: React.ReactNode }) {
 }
 
 function UserNav({ userProfile, signOut }: { userProfile: ManagedUser; signOut: () => Promise<void>; }) {
-  if (!userProfile) return null; 
+  if (!userProfile) return null;
 
   const userName = userProfile.name || "User";
   const userEmail = userProfile.email || "No email";
@@ -331,8 +329,8 @@ function UserNav({ userProfile, signOut }: { userProfile: ManagedUser; signOut: 
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-auto px-2 space-x-2">
           <Avatar className="h-8 w-8">
-            <AvatarImage 
-                src={userProfile.profilePictureUrl || `https://placehold.co/40x40.png`} 
+            <AvatarImage
+                src={userProfile.profilePictureUrl || `https://placehold.co/40x40.png`}
                 alt={userName + " Avatar"}
                 data-ai-hint="user avatar small"/>
             <AvatarFallback>{avatarFallbackChar}</AvatarFallback>
