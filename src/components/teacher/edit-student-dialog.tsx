@@ -40,14 +40,14 @@ const editStudentSchema = z.object({
   satsNumber: z.string().min(3, { message: 'SATS number must be at least 3 characters.' }),
   className: z.string().min(1, { message: 'Class Name (e.g., 10th Grade, LKG) is required.' }),
   classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG, NIOS - used for collection path) is required.' }),
-  sectionId: z.string().max(2).optional().or(z.literal('')),
+  sectionId: z.string().max(20).optional().or(z.literal('')), // Increased max for longer section names like "Sunshine"
   groupId: z.string().optional().or(z.literal('')),
   dateOfBirth: z.string().optional().or(z.literal('')),
   fatherName: z.string().optional().or(z.literal('')),
   motherName: z.string().optional().or(z.literal('')),
   fatherOccupation: z.string().optional().or(z.literal('')),
   motherOccupation: z.string().optional().or(z.literal('')),
-  parentsAnnualIncome: z.coerce.number().nonnegative("Income must be a positive number").optional().or(z.literal(0)),
+  parentsAnnualIncome: z.coerce.number().nonnegative("Income must be a positive number").optional().default(0),
   parentContactNumber: z.string().optional().or(z.literal('')),
   email: z.string().email({ message: "Invalid email address." }).optional().or(z.literal('')),
   caste: z.string().min(1, { message: 'Caste is required.' }),
@@ -128,38 +128,39 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
     try {
       const studentDocRef = doc(firestore, studentDocPath);
 
-      const studentDataToUpdate: Partial<Omit<Student, 'id' | 'authUid' | 'remarks' | 'scholarships' | 'examRecords' | 'rawAttendanceRecords'>> = {
+      const studentDataToUpdate: Partial<Student> = {
+        // Keep only fields that are part of Student type directly, others (like authUid, remarks etc.) are merged from studentToEdit
         name: values.name,
         satsNumber: values.satsNumber,
         className: values.className,
-        classId: values.classId, 
-        sectionId: values.sectionId || undefined,
-        groupId: values.groupId || undefined,
-        class: values.className,
-        section: values.sectionId || 'N/A',
-        dateOfBirth: values.dateOfBirth || undefined,
-        fatherName: values.fatherName || undefined,
-        motherName: values.motherName || undefined,
-        fatherOccupation: values.fatherOccupation || undefined,
-        motherOccupation: values.motherOccupation || undefined,
-        parentsAnnualIncome: values.parentsAnnualIncome || undefined,
-        parentContactNumber: values.parentContactNumber || undefined,
-        email: values.email || undefined,
+        classId: values.classId,
+        class: values.className, 
+        section: values.sectionId || 'N/A', 
         caste: values.caste,
         religion: values.religion,
         address: values.address,
-        siblingReference: values.siblingReference || undefined,
         profilePictureUrl: values.profilePictureUrl || studentToEdit.profilePictureUrl || `https://placehold.co/150x150.png?text=${values.name.charAt(0)}`,
-        backgroundInfo: values.backgroundInfo || undefined,
+        parentsAnnualIncome: values.parentsAnnualIncome, // Zod defaults to 0 if not provided/invalid
       };
+
+      // Conditionally add optional fields to avoid sending undefined
+      if (values.sectionId) studentDataToUpdate.sectionId = values.sectionId;
+      if (values.groupId) studentDataToUpdate.groupId = values.groupId;
+      if (values.dateOfBirth) studentDataToUpdate.dateOfBirth = values.dateOfBirth;
+      if (values.fatherName) studentDataToUpdate.fatherName = values.fatherName;
+      if (values.motherName) studentDataToUpdate.motherName = values.motherName;
+      if (values.fatherOccupation) studentDataToUpdate.fatherOccupation = values.fatherOccupation;
+      if (values.motherOccupation) studentDataToUpdate.motherOccupation = values.motherOccupation;
+      if (values.parentContactNumber) studentDataToUpdate.parentContactNumber = values.parentContactNumber;
+      if (values.email) studentDataToUpdate.email = values.email;
+      if (values.siblingReference) studentDataToUpdate.siblingReference = values.siblingReference;
+      if (values.backgroundInfo) studentDataToUpdate.backgroundInfo = values.backgroundInfo;
 
       await setDoc(studentDocRef, studentDataToUpdate, { merge: true });
 
       if (values.classId !== originalClassId || values.name !== studentToEdit.name) {
         const userDocRef = doc(firestore, getUserDocPath(studentToEdit.authUid));
-        const userUpdateData: Partial<ManagedUser> = {
-            name: values.name, 
-        };
+        const userUpdateData: Partial<ManagedUser> = { name: values.name };
         if (values.classId !== originalClassId) {
             userUpdateData.classId = values.classId;
         }
@@ -176,13 +177,13 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
       }
 
       const updatedStudentForCallback: Student = {
-        ...studentToEdit,
-        ...studentDataToUpdate,
+        ...studentToEdit, // Preserve existing fields like remarks, scholarships, etc.
+        ...studentDataToUpdate, // Override with new values
         classId: values.classId, 
       };
       onStudentEdited(updatedStudentForCallback);
 
-      if (values.classId === originalClassId) { // Only show simple success if classId wasn't changed
+      if (values.classId === originalClassId) { 
         toast({
             title: "Student Updated",
             description: `${values.name}'s details have been successfully updated.`,
@@ -245,7 +246,7 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <FormField control={form.control} name="sectionId" render={({ field }) => (
-                <FormItem><FormLabel>Section ID (Optional)</FormLabel><FormControl><Input placeholder="e.g. A, B" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Section ID (Optional)</FormLabel><FormControl><Input placeholder="e.g. A, B, Sunshine" {...field} /></FormControl><FormMessage /></FormItem>
               )}/>
               <FormField control={form.control} name="groupId" render={({ field }) => (
                 <FormItem><FormLabel>Group ID (Optional, for NIOS/NCLP)</FormLabel><FormControl><Input placeholder="e.g. Alpha, Batch1" {...field} /></FormControl><FormMessage /></FormItem>
@@ -316,6 +317,4 @@ export function EditStudentDialog({ isOpen, onOpenChange, onStudentEdited, stude
     </Dialog>
   );
 }
-    
-
     

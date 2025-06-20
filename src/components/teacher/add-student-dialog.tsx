@@ -38,17 +38,15 @@ import { useAppContext } from '@/app/(protected)/layout';
 const addStudentSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   satsNumber: z.string().min(3, { message: 'SATS number must be at least 3 characters.' }).regex(/^[a-zA-Z0-9]+$/, "SATS number should be alphanumeric."),
-  // className: z.string().min(1, { message: 'Class Name (e.g., 10th Grade, LKG) is required.' }), // Will be derived or selected
-  // classId: z.string().min(1, { message: 'Class ID (e.g., 10, LKG - used for collection path) is required.' }), // Will be derived or selected
-  assignedClassInfo: z.string().min(1, "You must select an assigned class/section for the student."), // "classId|sectionId|className"
-  sectionIdManual: z.string().max(3).optional().or(z.literal('')), // For cases where teacher needs to input section for a general class assignment
+  assignedClassInfo: z.string().min(1, "You must select an assigned class/section for the student."),
+  sectionIdManual: z.string().max(3).optional().or(z.literal('')),
   groupId: z.string().optional().or(z.literal('')),
   dateOfBirth: z.string().optional().or(z.literal('')),
   fatherName: z.string().optional().or(z.literal('')),
   motherName: z.string().optional().or(z.literal('')),
   fatherOccupation: z.string().optional().or(z.literal('')),
   motherOccupation: z.string().optional().or(z.literal('')),
-  parentsAnnualIncome: z.coerce.number().nonnegative("Income must be a positive number").optional().or(z.literal(0)),
+  parentsAnnualIncome: z.coerce.number().nonnegative("Income must be a positive number").optional().default(0),
   parentContactNumber: z.string().optional().or(z.literal('')),
   email: z.string().email({ message: "Invalid email address." }).optional().or(z.literal('')),
   caste: z.string().min(1, { message: 'Caste is required.' }),
@@ -97,7 +95,7 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
   const needsManualSection = useMemo(() => {
       if (!selectedAssignedClassInfo) return false;
       const [_classId, sectionId, _className] = selectedAssignedClassInfo.split('|');
-      return !sectionId; // If sectionId was empty in the assignment, might need manual input
+      return !sectionId; 
   }, [selectedAssignedClassInfo]);
 
 
@@ -130,39 +128,41 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, generatedLoginEmail, generatedPassword);
       const authUid = userCredential.user.uid;
 
-      const studentProfileDataForDb: Omit<Student, 'id'> = {
+      const studentProfileDataForDb: any = {
         authUid: authUid,
         name: values.name,
         satsNumber: values.satsNumber,
         className: finalClassName,
         classId: classId,
-        sectionId: finalSectionId,
-        groupId: values.groupId || undefined,
-        class: finalClassName, // For compatibility if older components use 'class'
-        section: finalSectionId || 'N/A', // For compatibility
-        dateOfBirth: values.dateOfBirth || undefined,
-        fatherName: values.fatherName || undefined,
-        motherName: values.motherName || undefined,
-        fatherOccupation: values.fatherOccupation || undefined,
-        motherOccupation: values.motherOccupation || undefined,
-        parentsAnnualIncome: values.parentsAnnualIncome || undefined,
-        parentContactNumber: values.parentContactNumber || undefined,
-        email: values.email || undefined,
+        class: finalClassName, 
+        section: finalSectionId || 'N/A',
         caste: values.caste,
         religion: values.religion,
         address: values.address,
-        siblingReference: values.siblingReference || undefined,
         profilePictureUrl: values.profilePictureUrl || `https://placehold.co/150x150.png?text=${values.name.charAt(0)}`,
-        backgroundInfo: values.backgroundInfo || undefined,
+        parentsAnnualIncome: values.parentsAnnualIncome, // Zod defaults to 0
         remarks: [], 
         scholarships: [], 
         examRecords: [], 
         rawAttendanceRecords: [], 
       };
-      const studentDocRef = await addDoc(collection(firestore, studentProfilesCollectionPath), studentProfileDataForDb);
+
+      if (finalSectionId) studentProfileDataForDb.sectionId = finalSectionId;
+      if (values.groupId) studentProfileDataForDb.groupId = values.groupId;
+      if (values.dateOfBirth) studentProfileDataForDb.dateOfBirth = values.dateOfBirth;
+      if (values.fatherName) studentProfileDataForDb.fatherName = values.fatherName;
+      if (values.motherName) studentProfileDataForDb.motherName = values.motherName;
+      if (values.fatherOccupation) studentProfileDataForDb.fatherOccupation = values.fatherOccupation;
+      if (values.motherOccupation) studentProfileDataForDb.motherOccupation = values.motherOccupation;
+      if (values.parentContactNumber) studentProfileDataForDb.parentContactNumber = values.parentContactNumber;
+      if (values.email) studentProfileDataForDb.email = values.email;
+      if (values.siblingReference) studentProfileDataForDb.siblingReference = values.siblingReference;
+      if (values.backgroundInfo) studentProfileDataForDb.backgroundInfo = values.backgroundInfo;
+      
+      const studentDocRef = await addDoc(collection(firestore, studentProfilesCollectionPath), studentProfileDataForDb as Omit<Student, 'id'>);
       const studentProfileId = studentDocRef.id; 
 
-      const userDocData: Partial<ManagedUser> = { // Using Partial as not all fields are set here
+      const userDocData: Partial<ManagedUser> = { 
         name: values.name,
         email: generatedLoginEmail,
         role: 'Student',
@@ -189,9 +189,9 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
               React.createElement('p', {className: "text-xs mt-1 text-destructive"}, "Advise student to change password on first login.")
             )
           ),
-          duration: 20000, // Longer duration to see credentials
+          duration: 20000,
       });
-      form.reset(); // Reset after successful submission and credential display
+      form.reset(); 
     } catch (error: any) {
       console.error("Error adding student or creating auth user:", error);
       let errorMessage = "Could not add student. Please check console for details.";
@@ -358,4 +358,3 @@ export function AddStudentDialog({ isOpen, onOpenChange, onStudentAdded }: AddSt
     </Dialog>
   );
 }
-
