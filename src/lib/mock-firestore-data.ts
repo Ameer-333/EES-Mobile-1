@@ -1,11 +1,17 @@
 
 /**
- * @fileOverview Mock data representing the expected Firestore database structure.
- * This file serves as a blueprint for understanding how data should be organized
- * in Firestore based on the application's types and collection paths.
+ * @fileOverview Firestore Database Structure Blueprint
+ * This file serves as a blueprint and example for the intended structure of your
+ * Firestore database. It uses the TypeScript types defined in `src/types/index.ts`
+ * to illustrate the fields expected within each document of your collections.
  *
- * You can use this as a reference to manually create documents in your
- * Firestore console or to write scripts for initial data population.
+ * Use this as a reference guide for:
+ *  - Manually creating initial documents in the Firebase Firestore console.
+ *  - Writing scripts for data population or migration.
+ *  - Understanding the data relationships and schema of the application.
+ *
+ * Each top-level exported constant (e.g., `exampleUsersData`) represents sample
+ * documents that would reside in the corresponding Firestore collection.
  */
 
 import type {
@@ -29,7 +35,7 @@ import type {
   TeacherAppraisalRequest
 } from '@/types';
 
-// --- Mock UIDs and IDs for linking ---
+// --- Example UIDs and IDs for linking records ---
 const adminAuthUid = 'admin001AuthUid';
 const teacher1AuthUid = 'teacher001AuthUid';
 const teacher2AuthUid = 'teacher002AuthUid';
@@ -38,22 +44,24 @@ const student2AuthUid = 'student002AuthUid';
 const student3AuthUid = 'student003AuthUid';
 const coordinatorAuthUid = 'coordinator001AuthUid';
 
-const student1ProfileId = 'studentProfileS001'; // Unique ID for student1's profile in their class
+const student1ProfileId = 'studentProfileS001'; // Unique ID for student1's profile within their class's subcollection
 const student2ProfileId = 'studentProfileS002';
 const student3ProfileId = 'studentProfileS003';
 
-const classId10A = 'CLASS_10_A';
-const classIdLKG = 'CLASS_LKG_SUN';
+const classId10A = 'CLASS_10_A'; // Example: Document ID for "Class 10 A" in 'student_data_by_class'
+const classIdLKG = 'CLASS_LKG_SUN'; // Example: Document ID for "LKG Sunshine" in 'student_data_by_class'
 
-// --- 1. `users` Collection Data (Array of ManagedUser) ---
-export const mockManagedUsers: ManagedUser[] = [
+// --- 1. `users` Collection: Document Structure Examples ---
+// Collection Path: /users/{authUid}
+export const exampleUsersData: ManagedUser[] = [
   {
-    id: adminAuthUid,
+    id: adminAuthUid, // Document ID is the authUid
     name: 'Dr. Evelyn Reed',
-    email: 'admin.evelyn@eesedu.com',
+    email: 'admin.evelyn@eesedu.com', // Login email
     role: 'Admin',
     status: 'Active',
     lastLogin: '2024-06-19T10:00:00Z',
+    // classId, studentProfileId, assignments are not applicable for Admin
   },
   {
     id: teacher1AuthUid,
@@ -67,6 +75,7 @@ export const mockManagedUsers: ManagedUser[] = [
       { id: 'assignT1_2', type: 'subject_teacher', classId: classId10A, className: 'Class 10 A', sectionId: 'A', subjectId: 'Maths' },
       { id: 'assignT1_3', type: 'subject_teacher', classId: classId10A, className: 'Class 10 A', sectionId: 'A', subjectId: 'Science' },
     ],
+    // classId, studentProfileId are not applicable for Teacher
   },
   {
     id: teacher2AuthUid,
@@ -87,8 +96,9 @@ export const mockManagedUsers: ManagedUser[] = [
     role: 'Student',
     status: 'Active',
     lastLogin: '2024-06-19T08:00:00Z',
-    classId: classId10A,
-    studentProfileId: student1ProfileId,
+    classId: classId10A, // Links to student_data_by_class/{classId10A}
+    studentProfileId: student1ProfileId, // Links to student_data_by_class/{classId10A}/profiles/{student1ProfileId}
+    // assignments are not applicable for Student
   },
   {
     id: student2AuthUid,
@@ -117,25 +127,29 @@ export const mockManagedUsers: ManagedUser[] = [
     role: 'Coordinator',
     status: 'Active',
     lastLogin: '2024-06-19T09:00:00Z',
+    // classId, studentProfileId, assignments might be used differently or not at all for Coordinator
   },
 ];
 
-// --- 2. `teachers` Collection Data (Array of Teacher HR Profiles) ---
-export const mockTeachers: Teacher[] = [
+// --- 2. `teachers` Collection: Document Structure Examples (HR Profiles) ---
+// Collection Path: /teachers/{authUid}
+export const exampleTeachersData: Teacher[] = [
   {
-    id: teacher1AuthUid, // Same as document ID, and ManagedUser ID
+    id: teacher1AuthUid, // Document ID is the authUid, same as ManagedUser ID
     authUid: teacher1AuthUid,
     name: 'Mr. Arjun Sharma',
-    email: 'arjun.sharma.contact@eesedu.com', // Contact email, might differ from login
+    email: 'arjun.sharma.contact@eesedu.com', // HR contact email
     phoneNumber: '+919876543210',
     address: '123, Knowledge Park, Bangalore, India',
     yearOfJoining: 2015,
     totalYearsWorked: new Date().getFullYear() - 2015,
-    subjectsTaught: ['Maths', 'Science', 'Physics' as SubjectName], // Assuming Physics is added to SubjectName
+    subjectsTaught: ['Maths', 'Science', 'Physics' as SubjectName],
     profilePictureUrl: 'https://placehold.co/100x100.png?text=AS',
     salaryHistory: [
       { id: 'salArjun1', monthYear: 'May 2024', dateIssued: '2024-06-01', amountIssued: 60000, amountDeducted: 500, daysAbsent: 1, reasonForAbsence: 'Sick leave' },
     ],
+    daysPresentThisMonth: 20, // Example optional field
+    daysAbsentThisMonth: 1,   // Example optional field
     currentAppraisalStatus: 'Appraised',
     lastAppraisalDate: '2024-03-10',
     lastAppraisalDetails: 'Approved for 10% increment based on performance.',
@@ -157,30 +171,38 @@ export const mockTeachers: Teacher[] = [
     currentAppraisalStatus: 'Pending Review',
     lastAppraisalDate: '2023-04-01',
     lastAppraisalDetails: 'Last appraisal completed successfully.',
+    // daysPresentThisMonth, daysAbsentThisMonth could be undefined or null
   },
 ];
 
-// --- 3. `student_data_by_class` Collection Data ---
-// This will be an object where keys are classId
-// Each class document contains a `profiles` subcollection (array of Student)
+// --- 3. `student_data_by_class` Collection: Document Structure Examples ---
+// This collection contains documents where each document ID is a `classId`.
+// Each class document then has a `profiles` subcollection.
 
-// Example Student Profiles:
-const studentProfile1: Student = {
-  id: student1ProfileId, // Document ID for this profile
+// Example Student Profile document structure (these go into the 'profiles' subcollection)
+const studentProfile1_Data: Student = {
+  id: student1ProfileId, // Document ID for this profile within its class's 'profiles' subcollection
   authUid: student1AuthUid,
   name: 'Rohan Verma',
   satsNumber: 'SATS001RV',
-  className: 'Class 10 A',
-  classId: classId10A,
-  sectionId: 'A',
-  class: 'Class 10 A', // compatibility
-  section: 'A', // compatibility
+  className: 'Class 10 A', // Display name
+  classId: classId10A,   // System ID for the class
+  sectionId: 'A',        // System ID for the section
+  // groupId: undefined, // Optional, for NIOS/NCLP further grouping
+  class: 'Class 10 A', // Compatibility field
+  section: 'A',        // Compatibility field
   dateOfBirth: '2008-05-10',
   fatherName: 'Mr. Suresh Verma',
   motherName: 'Mrs. Anita Verma',
+  fatherOccupation: 'Engineer',
+  motherOccupation: 'Homemaker',
+  parentsAnnualIncome: 800000,
+  parentContactNumber: '+919988776655',
+  email: 'rohan.verma.personal@example.com', // Personal email
   caste: 'General',
   religion: 'Hindu' as ReligionType,
   address: '789 Learning Street, Bangalore',
+  siblingReference: 'Sister: Anya Verma, Class 7B',
   profilePictureUrl: 'https://placehold.co/100x100.png?text=RV',
   remarks: [
     { id: 'remR1', teacherName: 'Mr. Arjun Sharma', teacherSubject: 'Maths', remark: 'Excellent grasp of concepts.', date: '2024-05-15', sentiment: 'good' },
@@ -197,11 +219,12 @@ const studentProfile1: Student = {
   ],
   rawAttendanceRecords: [
     { subjectName: 'Maths', date: '2024-06-18', status: 'Present' },
+    { subjectName: 'Science', date: '2024-06-18', status: 'Present' },
   ],
   backgroundInfo: 'Active in school debate club.',
 };
 
-const studentProfile2: Student = {
+const studentProfile2_Data: Student = {
   id: student2ProfileId,
   authUid: student2AuthUid,
   name: 'Aisha Khan',
@@ -224,16 +247,19 @@ const studentProfile2: Student = {
   ],
   examRecords: [],
   rawAttendanceRecords: [],
+  // Optional fields can be omitted or set to undefined
+  // fatherOccupation: undefined,
+  // parentsAnnualIncome: undefined,
 };
 
-const studentProfile3: Student = {
+const studentProfile3_Data: Student = {
   id: student3ProfileId,
   authUid: student3AuthUid,
   name: 'Leo Das',
   satsNumber: 'SATS003LD',
-  className: 'LKG Sunshine',
-  classId: classIdLKG,
-  sectionId: 'Sunshine',
+  className: 'LKG Sunshine', // Display name for LKG
+  classId: classIdLKG,     // System ID for LKG
+  sectionId: 'Sunshine',   // Specific section name for LKG
   class: 'LKG Sunshine',
   section: 'Sunshine',
   dateOfBirth: '2019-03-15',
@@ -241,117 +267,144 @@ const studentProfile3: Student = {
   religion: 'Christian' as ReligionType,
   address: '22 Joyful Road, Bangalore',
   profilePictureUrl: 'https://placehold.co/100x100.png?text=LD',
-  remarks: [],
-  scholarships: [],
-  examRecords: [],
-  rawAttendanceRecords: [],
+  remarks: [], scholarships: [], examRecords: [], rawAttendanceRecords: [],
 };
 
-// Structure for `student_data_by_class`
-// In Firestore, this would be:
+// Firestore structure for `student_data_by_class`:
 // student_data_by_class (collection)
-//   -- CLASS_10_A (document, classId is the doc ID)
-//        -- profiles (subcollection)
-//             -- studentProfileS001 (document, studentProfileId is the doc ID, content is studentProfile1)
-//             -- studentProfileS002 (document, content is studentProfile2)
-//   -- CLASS_LKG_SUN (document)
-//        -- profiles (subcollection)
-//             -- studentProfileS003 (document, content is studentProfile3)
-export const mockStudentDataByClass = {
-  [classId10A]: {
-    // This document might have class-specific metadata if needed, e.g., { className: "Class 10 A", year: 2024 }
-    // But for now, the primary content is the 'profiles' subcollection.
-    profiles: {
-      [student1ProfileId]: studentProfile1,
-      [student2ProfileId]: studentProfile2,
+//   -- {classId10A} (document)
+//        --> profiles (subcollection)
+//             -- {student1ProfileId} (document, data: studentProfile1_Data)
+//             -- {student2ProfileId} (document, data: studentProfile2_Data)
+//   -- {classIdLKG} (document)
+//        --> profiles (subcollection)
+//             -- {student3ProfileId} (document, data: studentProfile3_Data)
+
+// This object illustrates the data, not the exact Firebase SDK calls to create it.
+export const exampleStudentDataByClassStructure = {
+  [classId10A]: { // Document ID for the class in 'student_data_by_class'
+    // This document itself might have class-level metadata if needed, e.g.:
+    // classNameDisplay: "Class 10 Section A", academicYear: "2024-2025"
+    // The 'profiles' subcollection is nested under this document.
+    profiles: { // This key represents the subcollection name.
+      [student1ProfileId]: studentProfile1_Data, // Document ID: student1ProfileId, Data: studentProfile1_Data
+      [student2ProfileId]: studentProfile2_Data,
     }
   },
   [classIdLKG]: {
     profiles: {
-      [student3ProfileId]: studentProfile3,
+      [student3ProfileId]: studentProfile3_Data,
     }
   }
 };
 
 
-// --- 4. `app_settings` Collection Data ---
-// Document ID: "general"
-export const mockAppSettingsGeneral = {
+// --- 4. `app_settings` Collection: Document Structure Example ---
+// Collection Path: /app_settings/general
+// Document ID: "general" (typically a fixed ID for general settings)
+export const exampleAppSettingsGeneralData = {
   appName: 'EES Education Portal',
-  logoUrl: '/default-logo.png', // Example local path, or a full URL
+  logoUrl: '/default-school-logo.png', // Example local path, or a full HTTPS URL
   defaultLanguage: 'en',
   maintenanceMode: false,
+  // Add other global settings here
 };
 
-// --- 5. `hall_of_fame_items` Collection Data (Array of HallOfFameItem) ---
-export const mockHallOfFameItems: HallOfFameItem[] = [
+// --- 5. `hall_of_fame_items` Collection: Document Structure Examples ---
+// Collection Path: /hall_of_fame_items/{itemId}
+export const exampleHallOfFameItemsData: HallOfFameItem[] = [
   {
-    id: 'hof001',
+    id: 'hofItem001', // Document ID
     category: 'founder',
     name: 'Mr. Rajesh Kumar',
     title: 'Founder & Visionary',
-    description: 'Laid the foundation of EES Education with a vision for excellence.',
-    imageUrl: 'https://placehold.co/300x200.png?text=Founder',
+    description: 'Laid the foundation of EES Education with a vision for excellence and accessible quality education for all.',
+    imageUrl: 'https://placehold.co/400x300.png?text=Founder+Rajesh',
     year: '1995',
-    dataAiHint: 'founder portrait',
+    dataAiHint: 'founder portrait man',
   },
   {
-    id: 'hof002',
+    id: 'hofItem002',
     category: 'school-award',
-    name: 'Best School National Award',
-    description: 'Recognized for outstanding contribution to education.',
-    imageUrl: 'https://placehold.co/300x200.png?text=Award',
+    name: 'National Award for Educational Excellence',
+    title: 'Awarded by the Ministry of Education',
+    description: 'Recognized for outstanding contribution to primary and secondary education, innovative teaching methodologies, and community engagement.',
+    imageUrl: 'https://placehold.co/400x300.png?text=National+Award',
     year: 2020,
-    dataAiHint: 'school award trophy',
+    dataAiHint: 'award trophy certificate',
   },
   {
-    id: 'hof003',
+    id: 'hofItem003',
     category: 'student-achievement',
-    name: 'Priya Singh - National Science Olympiad Winner',
-    description: 'Secured first rank in the National Science Olympiad.',
-    imageUrl: 'https://placehold.co/300x200.png?text=Student',
+    name: 'Priya Singh - International Math Olympiad Gold Medalist',
+    title: 'Represented India and achieved Gold',
+    description: 'Secured the first rank globally in the prestigious International Math Olympiad, showcasing exceptional talent and dedication.',
+    imageUrl: 'https://placehold.co/400x300.png?text=Priya+Singh+IMO',
     year: 2022,
-    dataAiHint: 'student achievement medal',
+    dataAiHint: 'student medal achievement',
   },
 ];
 
-// --- 6. `teacher_appraisal_requests` Collection Data ---
-export const mockTeacherAppraisalRequests: TeacherAppraisalRequest[] = [
+// --- 6. `teacher_appraisal_requests` Collection: Document Structure Examples ---
+// Collection Path: /teacher_appraisal_requests/{requestId}
+export const exampleTeacherAppraisalRequestsData: TeacherAppraisalRequest[] = [
   {
-    id: 'appraisalReq001',
+    id: 'appraisalRequest001', // Document ID
     teacherId: teacher1AuthUid,
     teacherName: 'Mr. Arjun Sharma',
     requestedByCoordinatorId: coordinatorAuthUid,
     coordinatorName: 'Ms. Sofia Singh',
-    requestDate: '2024-06-15T10:00:00Z',
-    justification: 'Mr. Sharma has consistently exceeded expectations in student performance and has taken on additional responsibilities for curriculum development. His Math students have shown significant improvement.',
+    requestDate: '2024-06-15T10:00:00Z', // ISO Date string
+    justification: 'Mr. Sharma has consistently exceeded expectations in student performance for Class 10 Maths and Science. He has also taken initiative in organizing the science fair and mentoring junior teachers. His dedication warrants a salary review.',
     status: 'Pending Admin Review',
+    // adminNotes and processedDate would be undefined or null initially
   },
   {
-    id: 'appraisalReq002',
+    id: 'appraisalRequest002',
     teacherId: teacher2AuthUid,
     teacherName: 'Ms. Priya Patel',
     requestedByCoordinatorId: coordinatorAuthUid,
     coordinatorName: 'Ms. Sofia Singh',
     requestDate: '2024-05-20T14:30:00Z',
-    justification: 'Ms. Patel has shown excellent dedication as a mother teacher for LKG. Parent feedback has been overwhelmingly positive. Requesting a review for salary increment.',
+    justification: 'Ms. Patel has shown excellent dedication as a mother teacher for LKG Sunshine. Parent feedback has been overwhelmingly positive, highlighting her nurturing approach and innovative teaching methods for early learners. Requesting a review for salary increment.',
     status: 'Approved',
-    adminNotes: 'Approved. Performance review was excellent. Salary increment of 8% processed.',
+    adminNotes: 'Approved. Performance review was excellent. Salary increment of 8% processed. Updated in teacher\'s HR profile.',
     processedDate: '2024-05-25T11:00:00Z',
   },
 ];
 
 /**
- * How to interpret this mock data for Firestore:
+ * Guide to Mapping this Data to Firestore:
  *
- * 1. `mockManagedUsers` -> Each object is a document in the 'users' collection. Doc ID = object.id.
- * 2. `mockTeachers` -> Each object is a document in the 'teachers' collection. Doc ID = object.id.
- * 3. `mockStudentDataByClass` ->
- *    - Top-level keys (e.g., 'CLASS_10_A') are Document IDs in 'student_data_by_class' collection.
- *    - Inside each, `profiles` is a subcollection.
- *    - Keys of `profiles` (e.g., 'studentProfileS001') are Document IDs in that subcollection.
- *    - The value (e.g., studentProfile1) is the data for that student profile document.
- * 4. `mockAppSettingsGeneral` -> Data for a document named 'general' in the 'app_settings' collection.
- * 5. `mockHallOfFameItems` -> Each object is a document in 'hall_of_fame_items'. Doc ID = object.id.
- * 6. `mockTeacherAppraisalRequests` -> Each object is a document in 'teacher_appraisal_requests'. Doc ID = object.id.
+ * 1. `exampleUsersData`:
+ *    - Each object in this array represents a document in the `users` collection.
+ *    - The `id` field of each object should be used as the Document ID in Firestore.
+ *    - Collection Path: `users/{id}` (e.g., `users/admin001AuthUid`)
+ *
+ * 2. `exampleTeachersData`:
+ *    - Each object represents a document in the `teachers` collection (HR profiles).
+ *    - The `id` (which is also `authUid`) field is the Document ID.
+ *    - Collection Path: `teachers/{id}` (e.g., `teachers/teacher001AuthUid`)
+ *
+ * 3. `exampleStudentDataByClassStructure`:
+ *    - This object's top-level keys (e.g., `CLASS_10_A`) are Document IDs in the `student_data_by_class` collection.
+ *      - Collection Path: `student_data_by_class/{classId}`
+ *    - Inside each class document, the `profiles` key represents a **subcollection** named "profiles".
+ *    - The keys within `profiles` (e.g., `studentProfileS001`) are Document IDs for individual student profiles within that class's subcollection.
+ *      - Subcollection Path: `student_data_by_class/{classId}/profiles/{studentProfileId}`
+ *    - The data for each student profile document is the corresponding object (e.g., `studentProfile1_Data`).
+ *
+ * 4. `exampleAppSettingsGeneralData`:
+ *    - This object's data goes into a single document, typically named "general", within the `app_settings` collection.
+ *    - Document Path: `app_settings/general`
+ *
+ * 5. `exampleHallOfFameItemsData`:
+ *    - Each object is a document in the `hall_of_fame_items` collection.
+ *    - The `id` field can be used as the Document ID, or Firestore can auto-generate one.
+ *    - Collection Path: `hall_of_fame_items/{id}`
+ *
+ * 6. `exampleTeacherAppraisalRequestsData`:
+ *    - Each object is a document in the `teacher_appraisal_requests` collection.
+ *    - The `id` field can be used as the Document ID, or Firestore can auto-generate one.
+ *    - Collection Path: `teacher_appraisal_requests/{id}`
  */
