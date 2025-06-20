@@ -1,11 +1,11 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { UserRole, ManagedUser } from '@/types';
+import type { UserRole, ManagedUser, Teacher } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -36,9 +36,9 @@ import { Loader2, Info } from 'lucide-react';
 import { firestore, auth as firebaseAuth } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { FirebaseError } from 'firebase/app'; // Correct import for FirebaseError
+import { FirebaseError } from 'firebase/app';
 import { useToast } from "@/hooks/use-toast";
-import { getUsersCollectionPath } from '@/lib/firestore-paths';
+import { getUsersCollectionPath, getTeacherDocPath } from '@/lib/firestore-paths';
 import { Card, CardHeader as UICardHeader, CardContent as UICardContent, CardTitle as UICardTitle } from '@/components/ui/card';
 
 const addUserSchema = z.object({
@@ -65,7 +65,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     defaultValues: {
       name: '',
       email: '',
-      role: 'Student', // Default role
+      role: 'Student',
     },
   });
 
@@ -78,13 +78,11 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     const defaultPassword = `${roleNameCapitalized}Default@${new Date().getFullYear()}`;
 
     try {
-      // 1. Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, loginEmail, defaultPassword);
       const authUid = userCredential.user.uid;
 
-      // 2. Prepare Firestore data
       const newUserFirestoreData: ManagedUser = {
-        id: authUid, // Ensure Firestore document ID and 'id' field match Auth UID
+        id: authUid,
         name: values.name,
         email: loginEmail,
         role: values.role,
@@ -95,10 +93,28 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
         assignments: values.role === 'Teacher' ? [] : undefined,
       };
 
-      // 3. Save user profile to Firestore, using authUid as document ID
       const usersCollectionPath = getUsersCollectionPath();
       const userDocRef = doc(firestore, usersCollectionPath, authUid);
       await setDoc(userDocRef, newUserFirestoreData);
+      
+      let additionalActionsMessage = `Account for ${values.name} (${values.role}) created.`;
+
+      if (values.role === 'Teacher') {
+        const teacherHRProfile: Partial<Teacher> = {
+          id: authUid,
+          authUid: authUid,
+          name: values.name,
+          email: loginEmail, // HR contact email, initially same as login
+          yearOfJoining: new Date().getFullYear(),
+          subjectsTaught: [],
+          salaryHistory: [],
+          currentAppraisalStatus: 'No Active Appraisal',
+          // Other fields like phoneNumber, address can be added later
+        };
+        const teacherDocFirestorePath = getTeacherDocPath(authUid);
+        await setDoc(doc(firestore, teacherDocFirestorePath), teacherHRProfile, { merge: true });
+        additionalActionsMessage += " Basic teacher HR profile also created.";
+      }
       
       onUserAdded(newUserFirestoreData); 
       setGeneratedCredentials({ email: loginEmail, password: defaultPassword });
@@ -107,7 +123,7 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
         title: "User Account Created!",
         description: (
           React.createElement('div', null,
-            React.createElement('p', null, `Account for ${values.name} (${values.role}) created.`),
+            React.createElement('p', null, additionalActionsMessage),
             React.createElement('p', {className: "mt-2"}, React.createElement('strong', null, "Login Email: "), loginEmail),
             React.createElement('p', null, React.createElement('strong', null, "Default Password: "), defaultPassword),
             React.createElement('p', {className: "text-xs mt-1 text-destructive"}, "Advise user to change password on first login.")
@@ -148,12 +164,20 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
   }
 
   const handleCloseDialog = () => {
-    if (!isSubmitting) { // Only allow close if not submitting
+    if (!isSubmitting) {
         form.reset();
         setGeneratedCredentials(null);
         onOpenChange(false);
     }
   };
+
+  // Reset form if dialog is closed externally, e.g., by clicking outside or pressing Esc
+  useEffect(() => {
+    if (!isOpen) {
+      form.reset();
+      setGeneratedCredentials(null);
+    }
+  }, [isOpen, form]);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleCloseDialog}>
@@ -248,4 +272,3 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     </Dialog>
   );
 }
-
