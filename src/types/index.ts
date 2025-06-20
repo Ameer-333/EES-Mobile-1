@@ -152,6 +152,21 @@ export interface ManagedUser {
   assignments?: TeacherAssignment[];
 }
 
+// Specific profile for Coordinators, if different fields are needed than ManagedUser
+// For now, it can mirror ManagedUser, but a separate type allows future customization.
+export interface CoordinatorProfile {
+  id: string; // AuthUID
+  authUid: string;
+  name: string;
+  email: string; // Login email
+  role: 'Coordinator'; // Explicitly set role
+  status: 'Active' | 'Inactive' | 'Pending';
+  // Add any other coordinator-specific fields here if needed in the future
+  // e.g., departmentsOverseeing?: string[];
+  // lastActivityReportDate?: string;
+}
+
+
 export interface StudentFormData {
   name: string;
   satsNumber: string;
@@ -270,5 +285,3 @@ export interface TeacherAppraisalRequest {
   adminNotes?: string;
   processedDate?: string; // ISO Date string
 }
-
-

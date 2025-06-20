@@ -39,16 +39,19 @@ service cloud.firestore {
       // Users can read their own profile.
       allow read: if isSignedIn() && (isAdmin() || isCoordinator() || request.auth.uid == userId);
 
-      // Admins can create Teacher, Student, Coordinator user docs.
-      // Teachers can create Student user docs.
-      allow create: if isSignedIn() && 
-                      (isAdmin() || (isTeacher() && request.resource.data.role == 'Student'));
+      // Admins can create any user document here (Students, Teachers, Coordinators).
+      // Teachers can create 'Student' user documents (e.g., after creating student profile).
+      // Note: This rule primarily validates writes *from the app*. Auth creation is separate.
+      allow create: if isSignedIn() && (
+                      isAdmin() ||
+                      (isTeacher() && request.resource.data.role == 'Student')
+                    );
 
-      // Admins can update any user profile.
-      // Users can update their own profile (if app allows), unless they are a Coordinator.
-      allow update: if isSignedIn() && 
-                      (isAdmin() || (request.auth.uid == userId && getUserData(request.auth.uid).role != 'Coordinator'));
-      
+      // Admins and Coordinators can update any user profile.
+      // Users can update their own profile (e.g. display name, if app allows).
+      // Coordinators should ideally not update sensitive fields like role directly - use app logic.
+      allow update: if isSignedIn() && (isAdmin() || isCoordinator() || request.auth.uid == userId);
+
       // Only Admins can delete user profiles.
       allow delete: if isAdmin();
     }
@@ -58,13 +61,21 @@ service cloud.firestore {
       // Admins, Coordinators, and the specific teacher can read the teacher's HR profile.
       allow read: if isSignedIn() && (isAdmin() || isCoordinator() || request.auth.uid == teacherId);
 
-      // Only Admins can create, update, or delete teacher HR profiles.
-      // Coordinators interact via appraisal requests.
+      // Only Admins can create/update/delete teacher HR profiles.
+      // Coordinators use the appraisal request system.
+      allow write: if isAdmin();
+    }
+
+    // --- Coordinators Collection (Specific profiles for Coordinators) ---
+    match /coordinators/{coordinatorId} {
+      // Admins and the specific Coordinator can read the coordinator's profile.
+      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == coordinatorId);
+      // Only Admins can create/update/delete coordinator profiles.
       allow write: if isAdmin();
     }
 
     // --- Student Data (Profiles nested under classId) ---
-    // student_data_by_class/{classId}/profiles/{studentProfileId}
+    // student_data_by_class/{classIdFromPath}/profiles/{studentProfileId}
     match /student_data_by_class/{classIdFromPath}/profiles/{studentProfileId} {
 
       // READ access:
@@ -97,9 +108,8 @@ service cloud.firestore {
                     );
 
       // UPDATE access (modifying an existing student):
-      // - Admins can update any student.
+      // - Admins and Coordinators can update any student.
       // - Teachers can update students if assigned to the student's specific class/section/group.
-      //   (Teacher cannot change student's classId unless also Admin/Coordinator).
       allow update: if isSignedIn() && (
                       isAdmin() ||
                       isCoordinator() ||
@@ -109,29 +119,31 @@ service cloud.firestore {
                         getUserData(request.auth.uid).assignments.exists(assignment,
                           assignment.classId == resource.data.classId && // Student's actual class
                           (assignment.sectionId == null || assignment.sectionId == resource.data.sectionId) && // Student's actual section
-                          (assignment.groupId == null || assignment.groupId == resource.data.groupId) 
-                        ) && 
+                          (assignment.groupId == null || assignment.groupId == resource.data.groupId) // Student's actual group
+                        ) &&
                         (request.resource.data.classId == resource.data.classId || isAdmin() || isCoordinator()) // Teacher cannot change classId
                       )
                     );
 
       // DELETE access:
-      // - Admins can delete any student (but app logic should prevent for graduation, see Requirement 5).
+      // - Admins and Coordinators can delete any student.
       // - Teachers can delete students IF:
       //    - They are a 'class_teacher' or 'mother_teacher' for the student's specific class/section.
-      // This rule allows deletion; application logic must enforce the "no student deletion" policy.
-      allow delete: if isSignedIn() && (
-                      isAdmin() ||
-                      (
-                        isTeacher() &&
-                        resource.data.classId == classIdFromPath &&
-                        getUserData(request.auth.uid).assignments.exists(assignment,
-                          assignment.classId == resource.data.classId &&
-                          (assignment.sectionId == null || assignment.sectionId == resource.data.sectionId) &&
-                          (assignment.type == 'class_teacher' || assignment.type == 'mother_teacher')
-                        )
-                      )
-                    );
+      // THIS RULE IS COMMENTED OUT AS PER REQUIREMENT "Students should never be deleted"
+      // allow delete: if isSignedIn() && (
+      //                 isAdmin() ||
+      //                 isCoordinator() ||
+      //                 (
+      //                   isTeacher() &&
+      //                   resource.data.classId == classIdFromPath &&
+      //                   getUserData(request.auth.uid).assignments.exists(assignment,
+      //                     assignment.classId == resource.data.classId &&
+      //                     (assignment.sectionId == null || assignment.sectionId == resource.data.sectionId) &&
+      //                     (assignment.type == 'class_teacher' || assignment.type == 'mother_teacher')
+      //                   )
+      //                 )
+      //               );
+      allow delete: if false; // Explicitly disallow deletion from client, archiving should be a backend/admin process
     }
 
     // --- App Settings Collection ---
@@ -153,22 +165,19 @@ service cloud.firestore {
 
     // --- Teacher Appraisal Requests Collection ---
     match /teacher_appraisal_requests/{requestId} {
-        // Coordinators can create new appraisal requests.
-        allow create: if isCoordinator();
-
-        // Admins can read all. Coordinators can read requests they made. Teachers can read their own requests.
-        allow read: if isSignedIn() && 
-                      (isAdmin() || 
-                       (isCoordinator() && resource.data.requestedByCoordinatorId == request.auth.uid) ||
-                       (isTeacher() && resource.data.teacherId == request.auth.uid)
-                      );
-        
-        // Only Admins can update (approve/reject) appraisal requests.
-        allow update: if isAdmin();
-
-        // Only Admins can delete appraisal requests.
-        allow delete: if isAdmin();
+      // Admins and Coordinators can read all requests.
+      // Teachers can read their own requests.
+      allow read: if isSignedIn() && (
+                    isAdmin() ||
+                    isCoordinator() ||
+                    (isTeacher() && resource.data.teacherId == request.auth.uid)
+                  );
+      // Only Coordinators can create new appraisal requests.
+      allow create: if isCoordinator();
+      // Only Admins can update requests (e.g., to 'Approved' or 'Rejected').
+      allow update: if isAdmin();
+      // Only Admins can delete appraisal requests (e.g., if erroneous).
+      allow delete: if isAdmin();
     }
-
   }
 }

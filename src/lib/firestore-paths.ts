@@ -2,10 +2,12 @@
 // Defines constants for collection names
 export const USERS_COLLECTION = 'users';
 export const TEACHERS_COLLECTION = 'teachers';
+export const COORDINATORS_COLLECTION = 'coordinators'; // New
 export const STUDENT_DATA_ROOT_COLLECTION = 'student_data_by_class';
 export const PROFILES_SUBCOLLECTION_NAME = 'profiles'; // Subcollection under each class document
 export const APP_SETTINGS_COLLECTION = 'app_settings';
 export const HALL_OF_FAME_COLLECTION = 'hall_of_fame_items';
+export const TEACHER_APPRAISAL_REQUESTS_COLLECTION = 'teacher_appraisal_requests';
 
 
 // --- Path Helper Functions ---
@@ -26,6 +28,15 @@ export const getTeachersCollectionPath = (): string => TEACHERS_COLLECTION;
 export const getTeacherDocPath = (teacherAuthUid: string): string => {
   if (!teacherAuthUid) throw new Error("teacherAuthUid is required to get teacher document path");
   return `${TEACHERS_COLLECTION}/${teacherAuthUid}`;
+};
+
+// Path to the 'coordinators' collection
+export const getCoordinatorsCollectionPath = (): string => COORDINATORS_COLLECTION;
+
+// Path to a specific coordinator document in the 'coordinators' collection
+export const getCoordinatorDocPath = (coordinatorAuthUid: string): string => {
+  if (!coordinatorAuthUid) throw new Error("coordinatorAuthUid is required to get coordinator document path");
+  return `${COORDINATORS_COLLECTION}/${coordinatorAuthUid}`;
 };
 
 // Path to the root collection for student data (student_data_by_class)
@@ -69,4 +80,12 @@ export const getHallOfFameItemDocPath = (itemId: string): string => {
   if (!itemId) throw new Error("itemId is required to get Hall of Fame item document path");
   return `${HALL_OF_FAME_COLLECTION}/${itemId}`;
 };
-    
+
+// Path to the teacher_appraisal_requests collection
+export const getTeacherAppraisalRequestsCollectionPath = (): string => TEACHER_APPRAISAL_REQUESTS_COLLECTION;
+
+// Path to a specific teacher appraisal request document
+export const getTeacherAppraisalRequestDocPath = (requestId: string): string => {
+    if (!requestId) throw new Error("requestId is required to get teacher appraisal request document path");
+    return `${TEACHER_APPRAISAL_REQUESTS_COLLECTION}/${requestId}`;
+};
