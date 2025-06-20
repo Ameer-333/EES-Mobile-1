@@ -110,14 +110,16 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
           id: authUid,
           authUid: authUid,
           name: values.name,
-          email: loginEmail, 
+          email: loginEmail, // Using loginEmail as the contact email for this basic profile
+          phoneNumber: "", // Default empty string for required field
+          address: "",     // Default empty string for required field
           yearOfJoining: new Date().getFullYear(),
           subjectsTaught: [],
           salaryHistory: [],
           currentAppraisalStatus: 'No Active Appraisal',
         };
         const teacherDocFirestorePath = getTeacherDocPath(authUid);
-        await setDoc(doc(firestore, teacherDocFirestorePath), teacherHRProfile, { merge: true });
+        await setDoc(doc(firestore, teacherDocFirestorePath), teacherHRProfile);
         additionalActionsMessage += " Basic teacher HR profile also created.";
       }
       
@@ -276,3 +278,5 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     </Dialog>
   );
 }
+
+    
