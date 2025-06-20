@@ -81,17 +81,22 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, loginEmail, defaultPassword);
       const authUid = userCredential.user.uid;
 
-      const newUserFirestoreData: ManagedUser = {
+      const newUserFirestoreData: Partial<ManagedUser> = { // Use Partial to build the object
         id: authUid,
         name: values.name,
         email: loginEmail,
         role: values.role,
         status: 'Active',
         lastLogin: 'N/A',
-        classId: values.role === 'Student' ? 'TO_BE_ASSIGNED' : undefined,
-        studentProfileId: values.role === 'Student' ? 'TO_BE_ASSIGNED' : undefined,
-        assignments: values.role === 'Teacher' ? [] : undefined,
       };
+
+      if (values.role === 'Student') {
+        newUserFirestoreData.classId = 'TO_BE_ASSIGNED';
+        newUserFirestoreData.studentProfileId = 'TO_BE_ASSIGNED';
+      } else if (values.role === 'Teacher') {
+        newUserFirestoreData.assignments = [];
+      }
+      // For Admin and Coordinator, no extra fields (classId, studentProfileId, assignments) are added.
 
       const usersCollectionPath = getUsersCollectionPath();
       const userDocRef = doc(firestore, usersCollectionPath, authUid);
@@ -104,19 +109,19 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
           id: authUid,
           authUid: authUid,
           name: values.name,
-          email: loginEmail, // HR contact email, initially same as login
+          email: loginEmail, 
           yearOfJoining: new Date().getFullYear(),
           subjectsTaught: [],
           salaryHistory: [],
           currentAppraisalStatus: 'No Active Appraisal',
-          // Other fields like phoneNumber, address can be added later
         };
         const teacherDocFirestorePath = getTeacherDocPath(authUid);
         await setDoc(doc(firestore, teacherDocFirestorePath), teacherHRProfile, { merge: true });
         additionalActionsMessage += " Basic teacher HR profile also created.";
       }
       
-      onUserAdded(newUserFirestoreData); 
+      // Cast to ManagedUser for the callback, assuming the object structure is now correct.
+      onUserAdded(newUserFirestoreData as ManagedUser); 
       setGeneratedCredentials({ email: loginEmail, password: defaultPassword });
       
       toast({
@@ -171,7 +176,6 @@ export function AddUserDialog({ isOpen, onOpenChange, onUserAdded }: AddUserDial
     }
   };
 
-  // Reset form if dialog is closed externally, e.g., by clicking outside or pressing Esc
   useEffect(() => {
     if (!isOpen) {
       form.reset();
