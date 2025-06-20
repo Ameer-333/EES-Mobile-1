@@ -2,9 +2,9 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getFunctions, type Functions } from 'firebase/functions'; // Added
+import { getFunctions, type Functions } from 'firebase/functions';
 
-const firebaseConfig = {
+const firebaseConfigValues = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -14,30 +14,51 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-const essentialConfigs: (keyof typeof firebaseConfig)[] = ['apiKey', 'authDomain', 'projectId'];
-const missingConfigs = essentialConfigs.filter(key => !firebaseConfig[key]);
+// Validate essential Firebase configuration
+const essentialKeys: (keyof typeof firebaseConfigValues)[] = ['apiKey', 'authDomain', 'projectId'];
+const missingOrInvalidConfigs: string[] = [];
 
-if (missingConfigs.length > 0) {
-  const errorMessage = `Missing Firebase configuration: ${missingConfigs.join(', ')}. Please ensure these environment variables are set in your .env file (e.g., NEXT_PUBLIC_FIREBASE_API_KEY).`;
-  console.error(errorMessage);
-  if (typeof window !== 'undefined') {
+for (const key of essentialKeys) {
+  const value = firebaseConfigValues[key];
+  // Check if the value is undefined, null, an empty string, or the literal string "undefined"
+  if (value === undefined || value === null || String(value).trim() === "" || String(value).trim().toLowerCase() === "undefined") {
+    missingOrInvalidConfigs.push(key);
   }
+}
+
+if (missingOrInvalidConfigs.length > 0) {
+  const errorMessage = `Critical Error: Missing or invalid Firebase configuration for: ${missingOrInvalidConfigs.join(', ')}. Please ensure these NEXT_PUBLIC_ environment variables are correctly set in your deployment environment and .env files. App cannot start.`;
+  console.error(errorMessage);
+  // This error will halt execution, which is important for server-side startup
+  // or client-side if these vars are truly missing.
   throw new Error(errorMessage);
 }
 
 let app: FirebaseApp;
 let auth: Auth;
 let firestore: Firestore;
-let functionsInstance: Functions; // Renamed to avoid conflict with imported 'functions'
+let functionsInstance: Functions;
 
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
+try {
+  if (!getApps().length) {
+    app = initializeApp(firebaseConfigValues);
+  } else {
+    app = getApp();
+  }
+
+  auth = getAuth(app);
+  firestore = getFirestore(app);
+  functionsInstance = getFunctions(app); // Initialize Functions
+
+  // Additional check to ensure functionsInstance is usable
+  if (!functionsInstance || typeof functionsInstance.app === 'undefined') {
+      throw new Error("Firebase Functions service instance appears to be invalid after initialization.");
+  }
+
+} catch (e: any) {
+  console.error("Firebase initialization failed:", e.message, e.stack);
+  // Provide a more user-friendly error or re-throw if critical
+  throw new Error(`Firebase initialization failed. Please check your Firebase configuration and environment variables. Original error: ${e.message}`);
 }
 
-auth = getAuth(app);
-firestore = getFirestore(app);
-functionsInstance = getFunctions(app); // Initialize Functions
-
-export { app, auth, firestore, functionsInstance as functions }; // Export as 'functions'
+export { app, auth, firestore, functionsInstance as functions };
