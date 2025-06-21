@@ -36,7 +36,7 @@ let firestore: Firestore;
 let functionsInstance: Functions;
 
 try {
-  console.log("Attempting to initialize Firebase with config:", firebaseConfigValues); // Added log
+  console.log("Attempting to initialize Firebase with config:", firebaseConfigValues);
   if (!getApps().length) {
     app = initializeApp(firebaseConfigValues);
   } else {
@@ -54,15 +54,18 @@ try {
   }
   console.log("Firebase Auth service initialized successfully.");
 
-  firestore = getFirestore(app);
-  console.log("Raw Firestore instance from getFirestore(app):", firestore);
-  if (!firestore || typeof (firestore as any).collection !== 'function') {
-     console.error("Problematic Firestore instance details:", JSON.stringify(firestore, null, 2));
-     throw new Error(
-       `Firebase Firestore service instance appears to be invalid after initialization. Expected a Firestore client with a 'collection' method. Project ID: ${app.options.projectId}. Ensure Firestore is enabled and config is correct.`
-     );
+  // Isolate Firestore initialization to get a more specific error
+  try {
+    firestore = getFirestore(app);
+    // A valid Firestore instance from 'firebase/firestore' should have a .collection method.
+    if (!firestore || typeof (firestore as any).collection !== 'function') {
+      throw new Error("getFirestore(app) did not return a valid Firestore instance with a 'collection' method.");
+    }
+    console.log("Firestore service initialized successfully.");
+  } catch (e: any) {
+    console.error("CRITICAL: getFirestore(app) failed.", e);
+    throw new Error(`Firestore initialization failed specifically: ${e.message}`);
   }
-  console.log("Firestore service initialized successfully.");
 
   functionsInstance = getFunctions(app);
   if (!functionsInstance || typeof functionsInstance.app === 'undefined') {
