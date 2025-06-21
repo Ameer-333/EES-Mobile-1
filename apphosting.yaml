@@ -3,8 +3,8 @@ framework: nextjs
 
 env:
   NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyCmJNyuQG7NZOAJQvQCTPiwKFZS9--lLcA"
-  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "ees-mobile-5g.firebaseapp.com"
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: "ees-mobile-5wwwg.appspot.com"
-  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "ees-mobile-5wwwg.firebasestorage.app"
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "ees-mobile-5wwwg.firebaseapp.com"
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: "ees-mobile-5wwwg"
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "ees-mobile-5wwwg.appspot.com"
   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "35773718330"
   NEXT_PUBLIC_FIREBASE_APP_ID: "1:35773718330:web:618aac5313b07d95e7fa03"
