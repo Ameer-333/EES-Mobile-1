@@ -1,3 +1,4 @@
+
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
@@ -52,36 +53,34 @@ if (missingOrInvalidConfigs.length > 0) {
       auth = getAuth(app);
       if (!auth || typeof auth.onAuthStateChanged !== 'function') {
         console.error('Firebase Auth service instance appears to be invalid after initialization. Auth will be unavailable.');
-        auth = undefined; // Ensure auth is undefined if invalid
+        auth = undefined;
       } else {
         console.log('Firebase Auth service initialized successfully.');
       }
       
       try {
         firestore = getFirestore(app);
-        // A valid Firestore instance for the Web SDK should have a 'collection' method.
         if (!firestore || typeof (firestore as any).collection !== 'function') {
-           console.error("Firebase Firestore service instance appears to be invalid after initialization. Expected a Firestore client with a 'collection' method. Firestore will be unavailable. This might be due to Firestore not being enabled in 'Native Mode' for your project in the Firebase Console.");
-           firestore = undefined; // Ensure firestore is undefined if invalid
+           console.error("Firebase Firestore service instance appears to be invalid after initialization. Expected a Firestore client with a 'collection' method. This can happen if the database is in Datastore Mode instead of Native Mode.");
+           firestore = undefined;
         } else {
           console.log('Firestore service initialized successfully.');
         }
       } catch (e: any) {
-        console.error(`CRITICAL: getFirestore(app) failed. Firestore will be unavailable. Error: ${e.message}. This can happen if the database is in Datastore Mode instead of Native Mode.`);
+        console.error(`Firestore initialization failed specifically: ${e.message}. This can happen if the database is in Datastore Mode instead of Native Mode.`);
         firestore = undefined;
       }
       
       functionsInstance = getFunctions(app);
       if (!functionsInstance || typeof functionsInstance.app === 'undefined') {
         console.error('Firebase Functions service instance appears to be invalid after initialization. Functions will be unavailable.');
-        functionsInstance = undefined; // Ensure functions is undefined if invalid
+        functionsInstance = undefined;
       } else {
         console.log('Firebase Functions service initialized successfully.');
       }
     }
   } catch (e: any) {
     console.error(`A top-level Firebase initialization error occurred: ${e.message}. All Firebase services will be unavailable.`, e.stack);
-    // Reset all services to undefined in case of a catastrophic failure
     app = undefined;
     auth = undefined;
     firestore = undefined;
