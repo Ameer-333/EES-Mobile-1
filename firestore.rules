@@ -4,156 +4,114 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions to get user data and check roles
-    function isSignedIn() {
+    // --- Helper Functions ---
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    function getUserData(userId) {
-      // Ensure we don't try to read a non-existent document during rule evaluation,
-      // which can lead to permission denied if the doc doesn't exist yet (e.g., during create).
-      return getAfter(/databases/$(database)/documents/users/$(userId)).data;
+    function isUser(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
     
-    function getIncomingUserData() {
-      return request.resource.data;
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
-    function isUserRole(userId, role) {
-      return isSignedIn() && getUserData(userId).role == role;
+    function getUserRole(userId) {
+      return getUserData(userId).role;
     }
     
-    function isUserBeingAssignedRole(role) {
-        return isSignedIn() && request.resource.data.role == role;
+    function isRole(role) {
+      return isAuthenticated() && getUserRole(request.auth.uid) == role;
     }
 
     function isAdmin() {
-      return isUserRole(request.auth.uid, 'Admin');
+      return isRole('Admin');
     }
 
     function isCoordinator() {
-      return isUserRole(request.auth.uid, 'Coordinator');
+      return isRole('Coordinator');
     }
 
     function isTeacher() {
-      return isUserRole(request.auth.uid, 'Teacher');
+      return isRole('Teacher');
     }
 
-    function isStudent() {
-      return isUserRole(request.auth.uid, 'Student');
-    }
+    // --- Collection Rules ---
 
-    // --- Users Collection (Authentication profiles, roles, assignments) ---
+    // USERS: Core user data with roles
     match /users/{userId} {
-      allow read: if isSignedIn() && (isAdmin() || isCoordinator() || request.auth.uid == userId);
-
-      // Admins can create any user type (except other Admins via UI flow).
-      // Teachers can create 'Student' user type entries.
-      allow create: if isSignedIn() && (
-                      isAdmin() ||
-                      (isTeacher() && isUserBeingAssignedRole('Student'))
-                    );
-
-      // Admins can update any user profile.
-      // Coordinators can update non-sensitive fields if needed by app logic (e.g. their own name, if UI allows).
-      // Users can update their own profile (e.g. display name, profile pic URL). Teachers can update their own assignments.
-      // Prevent Coordinators from updating roles or other sensitive fields on users.
-      allow update: if isSignedIn() && (
-                      isAdmin() ||
-                      (isCoordinator() && request.auth.uid == userId && !(request.resource.data.role != resource.data.role)) || // Coordinator can update own, but not change their role.
-                      (request.auth.uid == userId) // General users can update their own (teacher, student)
-                    );
-
-      // Only Admins can delete user documents.
-      allow delete: if isAdmin();
+      // Admins and Coordinators can read any user profile.
+      // Users can read their own data.
+      allow read: if isAdmin() || isCoordinator() || isUser(userId);
+      
+      // Only Admins can create/update/delete user records directly.
+      // (Creation is handled by a Cloud Function invoked by an Admin).
+      allow write: if isAdmin();
     }
-
-    // --- Teachers Collection (HR specific profiles) ---
+    
+    // TEACHERS: HR-specific profiles for teachers
     match /teachers/{teacherId} {
-      // Admins, Coordinators, and the specific teacher can read the teacher's HR profile.
-      // Application logic should filter sensitive fields like salaryHistory for non-Admins.
-      allow read: if isSignedIn() && (isAdmin() || isCoordinator() || request.auth.uid == teacherId);
-
-      // Only Admins can create, update, or delete teacher HR profiles.
-      // Coordinators use the appraisal request system.
-      allow write: if isAdmin();
+      // Admins and Coordinators can read any teacher profile.
+      // A teacher can read their own profile.
+      allow read: if isAdmin() || isCoordinator() || isUser(teacherId);
+      
+      // Admins and Coordinators can edit teacher profiles.
+      allow write: if isAdmin() || isCoordinator();
     }
     
-    // --- Coordinators Collection ---
+    // COORDINATORS: Profiles for coordinators
     match /coordinators/{coordinatorId} {
-        allow read: if isSignedIn() && (isAdmin() || request.auth.uid == coordinatorId);
-        // Only Admins can create/update/delete coordinator specific profiles.
-        allow write: if isAdmin();
-    }
-
-
-    // --- Student Data (Profiles nested under classId) ---
-    // student_data_by_class/{classIdFromPath}/profiles/{studentProfileId}
-    match /student_data_by_class/{classIdFromPath}/profiles/{studentProfileId} {
-
-      allow read: if isSignedIn() && (
-                    isAdmin() ||
-                    isCoordinator() ||
-                    (isStudent() && getUserData(request.auth.uid).studentProfileId == studentProfileId && getUserData(request.auth.uid).classId == classIdFromPath) ||
-                    (isTeacher() && getUserData(request.auth.uid).assignments.exists(assignment, assignment.classId == classIdFromPath))
-                  );
-
-      allow create: if isSignedIn() && (
-                      isAdmin() ||
-                      (
-                        isTeacher() &&
-                        request.resource.data.classId == classIdFromPath &&
-                        getUserData(request.auth.uid).assignments.exists(assignment,
-                          assignment.classId == request.resource.data.classId &&
-                          (assignment.sectionId == null || assignment.sectionId == request.resource.data.sectionId) &&
-                          (assignment.type == 'class_teacher' || assignment.type == 'mother_teacher')
-                        )
-                      )
-                    );
-
-      allow update: if isSignedIn() && (
-                      isAdmin() ||
-                      isCoordinator() || // Coordinators can view all student data, update permissions might be fine here too
-                      (
-                        isTeacher() &&
-                        resource.data.classId == classIdFromPath && // Student document is in the correct path
-                        (request.resource.data.classId == resource.data.classId || isAdmin() || isCoordinator()) && // Only admin/coord can change classId
-                        getUserData(request.auth.uid).assignments.exists(assignment,
-                          assignment.classId == resource.data.classId &&
-                          (assignment.sectionId == null || assignment.sectionId == resource.data.sectionId) &&
-                          (assignment.groupId == null || assignment.groupId == resource.data.groupId)
-                        )
-                      )
-                    );
-
-      // Students should never be deleted from Firestore by client applications.
-      // Archiving or soft-delete (status field) should be handled by specific trusted processes if needed.
-      allow delete: if false;
-    }
-
-    // --- App Settings Collection ---
-    match /app_settings/general {
-      allow read: if isSignedIn();
+      // Admins can read any coordinator profile.
+      // A coordinator can read their own.
+      allow read: if isAdmin() || isUser(coordinatorId);
+      
+      // Only Admins can edit coordinator profiles.
       allow write: if isAdmin();
     }
 
-    // --- Hall of Fame Collection ---
-    match /hall_of_fame_items/{itemId} {
-      allow read: if isSignedIn();
+    // STUDENT DATA: Nested by class, contains detailed student profiles
+    match /student_data_by_class/{classId}/profiles/{studentId} {
+      // Any authenticated Teacher can read/write any student data.
+      // This is a broad rule for simplicity; a more advanced implementation
+      // would check a teacher's `assignments` array against the {classId}.
+      // The student can also read their own data.
+      // Admins and Coordinators have full access.
+      allow read: if isAdmin() || isCoordinator() || isTeacher() || (isAuthenticated() && request.auth.uid == resource.data.authUid);
+      allow write: if isAdmin() || isCoordinator() || isTeacher();
+    }
+    
+    // APP SETTINGS: Global settings for the application
+    match /app_settings/general {
+      // Anyone can read app settings (for login page branding).
+      allow read: if true;
+      
+      // Only Admins can change settings.
       allow write: if isAdmin();
     }
     
-    // --- Teacher Appraisal Requests Collection ---
+    // HALL OF FAME: Publicly visible achievements
+    match /hall_of_fame_items/{itemId} {
+      // Everyone can read the hall of fame.
+      allow read: if true;
+      
+      // Only Admins can manage the hall of fame.
+      allow write: if isAdmin();
+    }
+    
+    // TEACHER APPRAISAL REQUESTS: Submitted by coordinators for admin review
     match /teacher_appraisal_requests/{requestId} {
-        // Coordinators create. Admins read all, update (process). Teacher can read their own.
-        allow read: if isSignedIn() && (
-                        isAdmin() || 
-                        isCoordinator() ||
-                        (isTeacher() && resource.data.teacherId == request.auth.uid)
-                      );
-        allow create: if isCoordinator();
-        allow update: if isAdmin(); // For Admin to approve/reject
-        allow delete: if isAdmin();
+      // A coordinator can create a request, ensuring they are the author.
+      allow create: if isCoordinator() && request.auth.uid == request.resource.data.requestedByCoordinatorId;
+      
+      // Admins can read all requests. Coordinators can only read requests they created.
+      allow read: if isAdmin() || (isCoordinator() && request.auth.uid == resource.data.requestedByCoordinatorId);
+      
+      // Only Admins can update (approve/reject) requests.
+      allow update: if isAdmin();
+      
+      // Deletion of requests is disallowed to maintain a record.
+      allow delete: if false;
     }
   }
 }

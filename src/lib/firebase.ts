@@ -1,4 +1,3 @@
-
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
@@ -14,19 +13,27 @@ const firebaseConfigValues = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+// Validate essential environment variables
 const essentialKeys: (keyof typeof firebaseConfigValues)[] = ['apiKey', 'authDomain', 'projectId'];
 const missingOrInvalidConfigs: string[] = [];
 
 for (const key of essentialKeys) {
   const value = firebaseConfigValues[key];
-  if (value === undefined || value === null || String(value).trim() === "" || String(value).trim().toLowerCase() === "undefined") {
+  if (
+    value === undefined ||
+    value === null ||
+    String(value).trim() === '' ||
+    String(value).trim().toLowerCase() === 'undefined'
+  ) {
     missingOrInvalidConfigs.push(key);
   }
 }
 
 if (missingOrInvalidConfigs.length > 0) {
-  const errorMessage = `Critical Error: Missing or invalid Firebase configuration for: ${missingOrInvalidConfigs.join(', ')}. Please ensure these NEXT_PUBLIC_ environment variables are correctly set in your deployment environment and .env files. App cannot start.`;
-  console.error(errorMessage, "Current config values:", firebaseConfigValues);
+  const errorMessage = `Critical Error: Missing or invalid Firebase configuration for: ${missingOrInvalidConfigs.join(
+    ', '
+  )}. Please ensure these NEXT_PUBLIC_ environment variables are correctly set in your deployment environment and .env files. App cannot start.`;
+  console.error(errorMessage, 'Current config values:', firebaseConfigValues);
   throw new Error(errorMessage);
 }
 
@@ -36,7 +43,8 @@ let firestore: Firestore;
 let functionsInstance: Functions;
 
 try {
-  console.log("Attempting to initialize Firebase with config:", firebaseConfigValues);
+  console.log('Attempting to initialize Firebase with config:', firebaseConfigValues);
+
   if (!getApps().length) {
     app = initializeApp(firebaseConfigValues);
   } else {
@@ -44,38 +52,39 @@ try {
   }
 
   if (!app || typeof app.name === 'undefined') {
-    throw new Error("Firebase app object is invalid after initialization. Check NEXT_PUBLIC_ environment variables.");
+    throw new Error(
+      'Firebase app object is invalid after initialization. Check NEXT_PUBLIC_ environment variables.'
+    );
   }
-  console.log("Firebase app initialized with effective config for project ID:", app.options.projectId);
+  console.log('Firebase app initialized with effective config for project ID:', app.options.projectId);
 
   auth = getAuth(app);
   if (!auth || typeof auth.onAuthStateChanged !== 'function') {
-     throw new Error("Firebase Auth service instance appears to be invalid after initialization.");
+    throw new Error('Firebase Auth service instance appears to be invalid after initialization.');
   }
-  console.log("Firebase Auth service initialized successfully.");
+  console.log('Firebase Auth service initialized successfully.');
 
-  // Isolate Firestore initialization to get a more specific error
   try {
     firestore = getFirestore(app);
-    // A valid Firestore instance from 'firebase/firestore' should have a .collection method.
-    if (!firestore || typeof (firestore as any).collection !== 'function') {
-      throw new Error("Firebase Firestore service instance appears to be invalid after initialization. Expected a Firestore client with a 'collection' method. Please ensure your Firestore database was created in 'Native Mode' in the Google Cloud Console, not 'Datastore Mode'.");
+    if (!firestore || typeof firestore !== 'object') {
+      throw new Error('Firestore instance is invalid.');
     }
-    console.log("Firestore service initialized successfully.");
+    console.log('Firestore service initialized successfully.');
   } catch (e: any) {
-    console.error("CRITICAL: getFirestore(app) failed.", e);
+    console.error('CRITICAL: getFirestore(app) failed.', e);
     throw new Error(`Firestore initialization failed specifically: ${e.message}`);
   }
 
   functionsInstance = getFunctions(app);
   if (!functionsInstance || typeof functionsInstance.app === 'undefined') {
-     throw new Error("Firebase Functions service instance appears to be invalid after initialization.");
+    throw new Error('Firebase Functions service instance appears to be invalid after initialization.');
   }
-  console.log("Firebase Functions service initialized successfully.");
-
+  console.log('Firebase Functions service initialized successfully.');
 } catch (e: any) {
-  console.error("Firebase initialization failed:", e.message, e.stack);
-  throw new Error(`Firebase initialization failed. Please check your Firebase configuration and environment variables. Original error: ${e.message}`);
+  console.error('Firebase initialization failed:', e.message, e.stack);
+  throw new Error(
+    `Firebase initialization failed. Please check your Firebase configuration and environment variables. Original error: ${e.message}`
+  );
 }
 
 export { app, auth, firestore, functionsInstance as functions };
