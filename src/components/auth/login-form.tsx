@@ -56,6 +56,18 @@ export function LoginForm({ role }: LoginFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
+    
+    if (!auth) {
+      toast({
+        title: "Configuration Error",
+        description: "Firebase Authentication service is not available. Please check the site configuration and contact support.",
+        variant: "destructive",
+        duration: 10000,
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       
