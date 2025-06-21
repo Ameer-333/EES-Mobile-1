@@ -1,4 +1,5 @@
 runtime: nodejs
+
 env:
   NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyCmJNyuQG7NZOAJQvQCTPiwKFZS9--lLcA"
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "ees-mobile-5wwwg.firebaseapp.com"
