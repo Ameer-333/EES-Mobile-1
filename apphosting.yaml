@@ -1,5 +1,4 @@
 runtime: nodejs
-framework: nextjs
 
 env:
   NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyCmJNyuQG7NZOAJQvQCTPiwKFZS9--lLcA"
