@@ -59,7 +59,7 @@ try {
     firestore = getFirestore(app);
     // A valid Firestore instance from 'firebase/firestore' should have a .collection method.
     if (!firestore || typeof (firestore as any).collection !== 'function') {
-      throw new Error("getFirestore(app) did not return a valid Firestore instance with a 'collection' method.");
+      throw new Error("Firebase Firestore service instance appears to be invalid after initialization. Expected a Firestore client with a 'collection' method. Please ensure your Firestore database was created in 'Native Mode' in the Google Cloud Console, not 'Datastore Mode'.");
     }
     console.log("Firestore service initialized successfully.");
   } catch (e: any) {
