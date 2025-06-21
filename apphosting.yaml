@@ -1,15 +1,8 @@
 runtime: nodejs
-
 env:
-  - name: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: "AIzaSyCmJNyuQG7NZOAJQvQCTPiwKFZS9--lLcA"
-  - name: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: "ees-mobile-5wwwg.firebaseapp.com"
-  - name: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: "ees-mobile-5wwwg"
-  - name: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: "ees-mobile-5wwwg.appspot.com"
-  - name: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "35773718330"
-  - name: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: "1:35773718330:web:618aac5313b07d95e7fa03"
+  NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyCmJNyuQG7NZOAJQvQCTPiwKFZS9--lLcA"
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "ees-mobile-5wwwg.firebaseapp.com"
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: "ees-mobile-5wwwg"
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "ees-mobile-5wwwg.appspot.com"
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "35773718330"
+  NEXT_PUBLIC_FIREBASE_APP_ID: "1:35773718330:web:618aac5313b07d95e7fa03"
