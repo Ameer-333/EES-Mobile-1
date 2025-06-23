@@ -13,3 +13,4 @@ steps:
       - '-c'
       - |
         firebase deploy --only functions --project=ees-mobile-5wwwg
+
